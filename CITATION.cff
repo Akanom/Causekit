@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use causalkit in research, please cite the software and the exact version used."
+type: software
+title: "causalkit: Identification-aware causal inference and instrumental variables for Python"
+abstract: >-
+  An identification-aware Python toolkit for causal inference. Version 0.1.0a1
+  provides linear two-stage least squares with an excluded-instrument API,
+  homoskedastic, HC1, and one-way cluster-robust covariance, strict data
+  contracts, and first-stage and overidentification diagnostics.
+authors:
+  - family-names: Akanbi
+    given-names: "Oluwajuwon Mayomi"
+version: 0.1.0a1
+repository-code: "https://github.com/Akanom/causalkit"
+url: "https://github.com/Akanom/causalkit"
+license: MIT
+keywords:
+  - causal inference
+  - econometrics
+  - instrumental variables
+  - two-stage least squares
+  - 2SLS
+  - identification
