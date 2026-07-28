@@ -12,7 +12,35 @@ import numpy as np
 import pandas as pd
 
 import causalkit
-from causalkit import DifferenceInDifferences, EfficientDiD
+from causalkit import CrossFitter, DifferenceInDifferences, EfficientDiD
+
+
+class _ClassProbabilityResult:
+    def __init__(self, classes: np.ndarray, probabilities: np.ndarray) -> None:
+        self.classes_ = classes
+        self.probabilities = probabilities
+
+    def predict_proba(self, X):
+        return np.tile(self.probabilities, (len(X), 1))
+
+
+class _EmpiricalClassProbability:
+    def fit(self, X, y):
+        classes, counts = np.unique(np.asarray(y), return_counts=True)
+        return _ClassProbabilityResult(classes, counts / counts.sum())
+
+
+class _MeanResult:
+    def __init__(self, mean: float) -> None:
+        self.mean = mean
+
+    def predict(self, X):
+        return np.full(len(X), self.mean)
+
+
+class _MeanRegression:
+    def fit(self, X, y):
+        return _MeanResult(float(np.mean(y)))
 
 
 def _panel(n_entities: int, n_periods: int, seed: int) -> pd.DataFrame:
@@ -28,33 +56,47 @@ def _panel(n_entities: int, n_periods: int, seed: int) -> pd.DataFrame:
     treatment_time = np.repeat(assigned, n_periods)
     levels = np.repeat(rng.normal(scale=2.0, size=n_entities), n_periods)
     slopes = np.repeat(rng.normal(scale=0.15, size=n_entities), n_periods)
+    covariate = np.repeat(rng.normal(size=n_entities), n_periods)
     shocks = rng.normal(scale=0.5, size=n_entities * n_periods)
     treated = np.isfinite(treatment_time) & (period >= treatment_time)
     event_time = period - treatment_time
     effect = np.where(treated, 1.0 + 0.25 * event_time, 0.0)
-    outcome = levels + 0.4 * period + slopes * period + shocks + effect
+    outcome = levels + 0.4 * period + (slopes + 0.1 * covariate) * period + shocks + effect
     return pd.DataFrame(
         {
             "entity": entity,
             "time": period,
             "treatment_time": treatment_time,
             "outcome": outcome,
+            "x": covariate,
         }
     )
 
 
 def _fit(scenario: str, panel: pd.DataFrame):
-    model = (
-        DifferenceInDifferences(control_group="not_yet_treated")
-        if scenario == "conventional"
-        else EfficientDiD(pre_periods="all")
-    )
+    if scenario == "conventional":
+        model = DifferenceInDifferences(control_group="not_yet_treated")
+        extra: dict[str, object] = {}
+    else:
+        model = EfficientDiD(pre_periods="all")
+        extra = {}
+        if scenario == "efficient_covariate":
+            extra = {
+                "covariates": ["x"],
+                "cross_fitter": CrossFitter(
+                    propensity_factory=_EmpiricalClassProbability,
+                    outcome_factory=_MeanRegression,
+                    n_splits=3,
+                    random_state=20_260_728,
+                ),
+            }
     return model.fit(
         panel,
         outcome="outcome",
         entity="entity",
         time="time",
         treatment_time="treatment_time",
+        **extra,
     )
 
 
@@ -92,7 +134,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--scenario",
-        choices=("conventional", "efficient", "all"),
+        choices=("conventional", "efficient", "efficient_covariate", "all"),
         default="all",
     )
     parser.add_argument("--n-entities", type=int, default=20_000)
@@ -102,7 +144,11 @@ def main() -> None:
     args = parser.parse_args()
 
     panel = _panel(args.n_entities, args.periods, args.seed)
-    scenarios = ("conventional", "efficient") if args.scenario == "all" else (args.scenario,)
+    scenarios = (
+        ("conventional", "efficient", "efficient_covariate")
+        if args.scenario == "all"
+        else (args.scenario,)
+    )
     results = [_run(scenario, panel, measure_memory=args.measure_memory) for scenario in scenarios]
     print(
         json.dumps(

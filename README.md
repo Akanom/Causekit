@@ -1,10 +1,11 @@
 # causalkit
 
 `causalkit` is an identification-aware Python package for causal inference and
-instrumental-variable workflows. The `0.6.0a1` surface provides linear two-stage least
+instrumental-variable workflows. The `0.6.0a2` surface provides linear two-stage least
 squares, randomized-experiment effects, reusable nuisance cross-fitting, IPW/AIPW ATE,
 ATT, and ATC, a point-estimation alpha for scalar propensity-score matching, conventional
-staggered DiD, and Chen-Sant'Anna-Xie efficient DiD for no-covariate short panels.
+staggered DiD, and cross-fitted covariate-adjusted Chen-Sant'Anna-Xie efficient DiD for
+short panels.
 
 This is alpha research software. A successful fit is not evidence that an instrument is
 valid, and an IV coefficient is not automatically an average treatment effect. State the
@@ -85,6 +86,12 @@ Folds are stratified by treatment, predictions retain the original index, and ea
 must contain at least `n_splits` observations. Fold assignment is deterministic when
 `random_state` is fixed.
 
+The same orchestrator exposes multiclass class-probability prediction and masked scalar
+regression tasks. Those operations let panel estimators request cohort-specific outcome
+changes and conditional second moments without owning or copying model implementations.
+Every task receives a fresh model per fold. A separate `second_moment_factory=` is
+optional; when omitted, the outcome factory is reused.
+
 ### Nearest-neighbor matching point alpha
 
 `NearestNeighborMatch` consumes a supplied propensity rather than copying a binary model
@@ -142,17 +149,33 @@ conventional = DifferenceInDifferences(
     treatment_time="first_treated",
 )
 
-efficient = EfficientDiD(pre_periods="all").fit(
+cross_fitter = CrossFitter(
+    propensity_factory=make_multiclass_cohort_model,
+    outcome_factory=make_outcome_model,
+    second_moment_factory=make_second_moment_model,
+    n_splits=5,
+    random_state=2026,
+)
+
+efficient = EfficientDiD(
+    pre_periods="all",
+    inference="multiplier_bootstrap",
+    bootstrap_iterations=999,
+    random_state=2026,
+).fit(
     panel,
     outcome="outcome",
     entity="unit",
     time="period",
     treatment_time="first_treated",
+    covariates=["baseline_outcome", "age"],
+    cross_fitter=cross_fitter,
 )
 
 print(conventional.group_time)
 print(conventional.event_study)
 print(efficient.efficiency_weights)
+print(efficient.simultaneous_event_study)
 ```
 
 The data must be a balanced long panel with one row per entity-period, an absorbing first
@@ -161,11 +184,15 @@ treatment time, and an explicit never-treated sentinel (positive infinity by def
 periods. Robust inference treats the panel entity as the sampling unit; higher-level
 one-way clustering is available through `covariance="clustered"` and `cluster=`.
 
-The current efficient claim is deliberately narrow: no covariates, short balanced panels,
-and PT-All. Covariate adjustment, repeated cross-sections, sampling weights, and
-multiplier-bootstrap simultaneous bands refuse rather than falling back to a different
-estimator. See the [DiD contract](docs/DID_CONTRACT.md) for formulas, assumptions, target
-populations, and promotion gates.
+The covariate-efficient path forms cohort-density ratios from cross-fitted multiclass
+probabilities, estimates group-specific conditional outcome changes and residual-product
+conditional covariances through `CrossFitter`, and solves the observation-specific
+covariance systems without hidden regularization. Probabilities below
+`nuisance_probability_floor` and singular systems refuse rather than clip or repair.
+The efficiency claim is conditional on PT-All and the paper's nuisance regularity
+conditions. Repeated cross-sections and sampling weights remain unsupported. See the
+[DiD contract](docs/DID_CONTRACT.md) for formulas, assumptions, target populations, and
+promotion gates.
 
 There is no formula API yet. Prepare numeric arrays, `Series`, or `DataFrame` objects
 explicitly, including categorical encoding and transformations. `add_constant=True` is
@@ -175,7 +202,8 @@ desired intercept or the model should not have one.
 See [Package scope](docs/PACKAGE_SCOPE.md),
 [Identification and interpretation](docs/IDENTIFICATION.md),
 [Validation](docs/VALIDATION.md), [DiD contract](docs/DID_CONTRACT.md), and
-[Architecture](docs/ARCHITECTURE.md).
+[Architecture](docs/ARCHITECTURE.md). The package-wide Python/R/Stata evidence status is
+tracked in the [cross-software parity register](docs/PARITY.md).
 
 ## Randomized-experiment example
 
@@ -407,10 +435,12 @@ out-of-sample predictions participate while keeping causal identification inside
 The point-estimation matching alpha follows the
 [nearest-neighbor matching contract](docs/MATCHING_CONTRACT.md). Analytical uncertainty,
 external parity, OutputHub adaptation, and the remaining promotion evidence are still
-required before it can be described as a completed matching release. Later releases may
-add difference-in-differences and event studies, regression discontinuity, and panel IV.
-Each family must define its estimand, assumptions, failure behavior, diagnostics, and
-independent validation evidence before promotion.
+required before it can be described as a completed matching release. DiD promotion now
+includes cross-fitted covariate nuisances and simultaneous event-study bands; pre-trend/
+Hausman diagnostics, repeated cross-sections, and broader parity remain. Later releases
+may add regression discontinuity and panel IV. Each family must define its estimand,
+assumptions, failure behavior, diagnostics, and independent validation evidence before
+promotion.
 
 DADPLM and BDCPM are outside the current package scope. The roadmap is directional, not a
 promise of API shape or release timing. See [Package scope](docs/PACKAGE_SCOPE.md).

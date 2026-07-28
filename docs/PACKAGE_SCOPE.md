@@ -5,7 +5,7 @@ identification. Inclusion requires more than a method being common in applied ec
 the package must be able to state the estimand, identifying assumptions, supported data
 structure, inference target, diagnostics, and validation boundary.
 
-## Public `0.6.0a1` alpha surface
+## Public `0.6.0a2` alpha surface
 
 The surface is estimator-specific. Cross-sectional linear instrumental variables retain
 the following contract:
@@ -39,11 +39,12 @@ returning a methodologically incomplete standard error.
 
 The DiD surface adds `DifferenceInDifferences` and `EfficientDiD` for balanced short
 panels. The conventional class retains never-treated/not-yet-treated comparison choices;
-the efficient class implements the no-covariate Chen-Sant'Anna-Xie PT-All generated-
-outcome weighting contract. Both expose cohort-time, event-time, calendar-time, and ESavg
-effects, entity influence functions, robust/one-way-clustered pointwise inference, and
-OutputHub tables. Efficient DiD is an opt-in stronger-assumption estimator, not a
-replacement default.
+the efficient class implements both no-covariate and cross-fitted covariate-adjusted
+Chen-Sant'Anna-Xie PT-All generated-outcome weighting. Both expose cohort-time,
+event-time, calendar-time, and ESavg effects, entity influence functions, robust/one-way-
+clustered pointwise inference, optional multiplier-bootstrap simultaneous event-study
+bands, and OutputHub tables. Efficient DiD is an opt-in stronger-assumption estimator,
+not a replacement default.
 
 ## Deliberate boundaries in this release
 
@@ -57,7 +58,7 @@ The current alpha does not provide:
 - panel fixed effects, dynamic-panel GMM, or panel IV;
 - weak-IV-robust confidence sets or a complete identification-robust testing suite;
 - heteroskedasticity-robust overidentification tests;
-- multiway clustering, bootstrap inference, sampling weights, or survey design;
+- multiway clustering, general-purpose bootstrap inference, sampling weights, or survey design;
 - nonlinear IV, GMM beyond linear 2SLS, or control-function estimators; or
 - automatic discovery, selection, or validation of instruments.
 
@@ -131,7 +132,7 @@ and validation gates:
 | Family | Required design questions before promotion |
 | --- | --- |
 | Matching promotion | Reuse-aware analytical variance, estimated-propensity adjustment, external parity, OutputHub adaptation, and complete performance evidence |
-| DiD promotion | Covariate-adjusted public nuisance integration, conditional covariance estimation, simultaneous bands, pre-trend/Hausman diagnostics, repeated cross-sections, coverage, and broader parity |
+| DiD promotion | Pre-trend/Hausman diagnostics, repeated cross-sections, publication-scale coverage, covariate performance, and broader parity |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
 | Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |
 
@@ -144,8 +145,8 @@ The normative matching decisions and point-alpha boundary are recorded in
 implemented for audited point estimation only and is not a claim that the full matching
 promotion gates have passed.
 
-The conventional/efficient distinction, timing rules, formulas, and current no-covariate
-boundary are recorded in [Difference-in-differences contract](DID_CONTRACT.md).
+The conventional/efficient distinction, timing rules, formulas, covariate nuisance path,
+and inference boundaries are recorded in [Difference-in-differences contract](DID_CONTRACT.md).
 
 ## Out of current scope
 

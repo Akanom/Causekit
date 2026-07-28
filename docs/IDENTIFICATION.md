@@ -254,9 +254,9 @@ credible in a given application.
 
 `EfficientDiD` imposes the stronger PT-All condition used by Chen, Sant'Anna, and Xie
 (2025): conditional mean untreated trends are common across every retained period and
-cohort. In the implemented no-covariate path this overidentifies each `ATT(g,t)`, allowing
-the estimator to combine admissible pre-period/auxiliary-cohort moments using their
-inverse covariance. The resulting weights may be negative without creating the
+cohort, optionally conditional on the declared baseline covariates. This overidentifies
+each `ATT(g,t)`, allowing the estimator to combine admissible pre-period/auxiliary-cohort
+moments using unconditional or observation-specific inverse covariance. The resulting weights may be negative without creating the
 heterogeneous-effect contamination associated with TWFE weights, because every weighted
 moment identifies the same cohort-time effect under PT-All. If PT-All is false, the
 precision claim and possibly consistency fail; smaller standard errors are not evidence
@@ -269,9 +269,11 @@ effects. These are explicit target populations, not interchangeable labels.
 
 Analytic intervals are pointwise. Robust inference treats the panel entity as the random
 sampling unit; higher-level clustered inference assumes independent clusters and many
-clusters. Neither option supplies simultaneous coverage for an event-study path. The
-current alpha has no covariate adjustment, pre-trend test, Hausman test, or repeated-
-cross-section interpretation, and refuses those unsupported paths.
+clusters. The optional multiplier max-t path supplies a simultaneous band across the
+reported event-study coordinates, with multipliers drawn at the declared sampling level.
+It does not validate PT-All or turn a pre-trend plot into an identification test. The
+current alpha has no pre-trend test, Hausman test, or repeated-cross-section
+interpretation, and refuses those unsupported paths.
 
 ## Missing values, indices, and sample definition
 

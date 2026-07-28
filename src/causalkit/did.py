@@ -12,9 +12,11 @@ import pandas as pd
 from scipy.stats import norm
 from scipy.stats import t as student_t
 
+from .crossfit import CrossFitTask, CrossFitter
+
 ControlGroup = Literal["never_treated", "not_yet_treated"]
 DiDCovariance = Literal["robust", "clustered"]
-DiDInference = Literal["analytic"]
+DiDInference = Literal["analytic", "multiplier_bootstrap"]
 PrePeriods = Literal["all"] | int
 
 
@@ -34,7 +36,11 @@ class DiDResult:
     calendar_time_influence: pd.DataFrame
     overall_influence: pd.Series
     efficiency_weights: pd.DataFrame
+    conditional_efficiency_weights: pd.DataFrame
     candidate_influence_functions: pd.DataFrame
+    simultaneous_event_study: pd.DataFrame
+    nuisance_fold: pd.Series
+    cohort_probabilities: pd.DataFrame
     cohort_sizes: pd.Series
     n_entities: int
     n_periods: int
@@ -42,6 +48,11 @@ class DiDResult:
     covariance_type: DiDCovariance
     inference_distribution: str
     inference_df: float | None
+    inference_method: DiDInference
+    simultaneous_level: float | None
+    simultaneous_critical_value: float | None
+    bootstrap_iterations: int | None
+    bootstrap_random_state: int | None
     method: str
     parallel_trends: str
     control_group: str
@@ -51,6 +62,8 @@ class DiDResult:
     time_name: str
     outcome_name: str
     treatment_time_name: str
+    covariates: tuple[str, ...]
+    cross_fitted: bool
     estimation_entities: pd.Index
     times: tuple[float, ...]
     assumptions: tuple[str, ...]
@@ -162,9 +175,35 @@ class _EffectCell:
     weight_condition_number: float
 
 
+@dataclass(frozen=True)
+class _Change:
+    group: float
+    end: int
+    start: int
+
+    @property
+    def is_zero(self) -> bool:
+        return self.end == self.start
+
+
+@dataclass(frozen=True)
+class _CandidateSpec:
+    auxiliary_cohort: float
+    bridge_position: int
+    treated_change: _Change
+    never_change: _Change
+    auxiliary_change: _Change
+
+
 def _validate_constructor(
-    *, anticipation: int, covariance: str, inference: str
-) -> tuple[int, DiDCovariance, DiDInference]:
+    *,
+    anticipation: int,
+    covariance: str,
+    inference: str,
+    bootstrap_iterations: int,
+    random_state: int | None,
+    simultaneous_level: float,
+) -> tuple[int, DiDCovariance, DiDInference, int, int | None, float]:
     if isinstance(anticipation, bool) or not isinstance(anticipation, Integral):
         raise ValueError("anticipation must be a non-negative integer number of periods.")
     anticipation = int(anticipation)
@@ -172,16 +211,25 @@ def _validate_constructor(
         raise ValueError("anticipation must be a non-negative integer number of periods.")
     if covariance not in {"robust", "clustered"}:
         raise ValueError("covariance must be 'robust' or 'clustered'.")
-    if inference == "multiplier_bootstrap":
-        raise NotImplementedError(
-            "Multiplier-bootstrap simultaneous bands are not implemented in this alpha."
-        )
-    if inference != "analytic":
-        raise ValueError("inference must be 'analytic'.")
+    if inference not in {"analytic", "multiplier_bootstrap"}:
+        raise ValueError("inference must be 'analytic' or 'multiplier_bootstrap'.")
+    if (
+        isinstance(bootstrap_iterations, bool)
+        or not isinstance(bootstrap_iterations, Integral)
+        or int(bootstrap_iterations) < 99
+    ):
+        raise ValueError("bootstrap_iterations must be an integer of at least 99.")
+    if random_state is not None and not isinstance(random_state, Integral):
+        raise TypeError("random_state must be an integer or None.")
+    if not np.isfinite(simultaneous_level) or not 0.0 < simultaneous_level < 1.0:
+        raise ValueError("simultaneous_level must be strictly between zero and one.")
     return (
         anticipation,
         cast(DiDCovariance, covariance),
         cast(DiDInference, inference),
+        int(bootstrap_iterations),
+        None if random_state is None else int(random_state),
+        float(simultaneous_level),
     )
 
 
@@ -381,6 +429,124 @@ def _score_statistics(
     return standard_error, statistic, pvalue, distribution, inference_df, n_clusters
 
 
+def _prepare_covariates(
+    data: pd.DataFrame,
+    panel: _Panel,
+    *,
+    entity: str,
+    covariates: Sequence[str],
+    protected_names: Sequence[str],
+) -> tuple[pd.DataFrame, tuple[str, ...]]:
+    if isinstance(covariates, (str, bytes)):
+        raise TypeError("covariates must be a non-empty sequence of column names.")
+    names = tuple(covariates)
+    if not names:
+        raise ValueError("covariates must contain at least one column name.")
+    if any(not isinstance(name, str) or not name for name in names):
+        raise TypeError("Every covariate name must be a non-empty string.")
+    if len(set(names)) != len(names):
+        raise ValueError("covariate names must be unique.")
+    if set(names).intersection(protected_names):
+        raise ValueError("covariates must be distinct from outcome and panel role columns.")
+    missing = [name for name in names if name not in data.columns]
+    if missing:
+        raise ValueError(f"data is missing covariate column(s): {missing}.")
+    if data.loc[:, names].isna().any().any():
+        raise ValueError("covariates must not contain missing values.")
+    grouped = data.groupby(entity, sort=False)[list(names)]
+    if (grouped.nunique(dropna=False) != 1).any().any():
+        raise ValueError("every covariate must be constant within entity.")
+    frame = grouped.first().reindex(panel.entities)
+    try:
+        values = frame.to_numpy(dtype=float)
+    except (TypeError, ValueError) as error:
+        raise ValueError("covariates must contain only numeric values.") from error
+    if not np.isfinite(values).all():
+        raise ValueError("covariates must contain only finite values.")
+    return pd.DataFrame(values, index=panel.entities.copy(), columns=names), names
+
+
+def _candidate_specs(
+    panel: _Panel,
+    *,
+    cohort: float,
+    baseline_position: int,
+    target_position: int,
+    never_treated: float,
+) -> list[_CandidateSpec]:
+    specs: list[_CandidateSpec] = []
+    treated_change = _Change(cohort, target_position, baseline_position)
+    for auxiliary_cohort in panel.treated_cohorts:
+        auxiliary_position = panel.effective_positions[auxiliary_cohort]
+        bridge_start = baseline_position if auxiliary_cohort == cohort else baseline_position + 1
+        for bridge_position in range(bridge_start, auxiliary_position):
+            specs.append(
+                _CandidateSpec(
+                    auxiliary_cohort=auxiliary_cohort,
+                    bridge_position=bridge_position,
+                    treated_change=treated_change,
+                    never_change=_Change(never_treated, target_position, bridge_position),
+                    auxiliary_change=_Change(auxiliary_cohort, bridge_position, baseline_position),
+                )
+            )
+    return specs
+
+
+def _multiplier_event_study_band(
+    event_study: pd.DataFrame,
+    influence: pd.DataFrame,
+    *,
+    panel: _Panel,
+    covariance: DiDCovariance,
+    iterations: int,
+    random_state: int | None,
+    level: float,
+) -> tuple[pd.DataFrame, float]:
+    scores = influence.to_numpy(dtype=float)
+    standard_errors = event_study["std_err"].to_numpy(dtype=float)
+    if np.any(~np.isfinite(standard_errors)) or np.any(standard_errors <= 0.0):
+        raise ValueError(
+            "Simultaneous event-study bands require a positive finite standard error "
+            "for every event time."
+        )
+    n = len(panel.entities)
+    if covariance == "robust":
+        score_units = scores
+        finite_sample_scale = np.sqrt(n / (n - 1))
+    else:
+        if panel.clusters is None:  # defensive; validation owns the public refusal
+            raise ValueError("cluster labels are required for clustered multiplier bands.")
+        codes, labels = pd.factorize(panel.clusters, sort=False)
+        score_units = np.zeros((len(labels), scores.shape[1]))
+        np.add.at(score_units, codes, scores)
+        finite_sample_scale = np.sqrt(len(labels) / (len(labels) - 1))
+    rng = np.random.default_rng(random_state)
+    maximum_statistics = np.empty(iterations, dtype=float)
+    completed = 0
+    while completed < iterations:
+        batch = min(256, iterations - completed)
+        multipliers = rng.choice(np.array([-1.0, 1.0]), size=(batch, len(score_units)))
+        perturbations = finite_sample_scale * multipliers @ score_units / n
+        maximum_statistics[completed : completed + batch] = np.max(
+            np.abs(perturbations / standard_errors), axis=1
+        )
+        completed += batch
+    critical = float(np.quantile(maximum_statistics, level, method="higher"))
+    estimates = event_study["att"].to_numpy(dtype=float)
+    bands = pd.DataFrame(
+        {
+            "att": estimates,
+            "std_err": standard_errors,
+            "critical_value": critical,
+            "level": level,
+            "lower": estimates - critical * standard_errors,
+            "upper": estimates + critical * standard_errors,
+        },
+        index=event_study.index.copy(),
+    )
+    return bands, critical
+
+
 def _aggregate_influence(cells: list[_EffectCell], panel: _Panel) -> tuple[float, np.ndarray]:
     n = len(panel.entities)
     shares = np.array([cell.cohort_share for cell in cells])
@@ -435,7 +601,16 @@ def _assemble_result(
     time_name: str,
     treatment_time_name: str,
     efficiency_weights: pd.DataFrame,
+    conditional_efficiency_weights: pd.DataFrame,
     candidate_influence: pd.DataFrame,
+    inference: DiDInference,
+    bootstrap_iterations: int,
+    bootstrap_random_state: int | None,
+    simultaneous_level: float,
+    nuisance_fold: pd.Series,
+    cohort_probabilities: pd.DataFrame,
+    covariates: tuple[str, ...],
+    cross_fitted: bool,
     notes: tuple[str, ...],
 ) -> DiDResult:
     group_rows: list[dict[str, Any]] = []
@@ -524,6 +699,21 @@ def _assemble_result(
     )
     cohort_sizes.index.name = "cohort"
 
+    simultaneous_event_study = pd.DataFrame(
+        columns=["att", "std_err", "critical_value", "level", "lower", "upper"]
+    )
+    simultaneous_critical_value: float | None = None
+    if inference == "multiplier_bootstrap":
+        simultaneous_event_study, simultaneous_critical_value = _multiplier_event_study_band(
+            event_study,
+            event_study_influence,
+            panel=panel,
+            covariance=covariance,
+            iterations=bootstrap_iterations,
+            random_state=bootstrap_random_state,
+            level=simultaneous_level,
+        )
+
     return DiDResult(
         estimate=estimate,
         standard_error=standard_error,
@@ -537,7 +727,11 @@ def _assemble_result(
         calendar_time_influence=calendar_time_influence,
         overall_influence=overall_influence,
         efficiency_weights=efficiency_weights,
+        conditional_efficiency_weights=conditional_efficiency_weights,
         candidate_influence_functions=candidate_influence,
+        simultaneous_event_study=simultaneous_event_study,
+        nuisance_fold=nuisance_fold,
+        cohort_probabilities=cohort_probabilities,
         cohort_sizes=cohort_sizes,
         n_entities=len(panel.entities),
         n_periods=len(panel.times),
@@ -545,6 +739,15 @@ def _assemble_result(
         covariance_type=covariance,
         inference_distribution=distribution,
         inference_df=inference_df,
+        inference_method=inference,
+        simultaneous_level=(simultaneous_level if inference == "multiplier_bootstrap" else None),
+        simultaneous_critical_value=simultaneous_critical_value,
+        bootstrap_iterations=(
+            bootstrap_iterations if inference == "multiplier_bootstrap" else None
+        ),
+        bootstrap_random_state=(
+            bootstrap_random_state if inference == "multiplier_bootstrap" else None
+        ),
         method=method,
         parallel_trends=parallel_trends,
         control_group=control_group,
@@ -554,6 +757,8 @@ def _assemble_result(
         time_name=time_name,
         outcome_name=outcome_name,
         treatment_time_name=treatment_time_name,
+        covariates=covariates,
+        cross_fitted=cross_fitted,
         estimation_entities=panel.entities.copy(),
         times=tuple(float(value) for value in panel.times),
         assumptions=(
@@ -578,16 +783,34 @@ class DifferenceInDifferences:
         anticipation: int = 0,
         covariance: DiDCovariance = "robust",
         inference: DiDInference = "analytic",
+        bootstrap_iterations: int = 999,
+        random_state: int | None = None,
+        simultaneous_level: float = 0.95,
     ) -> None:
         if control_group not in {"never_treated", "not_yet_treated"}:
             raise ValueError("control_group must be 'never_treated' or 'not_yet_treated'.")
-        anticipation, covariance, inference = _validate_constructor(
-            anticipation=anticipation, covariance=covariance, inference=inference
+        (
+            anticipation,
+            covariance,
+            inference,
+            bootstrap_iterations,
+            random_state,
+            simultaneous_level,
+        ) = _validate_constructor(
+            anticipation=anticipation,
+            covariance=covariance,
+            inference=inference,
+            bootstrap_iterations=bootstrap_iterations,
+            random_state=random_state,
+            simultaneous_level=simultaneous_level,
         )
         self.control_group = control_group
         self.anticipation = anticipation
         self.covariance = covariance
         self.inference = inference
+        self.bootstrap_iterations = bootstrap_iterations
+        self.random_state = random_state
+        self.simultaneous_level = simultaneous_level
 
     def fit(
         self,
@@ -693,16 +916,400 @@ class DifferenceInDifferences:
             time_name=time,
             treatment_time_name=treatment_time,
             efficiency_weights=empty_weights,
+            conditional_efficiency_weights=pd.DataFrame(index=panel.entities.copy()),
             candidate_influence=empty_candidate,
+            inference=self.inference,
+            bootstrap_iterations=self.bootstrap_iterations,
+            bootstrap_random_state=self.random_state,
+            simultaneous_level=self.simultaneous_level,
+            nuisance_fold=pd.Series(dtype="int64", name="fold"),
+            cohort_probabilities=pd.DataFrame(index=panel.entities.copy()),
+            covariates=(),
+            cross_fitted=False,
             notes=(
                 "Group-time effects use the period immediately before the effective treatment boundary as baseline.",
-                "Reported confidence intervals are pointwise; simultaneous event-study bands are not implemented.",
+                (
+                    "Event-study bands use a studentized entity-level multiplier bootstrap."
+                    if self.inference == "multiplier_bootstrap"
+                    else "Reported confidence intervals are pointwise."
+                ),
             ),
         )
 
 
+def _change_values(panel: _Panel, change: _Change) -> np.ndarray:
+    return panel.outcomes[:, change.end] - panel.outcomes[:, change.start]
+
+
+def _ordered_pair(left: _Change, right: _Change) -> tuple[_Change, _Change]:
+    left_key = (left.group, left.end, left.start)
+    right_key = (right.group, right.end, right.start)
+    return (left, right) if left_key <= right_key else (right, left)
+
+
+def _fit_covariate_efficient(
+    data: pd.DataFrame,
+    panel: _Panel,
+    *,
+    outcome: str,
+    entity: str,
+    time: str,
+    treatment_time: str,
+    never_treated: float,
+    covariates: Sequence[str],
+    cross_fitter: CrossFitter,
+    pre_periods: PrePeriods,
+    anticipation: int,
+    covariance: DiDCovariance,
+    inference: DiDInference,
+    bootstrap_iterations: int,
+    bootstrap_random_state: int | None,
+    simultaneous_level: float,
+    singularity_tolerance: float,
+    nuisance_probability_floor: float,
+) -> DiDResult:
+    if cross_fitter.outcome_factory is None:
+        raise ValueError("cross_fitter must provide an outcome_factory for DiD nuisances.")
+    X, covariate_names = _prepare_covariates(
+        data,
+        panel,
+        entity=entity,
+        covariates=covariates,
+        protected_names=(outcome, entity, time, treatment_time),
+    )
+    strata = pd.Series(
+        panel.original_cohorts,
+        index=panel.entities.copy(),
+        name="treatment_cohort",
+    )
+    class_result = cross_fitter.fit_predict_class_probabilities(X, classes=strata)
+    probabilities = class_result.probabilities
+    if float(probabilities.to_numpy().min()) <= nuisance_probability_floor:
+        raise ValueError(
+            "Cross-fitted cohort probabilities violate nuisance_probability_floor; "
+            "no clipping was applied."
+        )
+
+    cell_definitions: list[tuple[float, int, int, list[_CandidateSpec]]] = []
+    changes: dict[_Change, None] = {}
+    for cohort in panel.treated_cohorts:
+        effective_position = panel.effective_positions[cohort]
+        if pre_periods == "all":
+            baseline_position = 0
+        else:
+            baseline_position = effective_position - int(pre_periods)
+            if baseline_position < 0:
+                raise ValueError(
+                    f"pre_periods={pre_periods} exceeds the available clean history "
+                    f"for cohort {cohort}."
+                )
+        for target_position in range(effective_position, len(panel.times)):
+            specs = _candidate_specs(
+                panel,
+                cohort=cohort,
+                baseline_position=baseline_position,
+                target_position=target_position,
+                never_treated=never_treated,
+            )
+            if not specs:
+                raise ValueError(
+                    f"No admissible PT-All generated outcomes exist for cohort {cohort}."
+                )
+            cell_definitions.append((cohort, baseline_position, target_position, specs))
+            for spec in specs:
+                changes[spec.treated_change] = None
+                changes[spec.never_change] = None
+                changes[spec.auxiliary_change] = None
+
+    nonzero_changes = [change for change in changes if not change.is_zero]
+    mean_task_names = {
+        change: f"conditional_mean_{position}" for position, change in enumerate(nonzero_changes)
+    }
+    mean_tasks = [
+        CrossFitTask(
+            name=mean_task_names[change],
+            target=pd.Series(
+                _change_values(panel, change),
+                index=panel.entities.copy(),
+            ),
+            train_mask=pd.Series(
+                panel.original_cohorts == change.group,
+                index=panel.entities.copy(),
+            ),
+        )
+        for change in nonzero_changes
+    ]
+    mean_result = cross_fitter.fit_predict_tasks(X, tasks=mean_tasks, strata=strata)
+    if not class_result.fold.equals(mean_result.fold):
+        raise RuntimeError("CrossFitter returned inconsistent folds across DiD nuisance tasks.")
+
+    def conditional_mean(change: _Change) -> np.ndarray:
+        if change.is_zero:
+            return np.zeros(len(panel.entities))
+        return mean_result.predictions[mean_task_names[change]].to_numpy(dtype=float)
+
+    residuals = {
+        change: _change_values(panel, change) - conditional_mean(change) for change in changes
+    }
+    covariance_pairs: dict[tuple[_Change, _Change], None] = {}
+    for _, _, _, specs in cell_definitions:
+        if len(specs) == 1:
+            continue
+        treated_change = specs[0].treated_change
+        covariance_pairs[_ordered_pair(treated_change, treated_change)] = None
+        for left in specs:
+            for right in specs:
+                covariance_pairs[_ordered_pair(left.never_change, right.never_change)] = None
+                if left.auxiliary_cohort == treated_change.group:
+                    covariance_pairs[_ordered_pair(treated_change, left.auxiliary_change)] = None
+                if right.auxiliary_cohort == treated_change.group:
+                    covariance_pairs[_ordered_pair(treated_change, right.auxiliary_change)] = None
+                if left.auxiliary_cohort == right.auxiliary_cohort:
+                    covariance_pairs[
+                        _ordered_pair(left.auxiliary_change, right.auxiliary_change)
+                    ] = None
+    nonzero_pairs = [
+        pair for pair in covariance_pairs if not pair[0].is_zero and not pair[1].is_zero
+    ]
+    covariance_task_names = {
+        pair: f"conditional_covariance_{position}" for position, pair in enumerate(nonzero_pairs)
+    }
+    covariance_predictions: pd.DataFrame | None = None
+    if nonzero_pairs:
+        second_moment_factory = cross_fitter.second_moment_factory
+        if second_moment_factory is None:
+            raise ValueError("cross_fitter must provide second_moment_factory or outcome_factory.")
+        covariance_tasks = [
+            CrossFitTask(
+                name=covariance_task_names[pair],
+                target=pd.Series(
+                    residuals[pair[0]] * residuals[pair[1]],
+                    index=panel.entities.copy(),
+                ),
+                train_mask=pd.Series(
+                    panel.original_cohorts == pair[0].group,
+                    index=panel.entities.copy(),
+                ),
+                factory=second_moment_factory,
+            )
+            for pair in nonzero_pairs
+        ]
+        covariance_result = cross_fitter.fit_predict_tasks(X, tasks=covariance_tasks, strata=strata)
+        if not class_result.fold.equals(covariance_result.fold):
+            raise RuntimeError("CrossFitter returned inconsistent conditional-covariance folds.")
+        covariance_predictions = covariance_result.predictions
+
+    def conditional_covariance(left: _Change, right: _Change) -> np.ndarray:
+        if left.is_zero or right.is_zero:
+            return np.zeros(len(panel.entities))
+        pair = _ordered_pair(left, right)
+        if covariance_predictions is None or pair not in covariance_task_names:
+            raise RuntimeError("A required conditional covariance nuisance is missing.")
+        return covariance_predictions[covariance_task_names[pair]].to_numpy(dtype=float)
+
+    n = len(panel.entities)
+    cells: list[_EffectCell] = []
+    weight_rows: list[dict[str, float]] = []
+    candidate_arrays: list[np.ndarray] = []
+    candidate_keys: list[tuple[float, float, float, float]] = []
+    conditional_weight_arrays: list[np.ndarray] = []
+    probability = {
+        float(label): probabilities[label].to_numpy(dtype=float) for label in probabilities.columns
+    }
+    for cohort, baseline_position, target_position, specs in cell_definitions:
+        treated_mask = panel.original_cohorts == cohort
+        n_treated = int(treated_mask.sum())
+        pi_treated = n_treated / n
+        generated: list[np.ndarray] = []
+        candidate_atts: list[float] = []
+        for spec in specs:
+            auxiliary_mask = panel.original_cohorts == spec.auxiliary_cohort
+            treated_change_values = _change_values(panel, spec.treated_change)
+            never_change_values = _change_values(panel, spec.never_change)
+            auxiliary_change_values = _change_values(panel, spec.auxiliary_change)
+            mean_never = conditional_mean(spec.never_change)
+            mean_auxiliary = conditional_mean(spec.auxiliary_change)
+            score = (
+                treated_mask.astype(float)
+                / pi_treated
+                * (treated_change_values - mean_never - mean_auxiliary)
+                - probability[cohort]
+                / probability[float(never_treated)]
+                * panel.never_mask.astype(float)
+                / pi_treated
+                * (never_change_values - mean_never)
+                - probability[cohort]
+                / probability[spec.auxiliary_cohort]
+                * auxiliary_mask.astype(float)
+                / pi_treated
+                * (auxiliary_change_values - mean_auxiliary)
+            )
+            generated.append(score)
+            candidate_atts.append(float(score.mean()))
+        generated_matrix = np.column_stack(generated)
+        candidate_count = len(specs)
+        if candidate_count == 1:
+            weights = np.ones((n, 1))
+            condition_number = 1.0
+        else:
+            omega = np.empty((n, candidate_count, candidate_count), dtype=float)
+            treated_change = specs[0].treated_change
+            treated_variance = conditional_covariance(treated_change, treated_change)
+            for left_position, left in enumerate(specs):
+                for right_position, right in enumerate(specs):
+                    value = treated_variance / probability[cohort]
+                    value = (
+                        value
+                        + conditional_covariance(left.never_change, right.never_change)
+                        / probability[float(never_treated)]
+                    )
+                    if left.auxiliary_cohort == cohort:
+                        value = (
+                            value
+                            - conditional_covariance(treated_change, left.auxiliary_change)
+                            / probability[cohort]
+                        )
+                    if right.auxiliary_cohort == cohort:
+                        value = (
+                            value
+                            - conditional_covariance(treated_change, right.auxiliary_change)
+                            / probability[cohort]
+                        )
+                    if left.auxiliary_cohort == right.auxiliary_cohort:
+                        value = (
+                            value
+                            + conditional_covariance(left.auxiliary_change, right.auxiliary_change)
+                            / probability[left.auxiliary_cohort]
+                        )
+                    omega[:, left_position, right_position] = value
+            omega = 0.5 * (omega + np.swapaxes(omega, 1, 2))
+            eigenvalues = np.linalg.eigvalsh(omega)
+            largest = eigenvalues[:, -1]
+            smallest = eigenvalues[:, 0]
+            invalid = (
+                ~np.isfinite(eigenvalues).all(axis=1)
+                | (largest <= 0.0)
+                | (smallest <= singularity_tolerance * largest)
+            )
+            if invalid.any():
+                raise ValueError(
+                    "The cross-fitted conditional covariance system is singular or "
+                    "numerically unidentified for at least one entity; no ridge, clipping, "
+                    "or pseudoinverse was applied."
+                )
+            condition_number = float(np.max(largest / smallest))
+            ones = np.ones((n, candidate_count))
+            solved = np.linalg.solve(omega, ones[..., None])[..., 0]
+            denominators = np.sum(solved, axis=1)
+            if np.any(~np.isfinite(denominators)) or np.any(
+                np.abs(denominators) <= np.finfo(float).eps
+            ):
+                raise ValueError(
+                    "The conditional efficient weight normalization is singular or non-finite."
+                )
+            weights = solved / denominators[:, None]
+        weighted_score = np.sum(weights * generated_matrix, axis=1)
+        att = float(weighted_score.mean())
+        efficient_influence = weighted_score - treated_mask.astype(float) / pi_treated * att
+        public_time = float(panel.times[target_position])
+        for position, (spec, candidate_att) in enumerate(zip(specs, candidate_atts, strict=True)):
+            candidate_if = generated_matrix[:, position] - (
+                treated_mask.astype(float) / pi_treated * candidate_att
+            )
+            realized_weights = weights[:, position]
+            weight_rows.append(
+                {
+                    "cohort": cohort,
+                    "time": public_time,
+                    "auxiliary_cohort": spec.auxiliary_cohort,
+                    "bridge_period": float(panel.times[spec.bridge_position]),
+                    "candidate_att": candidate_att,
+                    "weight": float(realized_weights.mean()),
+                    "weight_min": float(realized_weights.min()),
+                    "weight_max": float(realized_weights.max()),
+                    "weight_std": float(realized_weights.std(ddof=0)),
+                }
+            )
+            candidate_arrays.append(candidate_if)
+            candidate_keys.append(
+                (
+                    cohort,
+                    public_time,
+                    spec.auxiliary_cohort,
+                    float(panel.times[spec.bridge_position]),
+                )
+            )
+            conditional_weight_arrays.append(realized_weights)
+        cells.append(
+            _EffectCell(
+                cohort=cohort,
+                time=public_time,
+                event_time=target_position - panel.original_positions[cohort],
+                base_period=float(panel.times[baseline_position]),
+                att=att,
+                influence=efficient_influence,
+                n_treated=n_treated,
+                n_comparison=int(panel.never_mask.sum()),
+                cohort_share=pi_treated,
+                weight_condition_number=condition_number,
+            )
+        )
+
+    candidate_columns = pd.MultiIndex.from_tuples(
+        candidate_keys,
+        names=["cohort", "time", "auxiliary_cohort", "bridge_period"],
+    )
+    candidate_influence = pd.DataFrame(
+        np.column_stack(candidate_arrays),
+        index=panel.entities.copy(),
+        columns=candidate_columns,
+    )
+    conditional_weights = pd.DataFrame(
+        np.column_stack(conditional_weight_arrays),
+        index=panel.entities.copy(),
+        columns=candidate_columns.copy(),
+    )
+    return _assemble_result(
+        cells,
+        panel,
+        covariance=covariance,
+        method="chen_santanna_xie_efficient_covariate_adjusted",
+        parallel_trends="all_conditional_on_covariates",
+        control_group="never_and_admissible_auxiliary_cohorts",
+        anticipation=anticipation,
+        pre_periods=pre_periods,
+        outcome_name=outcome,
+        entity_name=entity,
+        time_name=time,
+        treatment_time_name=treatment_time,
+        efficiency_weights=pd.DataFrame(weight_rows),
+        conditional_efficiency_weights=conditional_weights,
+        candidate_influence=candidate_influence,
+        inference=inference,
+        bootstrap_iterations=bootstrap_iterations,
+        bootstrap_random_state=bootstrap_random_state,
+        simultaneous_level=simultaneous_level,
+        nuisance_fold=class_result.fold,
+        cohort_probabilities=probabilities,
+        covariates=covariate_names,
+        cross_fitted=True,
+        notes=(
+            "All reported outcome, cohort-probability, and conditional-covariance nuisance predictions are out of fold.",
+            "Cohort density ratios are formed from cross-fitted multiclass probabilities and are refused below the declared floor rather than clipped.",
+            "The conditional covariance follows Chen-Sant'Anna-Xie equation (3.12), estimated by cross-fitted residual-product regressions.",
+            "Semiparametric efficiency requires PT-All and the nuisance consistency, overlap, weighting, and product-rate conditions in the paper's Assumption C.1.",
+            "Higher-level clustered covariance does not claim the independent-entity semiparametric efficiency bound.",
+            (
+                "Event-study bands use a studentized multiplier bootstrap."
+                if inference == "multiplier_bootstrap"
+                else "Reported confidence intervals are pointwise."
+            ),
+        ),
+    )
+
+
 class EfficientDiD:
-    """Chen-Sant'Anna-Xie no-covariate efficient DiD under PT-All."""
+    """Chen-Sant'Anna-Xie efficient DiD under PT-All."""
 
     def __init__(
         self,
@@ -711,7 +1318,11 @@ class EfficientDiD:
         anticipation: int = 0,
         covariance: DiDCovariance = "robust",
         inference: DiDInference = "analytic",
+        bootstrap_iterations: int = 999,
+        random_state: int | None = None,
+        simultaneous_level: float = 0.95,
         singularity_tolerance: float = 1e-12,
+        nuisance_probability_floor: float = 1e-6,
     ) -> None:
         if pre_periods != "all" and (
             isinstance(pre_periods, bool)
@@ -721,14 +1332,37 @@ class EfficientDiD:
             raise ValueError("pre_periods must be 'all' or a positive integer.")
         if not np.isfinite(singularity_tolerance) or not 0 < singularity_tolerance < 1:
             raise ValueError("singularity_tolerance must be finite and strictly between 0 and 1.")
-        anticipation, covariance, inference = _validate_constructor(
-            anticipation=anticipation, covariance=covariance, inference=inference
+        if (
+            not np.isfinite(nuisance_probability_floor)
+            or not 0.0 < nuisance_probability_floor < 0.5
+        ):
+            raise ValueError(
+                "nuisance_probability_floor must be finite and strictly between zero and 0.5."
+            )
+        (
+            anticipation,
+            covariance,
+            inference,
+            bootstrap_iterations,
+            random_state,
+            simultaneous_level,
+        ) = _validate_constructor(
+            anticipation=anticipation,
+            covariance=covariance,
+            inference=inference,
+            bootstrap_iterations=bootstrap_iterations,
+            random_state=random_state,
+            simultaneous_level=simultaneous_level,
         )
-        self.pre_periods = "all" if pre_periods == "all" else int(pre_periods)
+        self.pre_periods: PrePeriods = "all" if pre_periods == "all" else int(pre_periods)
         self.anticipation = anticipation
         self.covariance = covariance
         self.inference = inference
+        self.bootstrap_iterations = bootstrap_iterations
+        self.random_state = random_state
+        self.simultaneous_level = simultaneous_level
         self.singularity_tolerance = float(singularity_tolerance)
+        self.nuisance_probability_floor = float(nuisance_probability_floor)
 
     def fit(
         self,
@@ -741,14 +1375,17 @@ class EfficientDiD:
         never_treated: float = np.inf,
         cluster: str | None = None,
         covariates: Sequence[str] | None = None,
+        cross_fitter: CrossFitter | None = None,
     ) -> DiDResult:
         """Estimate efficient group-time effects and their aggregations."""
 
-        if covariates is not None:
-            raise NotImplementedError(
-                "The covariate-adjusted efficient DiD path is not implemented in this alpha; "
-                "it requires public nuisance predictions and conditional covariance estimation."
+        if covariates is not None and cross_fitter is None:
+            raise ValueError(
+                "cross_fitter is required when covariates are supplied; EfficientDiD does "
+                "not own or fit nuisance model classes."
             )
+        if covariates is None and cross_fitter is not None:
+            raise ValueError("cross_fitter is only used when covariates are supplied.")
         panel = _prepare_panel(
             data,
             outcome=outcome,
@@ -760,12 +1397,36 @@ class EfficientDiD:
             covariance=self.covariance,
             cluster=cluster,
         )
+        if covariates is not None:
+            if cross_fitter is None:  # defensive narrowing after the public refusal above
+                raise ValueError("cross_fitter is required for covariate adjustment.")
+            return _fit_covariate_efficient(
+                data,
+                panel,
+                outcome=outcome,
+                entity=entity,
+                time=time,
+                treatment_time=treatment_time,
+                never_treated=float(never_treated),
+                covariates=covariates,
+                cross_fitter=cross_fitter,
+                pre_periods=self.pre_periods,
+                anticipation=self.anticipation,
+                covariance=self.covariance,
+                inference=self.inference,
+                bootstrap_iterations=self.bootstrap_iterations,
+                bootstrap_random_state=self.random_state,
+                simultaneous_level=self.simultaneous_level,
+                singularity_tolerance=self.singularity_tolerance,
+                nuisance_probability_floor=self.nuisance_probability_floor,
+            )
         n = len(panel.entities)
         pi_never = float(panel.never_mask.mean())
         cells: list[_EffectCell] = []
         weight_rows: list[dict[str, float]] = []
         candidate_arrays: list[np.ndarray] = []
         candidate_keys: list[tuple[float, float, float, float]] = []
+        conditional_weight_arrays: list[np.ndarray] = []
 
         for cohort in panel.treated_cohorts:
             treated_mask = panel.original_cohorts == cohort
@@ -887,6 +1548,7 @@ class EfficientDiD:
                     )
                     candidate_arrays.append(candidate_if)
                     candidate_keys.append((cohort, public_time, auxiliary_cohort, bridge_period))
+                    conditional_weight_arrays.append(np.full(n, float(weight)))
                 cells.append(
                     _EffectCell(
                         cohort=cohort,
@@ -912,6 +1574,11 @@ class EfficientDiD:
             index=panel.entities.copy(),
             columns=candidate_columns,
         )
+        conditional_weights = pd.DataFrame(
+            np.column_stack(conditional_weight_arrays),
+            index=panel.entities.copy(),
+            columns=candidate_columns.copy(),
+        )
         return _assemble_result(
             cells,
             panel,
@@ -926,11 +1593,24 @@ class EfficientDiD:
             time_name=time,
             treatment_time_name=treatment_time,
             efficiency_weights=efficiency_weights,
+            conditional_efficiency_weights=conditional_weights,
             candidate_influence=candidate_influence,
+            inference=self.inference,
+            bootstrap_iterations=self.bootstrap_iterations,
+            bootstrap_random_state=self.random_state,
+            simultaneous_level=self.simultaneous_level,
+            nuisance_fold=pd.Series(dtype="int64", name="fold"),
+            cohort_probabilities=pd.DataFrame(index=panel.entities.copy()),
+            covariates=(),
+            cross_fitted=False,
             notes=(
                 "Efficiency is claimed only for the no-covariate PT-All short-panel model implemented here.",
                 "Efficiency weights may be negative because they combine homogeneous identifying moments.",
                 "Higher-level clustered covariance does not claim the independent-entity semiparametric efficiency bound.",
-                "Reported confidence intervals are pointwise; simultaneous event-study bands are not implemented.",
+                (
+                    "Event-study bands use a studentized entity-level multiplier bootstrap."
+                    if self.inference == "multiplier_bootstrap"
+                    else "Reported confidence intervals are pointwise."
+                ),
             ),
         )

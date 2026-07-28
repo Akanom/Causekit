@@ -40,6 +40,15 @@ singular systems without hidden regularization. Anticipation, control contaminat
 balanced-panel validation, entity-level HC scaling, cluster-summed covariance, and random
 cohort-share influence terms require direct tests.
 
+The covariate path additionally requires exact shared-fold alignment across multiclass
+cohort probabilities, masked outcome-change tasks, and residual-product second-moment
+tasks; a multi-moment fixture must exercise observation-specific conditional covariance
+inversion. Tests must prove that low cohort probabilities and singular conditional
+systems refuse without clipping or repair. Simultaneous-band tests reconstruct the seeded
+Rademacher max-t critical value from entity scores and from cluster-summed scores. A fixed-
+seed Monte Carlo smoke checks bias and empirical coverage without being presented as a
+publication-scale coverage study.
+
 The recorded efficient reference is `david-loeb/edid` commit
 `f55a4a4aba14f0826f59ad7aa4af3bafaeba529b`. On the eight-entity orthogonal-score fixture,
 the public R implementation returns candidate effects `(10, 10, 10)`, weights
@@ -179,7 +188,25 @@ passing only after its tests have executed successfully in the recorded environm
 | Matching performance | Balanced/imbalanced arms, ties, attrition, reuse at scale | Sorted-scalar behavior, elapsed time, peak memory, no quadratic distance matrix |
 | Conventional DiD | Single/staggered cohorts, never/not-yet controls, anticipation | Hand `ATT(g,t)`, event/calendar/ESavg targets, uncontaminated controls, influence identities |
 | Efficient DiD | Multiple pre-periods and auxiliary cohorts under PT-All | Candidate effects, inverse-covariance weights, efficient influence, singular refusal, R parity |
-| DiD inference | Entity and higher-level clustered sampling | HC1/cluster score identities, reference distribution metadata, pointwise-only disclosure |
+| Covariate-efficient DiD | Multiple moments, valid/invalid overlap and covariance systems | OOF alignment, equation (4.4) scores, equation (3.12) weights, exact refusal boundaries |
+| DiD inference | Entity and higher-level clustered sampling | HC1/cluster score identities, pointwise metadata, robust/cluster max-t band identities |
+
+## Cross-software parity matrix
+
+Every model family must ultimately record estimand-aligned comparisons in Python, R, and
+Stata. A parity row records the exact software/package version, fixture provenance,
+estimation options, sample and parameter mapping, covariance corrections, seed,
+tolerances, and observed discrepancy. “Unavailable” and “non-comparable” are valid states
+when a platform lacks the estimator or implements different identifying moments; neither
+state is a pass.
+
+The maintained no-covariate efficient DiD row currently pins the public R `edid`
+implementation. Covariate-efficient DiD parity and the repository-wide Python/R/Stata
+matrix remain open. Adding an arbitrary regression that happens to return a similar
+number does not satisfy this gate.
+
+The live status and completion rule are maintained in [Cross-software parity
+register](PARITY.md).
 
 ## Numerical tolerances
 

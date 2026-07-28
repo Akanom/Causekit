@@ -54,7 +54,7 @@ def to_outputhub_model(
             name=name
             or (
                 "Efficient DiD"
-                if result.method == "chen_santanna_xie_efficient"
+                if result.method.startswith("chen_santanna_xie_efficient")
                 else "Difference-in-Differences"
             ),
             depvar=result.outcome_name,
@@ -81,7 +81,12 @@ def to_outputhub_model(
                 "pre_periods": result.pre_periods,
                 "covariance_type": result.covariance_type,
                 "inference_distribution": result.inference_distribution,
+                "inference_method": result.inference_method,
+                "simultaneous_level": result.simultaneous_level,
+                "simultaneous_critical_value": result.simultaneous_critical_value,
                 "n_clusters": result.n_clusters,
+                "covariates": list(result.covariates),
+                "nuisance_cross_fitted": result.cross_fitted,
                 "causal_interpretation_requires_assumptions": True,
                 "assumptions": list(result.assumptions),
             },
@@ -205,7 +210,7 @@ def add_to_outputhub(
         result.estimator.upper()
         if isinstance(result, ObservationalATEResult)
         else "Efficient DiD"
-        if isinstance(result, DiDResult) and result.method == "chen_santanna_xie_efficient"
+        if isinstance(result, DiDResult) and result.method.startswith("chen_santanna_xie_efficient")
         else "Difference-in-Differences"
         if isinstance(result, DiDResult)
         else "Randomized ATE"
@@ -243,9 +248,19 @@ def add_to_outputhub(
         hub.add_table(
             f"{model_name} event study",
             result.event_study.reset_index(),
-            caption="Cohort-share-weighted event-time effects; intervals are pointwise.",
+            caption="Cohort-share-weighted event-time effects with pointwise inference.",
             metadata=table_metadata,
         )
+        if not result.simultaneous_event_study.empty:
+            hub.add_table(
+                f"{model_name} simultaneous event-study bands",
+                result.simultaneous_event_study.reset_index(),
+                caption=(
+                    "Studentized multiplier-bootstrap max-t bands over the reported "
+                    "event-time path."
+                ),
+                metadata=table_metadata,
+            )
         hub.add_table(
             f"{model_name} calendar-time effects",
             result.calendar_time.reset_index(),

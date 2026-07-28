@@ -6,7 +6,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from causalkit import AIPWATE, CrossFitResult, CrossFitter
+from causalkit import (
+    AIPWATE,
+    ClassProbabilityCrossFitResult,
+    CrossFitResult,
+    CrossFitTask,
+    CrossFitTaskResult,
+    CrossFitter,
+)
 
 
 class _ConstantPropensityResult:
@@ -36,6 +43,21 @@ class _LinearOutcome:
     def fit(self, X, y):
         design = np.column_stack([np.ones(len(X)), np.asarray(X, dtype=float)])
         return _LinearResult(np.linalg.lstsq(design, np.asarray(y), rcond=None)[0])
+
+
+class _ClassProbabilityResult:
+    def __init__(self, classes: np.ndarray, probabilities: np.ndarray) -> None:
+        self.classes_ = classes
+        self.probabilities = probabilities
+
+    def predict_proba(self, X):
+        return np.tile(self.probabilities, (len(X), 1))
+
+
+class _ClassProbability:
+    def fit(self, X, y):
+        classes, counts = np.unique(np.asarray(y), return_counts=True)
+        return _ClassProbabilityResult(classes, counts / counts.sum())
 
 
 def _data(nobs: int = 300, seed: int = 902):
@@ -118,4 +140,60 @@ def test_cross_fitting_refuses_small_arms_and_index_drift() -> None:
             X,
             treatment=treatment.set_axis(pd.RangeIndex(1, len(treatment) + 1)),
             outcome=outcome,
+        )
+
+
+def test_multiclass_probabilities_are_aligned_out_of_fold_and_sum_to_one() -> None:
+    X = pd.DataFrame({"x": np.linspace(-1.0, 1.0, 18)}, index=pd.Index(range(100, 118)))
+    classes = pd.Series(np.repeat([2.0, 4.0, np.inf], 6), index=X.index)
+    result = CrossFitter(
+        propensity_factory=_ClassProbability,
+        outcome_factory=_LinearOutcome,
+        n_splits=3,
+        random_state=19,
+    ).fit_predict_class_probabilities(X, classes=classes)
+
+    assert isinstance(result, ClassProbabilityCrossFitResult)
+    assert result.probabilities.index.equals(X.index)
+    assert result.probabilities.columns.tolist() == [2.0, 4.0, np.inf]
+    np.testing.assert_allclose(result.probabilities.sum(axis=1), 1.0, rtol=0, atol=1e-14)
+    assert result.fold.index.equals(X.index)
+    for fold in range(3):
+        assert set(classes[result.fold == fold]) == {2.0, 4.0, np.inf}
+
+
+def test_masked_regression_tasks_share_folds_and_preserve_task_labels() -> None:
+    X = pd.DataFrame({"x": np.tile(np.arange(6, dtype=float), 2)})
+    strata = pd.Series(np.repeat([0, 1], 6), index=X.index)
+    target = pd.Series(1.0 + 2.0 * X["x"], index=X.index)
+    tasks = (
+        CrossFitTask(name="all", target=target),
+        CrossFitTask(name="stratum_zero", target=target, train_mask=strata.eq(0)),
+    )
+    result = CrossFitter(
+        propensity_factory=_ClassProbability,
+        outcome_factory=_LinearOutcome,
+        n_splits=2,
+        random_state=5,
+    ).fit_predict_tasks(X, tasks=tasks, strata=strata)
+
+    assert isinstance(result, CrossFitTaskResult)
+    assert result.predictions.columns.tolist() == ["all", "stratum_zero"]
+    assert result.predictions.index.equals(X.index)
+    np.testing.assert_allclose(result.predictions, np.column_stack([target, target]), atol=1e-12)
+    assert set(result.model_names) == {"all", "stratum_zero"}
+
+
+def test_generic_cross_fitting_refuses_duplicate_tasks_and_too_small_strata() -> None:
+    X = pd.DataFrame({"x": np.arange(6, dtype=float)})
+    target = pd.Series(np.arange(6, dtype=float))
+    fitter = CrossFitter(outcome_factory=_LinearOutcome, n_splits=3)
+    duplicate = CrossFitTask(name="same", target=target)
+    with pytest.raises(ValueError, match="task names must be unique"):
+        fitter.fit_predict_tasks(X, tasks=[duplicate, duplicate])
+    with pytest.raises(ValueError, match="stratum must contain at least n_splits"):
+        fitter.fit_predict_tasks(
+            X,
+            tasks=[duplicate],
+            strata=pd.Series([0, 0, 0, 0, 1, 1]),
         )

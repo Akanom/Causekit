@@ -141,6 +141,8 @@ def test_did_converts_and_adds_auditable_effect_tables() -> None:
     model = to_outputhub_model(result)
     assert model.metadata["estimator"] == "conventional_group_time"
     assert model.metadata["parallel_trends"] == "post"
+    assert model.metadata["inference_method"] == "analytic"
+    assert model.metadata["nuisance_cross_fitted"] is False
     assert model.params.index.tolist() == ["esavg"]
     hub = outputhub.OutputHub("DiD analysis")
     add_to_outputhub(hub, result)

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from causalkit import DiDResult, DifferenceInDifferences, EfficientDiD
+from causalkit import CrossFitter, DiDResult, DifferenceInDifferences, EfficientDiD
 
 FIT_COLUMNS = {
     "outcome": "outcome",
@@ -74,6 +74,84 @@ def _efficient_hand_panel() -> pd.DataFrame:
 
 def _fit(model, data: pd.DataFrame, **kwargs):
     return model.fit(data, **FIT_COLUMNS, **kwargs)
+
+
+class _ClassProbabilityResult:
+    def __init__(self, classes: np.ndarray, probabilities: np.ndarray) -> None:
+        self.classes_ = classes
+        self.probabilities = probabilities
+
+    def predict_proba(self, X):
+        return np.tile(self.probabilities, (len(X), 1))
+
+
+class _ClassProbability:
+    def fit(self, X, y):
+        classes, counts = np.unique(np.asarray(y), return_counts=True)
+        return _ClassProbabilityResult(classes, counts / counts.sum())
+
+
+class _LinearResult:
+    def __init__(self, coefficients: np.ndarray) -> None:
+        self.coefficients = coefficients
+
+    def predict(self, X):
+        design = np.column_stack([np.ones(len(X)), np.asarray(X, dtype=float)])
+        return design @ self.coefficients
+
+
+class _LinearRegression:
+    def fit(self, X, y):
+        design = np.column_stack([np.ones(len(X)), np.asarray(X, dtype=float)])
+        return _LinearResult(np.linalg.lstsq(design, np.asarray(y), rcond=None)[0])
+
+
+class _ZeroResult:
+    def predict(self, X):
+        return np.zeros(len(X))
+
+
+class _ZeroRegression:
+    def fit(self, X, y):
+        return _ZeroResult()
+
+
+def _covariate_panel() -> pd.DataFrame:
+    rows: list[dict[str, float | str]] = []
+    covariate = np.linspace(-2.0, 2.0, 30)
+    for cohort, prefix, effect in ((2.0, "treated", 2.0), (np.inf, "never", 0.0)):
+        for position, x in enumerate(covariate):
+            for period in (1, 2):
+                rows.append(
+                    {
+                        "entity": f"{prefix}_{position}",
+                        "time": period,
+                        "treatment_time": cohort,
+                        "x": x,
+                        "outcome": 3.0 + x + (period - 1) * (0.5 * x + effect),
+                    }
+                )
+    return pd.DataFrame(rows)
+
+
+def _did_cross_fitter(*, seed: int = 37) -> CrossFitter:
+    return CrossFitter(
+        propensity_factory=_ClassProbability,
+        outcome_factory=_LinearRegression,
+        n_splits=3,
+        random_state=seed,
+    )
+
+
+def _multi_moment_covariate_panel(repetitions: int = 12) -> pd.DataFrame:
+    base = _efficient_hand_panel().assign(x=0.0)
+    return pd.concat(
+        [
+            base.assign(entity=lambda frame, repeat=repeat: frame["entity"] + f"_{repeat}")
+            for repeat in range(repetitions)
+        ],
+        ignore_index=True,
+    )
 
 
 def test_conventional_hand_computed_group_time_and_aggregations() -> None:
@@ -180,6 +258,56 @@ def test_efficient_result_exposes_candidate_and_aggregate_influence_identities()
     )
 
 
+def test_covariate_adjusted_efficient_path_uses_cross_fitted_nuisances() -> None:
+    result = _fit(
+        EfficientDiD(),
+        _covariate_panel(),
+        covariates=["x"],
+        cross_fitter=_did_cross_fitter(),
+    )
+
+    assert result.estimate == pytest.approx(2.0, abs=2e-12)
+    assert result.group_time.loc[(2.0, 2.0), "att"] == pytest.approx(2.0, abs=2e-12)
+    assert result.cross_fitted
+    assert result.covariates == ("x",)
+    assert set(result.nuisance_fold.unique()) == {0, 1, 2}
+    assert result.nuisance_fold.index.equals(result.estimation_entities)
+    assert result.cohort_probabilities.index.equals(result.estimation_entities)
+    np.testing.assert_allclose(result.cohort_probabilities.sum(axis=1), 1.0, atol=1e-14)
+    np.testing.assert_allclose(result.conditional_efficiency_weights.sum(axis=1), 1.0, atol=1e-14)
+
+
+def test_covariate_path_is_deterministic_for_a_fixed_crossfit_seed() -> None:
+    data = _covariate_panel()
+    first = _fit(EfficientDiD(), data, covariates=["x"], cross_fitter=_did_cross_fitter(seed=8))
+    second = _fit(EfficientDiD(), data, covariates=["x"], cross_fitter=_did_cross_fitter(seed=8))
+
+    pd.testing.assert_series_equal(first.nuisance_fold, second.nuisance_fold)
+    pd.testing.assert_frame_equal(first.cohort_probabilities, second.cohort_probabilities)
+    pd.testing.assert_frame_equal(
+        first.conditional_efficiency_weights, second.conditional_efficiency_weights
+    )
+    pd.testing.assert_frame_equal(first.group_time, second.group_time)
+
+
+def test_covariate_path_estimates_and_inverts_conditional_multi_moment_covariance() -> None:
+    result = _fit(
+        EfficientDiD(),
+        _multi_moment_covariate_panel(),
+        covariates=["x"],
+        cross_fitter=_did_cross_fitter(seed=7),
+    )
+
+    assert result.estimate == pytest.approx(10.0, abs=0.03)
+    assert len(result.efficiency_weights) == 3
+    assert result.group_time.loc[(4.0, 4.0), "weight_condition_number"] > 1.0
+    assert result.efficiency_weights["weight_std"].gt(0.0).all()
+    np.testing.assert_allclose(
+        result.conditional_efficiency_weights.sum(axis=1), 1.0, rtol=0, atol=2e-14
+    )
+    assert np.isfinite(result.candidate_influence_functions).all().all()
+
+
 def test_anticipation_shifts_effective_boundary_without_relabeling_adoption_cohort() -> None:
     data = _staggered_panel()
     data.loc[np.isfinite(data["treatment_time"]), "treatment_time"] = 3.0
@@ -272,12 +400,161 @@ def test_treatment_at_first_effective_period_is_refused() -> None:
         _fit(DifferenceInDifferences(), data)
 
 
-def test_covariate_and_multiplier_bootstrap_paths_are_explicitly_refused() -> None:
+def test_covariate_path_requires_cross_fitter_and_constant_entity_covariates() -> None:
     data = _staggered_panel().assign(x=1.0)
-    with pytest.raises(NotImplementedError, match="covariate-adjusted"):
+    with pytest.raises(ValueError, match="cross_fitter"):
         _fit(EfficientDiD(), data, covariates=["x"])
-    with pytest.raises(NotImplementedError, match="simultaneous"):
-        DifferenceInDifferences(inference="multiplier_bootstrap")
+    data.loc[(data["entity"] == "g2_a") & (data["time"] == 1), "x"] = 2.0
+    with pytest.raises(ValueError, match="constant within entity"):
+        _fit(
+            EfficientDiD(),
+            data,
+            covariates=["x"],
+            cross_fitter=_did_cross_fitter(),
+        )
+
+
+def test_multiplier_event_study_band_matches_hand_computed_rademacher_max_t() -> None:
+    iterations = 199
+    seed = 20260728
+    level = 0.90
+    result = _fit(
+        DifferenceInDifferences(
+            inference="multiplier_bootstrap",
+            bootstrap_iterations=iterations,
+            random_state=seed,
+            simultaneous_level=level,
+        ),
+        _staggered_panel(),
+    )
+    scores = result.event_study_influence.to_numpy(dtype=float)
+    standard_errors = result.event_study["std_err"].to_numpy(dtype=float)
+    multipliers = np.random.default_rng(seed).choice(
+        np.array([-1.0, 1.0]), size=(iterations, result.n_entities)
+    )
+    draws = np.sqrt(result.n_entities / (result.n_entities - 1)) * multipliers @ scores
+    draws /= result.n_entities
+    max_statistics = np.max(np.abs(draws / standard_errors), axis=1)
+    expected_critical = np.quantile(max_statistics, level, method="higher")
+
+    assert result.inference_method == "multiplier_bootstrap"
+    assert result.simultaneous_critical_value == pytest.approx(expected_critical, abs=1e-14)
+    assert result.bootstrap_iterations == iterations
+    assert result.bootstrap_random_state == seed
+    assert result.simultaneous_level == level
+    np.testing.assert_allclose(
+        result.simultaneous_event_study["lower"],
+        result.event_study["att"] - expected_critical * result.event_study["std_err"],
+        rtol=0,
+        atol=1e-14,
+    )
+    np.testing.assert_allclose(
+        result.simultaneous_event_study["upper"],
+        result.event_study["att"] + expected_critical * result.event_study["std_err"],
+        rtol=0,
+        atol=1e-14,
+    )
+
+
+def test_multiplier_band_is_reproducible_and_analytic_path_has_no_band() -> None:
+    model = EfficientDiD(
+        inference="multiplier_bootstrap", bootstrap_iterations=101, random_state=11
+    )
+    first = _fit(model, _efficient_hand_panel())
+    second = _fit(model, _efficient_hand_panel())
+    pd.testing.assert_frame_equal(first.simultaneous_event_study, second.simultaneous_event_study)
+    assert (
+        DifferenceInDifferences()
+        .fit(_staggered_panel(), **FIT_COLUMNS)
+        .simultaneous_event_study.empty
+    )
+
+
+def test_cluster_multiplier_band_uses_cluster_summed_scores() -> None:
+    data = _staggered_panel()
+    data["cluster"] = data["entity"]
+    iterations = 101
+    seed = 18
+    result = _fit(
+        DifferenceInDifferences(
+            covariance="clustered",
+            inference="multiplier_bootstrap",
+            bootstrap_iterations=iterations,
+            random_state=seed,
+        ),
+        data,
+        cluster="cluster",
+    )
+    scores = result.event_study_influence.to_numpy(dtype=float)
+    multipliers = np.random.default_rng(seed).choice(
+        np.array([-1.0, 1.0]), size=(iterations, result.n_clusters)
+    )
+    draws = np.sqrt(result.n_clusters / (result.n_clusters - 1)) * multipliers @ scores
+    draws /= result.n_entities
+    expected = np.quantile(
+        np.max(np.abs(draws / result.event_study["std_err"].to_numpy()), axis=1),
+        0.95,
+        method="higher",
+    )
+
+    assert result.simultaneous_critical_value == pytest.approx(expected, abs=1e-14)
+
+
+@pytest.mark.simulation
+def test_covariate_adjusted_multiplier_band_has_seeded_coverage_smoke() -> None:
+    covered = 0
+    estimates: list[float] = []
+    repetitions = 20
+    for seed in range(repetitions):
+        rng = np.random.default_rng(seed)
+        rows: list[dict[str, float | str]] = []
+        for cohort, prefix, effect in ((2.0, "treated", 2.0), (np.inf, "never", 0.0)):
+            x = rng.normal(size=80)
+            baseline_error = rng.normal(size=80)
+            change_error = rng.normal(size=80)
+            for position in range(80):
+                baseline = 3.0 + x[position] + baseline_error[position]
+                for period, value in (
+                    (1, baseline),
+                    (
+                        2,
+                        baseline + 0.5 * x[position] + effect + change_error[position],
+                    ),
+                ):
+                    rows.append(
+                        {
+                            "entity": f"{prefix}_{position}",
+                            "time": period,
+                            "treatment_time": cohort,
+                            "x": x[position],
+                            "outcome": value,
+                        }
+                    )
+        result = _fit(
+            EfficientDiD(
+                inference="multiplier_bootstrap",
+                bootstrap_iterations=99,
+                random_state=seed,
+            ),
+            pd.DataFrame(rows),
+            covariates=["x"],
+            cross_fitter=_did_cross_fitter(seed=seed),
+        )
+        band = result.simultaneous_event_study.iloc[0]
+        covered += int(band["lower"] <= 2.0 <= band["upper"])
+        estimates.append(result.estimate)
+
+    assert np.mean(estimates) == pytest.approx(2.0, abs=0.12)
+    assert covered >= 16
+
+
+def test_invalid_multiplier_band_configuration_is_refused() -> None:
+    with pytest.raises(ValueError, match="at least 99"):
+        DifferenceInDifferences(inference="multiplier_bootstrap", bootstrap_iterations=20)
+    with pytest.raises(ValueError, match="strictly between"):
+        DifferenceInDifferences(
+            inference="multiplier_bootstrap", bootstrap_iterations=99, simultaneous_level=1.0
+        )
 
 
 def test_efficient_singular_weight_system_is_refused_without_regularization() -> None:
@@ -285,6 +562,23 @@ def test_efficient_singular_weight_system_is_refused_without_regularization() ->
     data.loc[data["treatment_time"] == 4.0, "outcome"] = np.tile([-10.0, -10.0, -10.0, 0.0], 4)
     with pytest.raises(ValueError, match="singular"):
         _fit(EfficientDiD(), data)
+
+
+def test_singular_cross_fitted_conditional_covariance_is_refused_without_repair() -> None:
+    fitter = CrossFitter(
+        propensity_factory=_ClassProbability,
+        outcome_factory=_LinearRegression,
+        second_moment_factory=_ZeroRegression,
+        n_splits=3,
+        random_state=7,
+    )
+    with pytest.raises(ValueError, match="conditional covariance system is singular"):
+        _fit(
+            EfficientDiD(),
+            _multi_moment_covariate_panel(),
+            covariates=["x"],
+            cross_fitter=fitter,
+        )
 
 
 def test_invalid_constructor_and_cluster_contracts_are_refused() -> None:

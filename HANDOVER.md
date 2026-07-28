@@ -37,15 +37,26 @@ future task can resume without reconstructing intent from chat history.
    multiplier-bootstrap simultaneous bands, pre-trend/Hausman diagnostics, repeated
    cross-sections, coverage simulations, and broader parity remain open.
 
+7. `0.6.0a2` DiD nuisance/inference promotion: `CrossFitter` now provides reusable
+   multiclass class-probability and masked scalar-regression tasks. The covariate-adjusted
+   `EfficientDiD` path uses those tasks for cohort probabilities, group-specific outcome
+   changes, and residual-product conditional covariances; it then solves the paper's
+   observation-specific equation (3.12) systems without hidden repair. Both DiD classes
+   support reproducible entity- or declared-cluster Rademacher max-t simultaneous
+   event-study bands. Exact recovery, multi-moment, robust/cluster band, singular-refusal,
+   and seeded coverage-smoke tests are maintained.
+
 ## Open promotion gates
 
 - Matching still defaults to `inference="none"`. Abadie–Imbens reuse-aware variance, the
   estimated-propensity first-step adjustment, external Stata/R parity, OutputHub
   adaptation, and the remaining promotion matrix are open. Do not substitute a generic
   sandwich, ordinary bootstrap, or cluster wrapper.
-- Efficient DiD must not fit or copy nuisance models internally. Its future covariate path
-  must consume the public nuisance/cross-fitting protocols and reproduce the paper's
-  conditional covariance and inference requirements.
+- Efficient DiD owns no nuisance model classes. The implemented covariate path must keep
+  consuming public cross-fitting factories; direct density-ratio regression remains a
+  possible future stability enhancement over ratios of multiclass probabilities.
+- Pre-trend/Hausman diagnostics, repeated-cross-section DiD, publication-scale coverage,
+  covariate-path external parity, and a larger covariate benchmark remain open.
 
 ## Required implementation patterns
 
@@ -67,13 +78,13 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Finish DiD promotion from `docs/DID_CONTRACT.md`: integrate supplied/cross-fitted
-   covariate nuisances, conditional covariance estimation, simultaneous bands,
-   pre-trend/Hausman diagnostics, coverage, and broader reference evidence.
-2. Finish matching promotion from `docs/MATCHING_CONTRACT.md`: settle
+1. Finish matching promotion from `docs/MATCHING_CONTRACT.md`: settle
    score-provenance-specific analytical inference, then add variance identities/coverage,
    aligned external parity, OutputHub adaptation, and the full benchmark matrix without
    weakening the current refusal boundaries.
+2. Return to DiD for pre-trend/Hausman diagnostics, repeated cross-sections,
+   publication-scale coverage, direct-ratio nuisance support if justified, and broader
+   reference evidence.
 3. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
    manipulation checks, bias correction, and local estimand.
 4. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
@@ -83,3 +94,13 @@ Continue to preserve the matching tie/inference, target-population, and no-quadr
 matrix decisions. For DiD, preserve the conventional/efficient separation, PT-All label,
 entity-level influence records, no-hidden-regularization refusal, and fixed-T/vectorized-n
 execution path. Do not relabel either alpha as promoted merely to make an early demo run.
+
+## Cross-software parity gate
+
+Before a model family is release-complete, maintain estimand-aligned Python, R, and Stata
+comparisons where all three ecosystems expose the same estimator. Record software and
+package versions, source or fixture, option and parameter mapping, covariance corrections,
+seed, tolerances, and maximum discrepancies. If an ecosystem lacks the estimator or uses
+different identifying moments, record the row as non-comparable or unavailable rather
+than manufacturing a parity pass. The existing no-covariate efficient DiD R comparator is
+pinned; Python/R/Stata coverage for every model remains a package-wide release gate.

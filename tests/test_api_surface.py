@@ -21,6 +21,9 @@ PUBLIC_EXPORTS = {
     "OverlapDiagnostic",
     "CrossFitter",
     "CrossFitResult",
+    "CrossFitTask",
+    "CrossFitTaskResult",
+    "ClassProbabilityCrossFitResult",
     "NuisanceEstimatorProtocol",
     "PropensityResultProtocol",
     "OutcomeResultProtocol",
@@ -77,12 +80,15 @@ def test_estimator_signatures_keep_identification_inputs_explicit() -> None:
     assert conventional_did.parameters["anticipation"].default == 0
     assert conventional_did.parameters["covariance"].default == "robust"
     assert conventional_did.parameters["inference"].default == "analytic"
+    assert conventional_did.parameters["bootstrap_iterations"].default == 999
+    assert conventional_did.parameters["simultaneous_level"].default == 0.95
 
     efficient_did = inspect.signature(causalkit.EfficientDiD)
     assert efficient_did.parameters["pre_periods"].default == "all"
     assert efficient_did.parameters["anticipation"].default == 0
     assert efficient_did.parameters["covariance"].default == "robust"
     assert efficient_did.parameters["inference"].default == "analytic"
+    assert efficient_did.parameters["nuisance_probability_floor"].default == 1e-6
 
 
 def test_fit_returns_the_public_result_type() -> None:

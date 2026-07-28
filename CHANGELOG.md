@@ -4,6 +4,44 @@ All notable changes to `causalkit` are recorded here. The project follows
 [Semantic Versioning](https://semver.org/) once a public contract is released. Alpha
 versions may refine APIs, but breaking changes must still be documented explicitly.
 
+## [0.6.0a2] - Unreleased
+
+### Added
+
+- Reusable `CrossFitter.fit_predict_class_probabilities` and
+  `CrossFitter.fit_predict_tasks` operations for multiclass probabilities and arbitrary
+  masked scalar nuisance regressions on one deterministic fold plan.
+- A covariate-adjusted `EfficientDiD` path that obtains cohort probabilities,
+  group-specific outcome-change regressions, and residual-product conditional
+  covariances through public `CrossFitter` factories.
+- Observation-specific Chen-Sant'Anna-Xie equation (3.12) covariance systems and
+  efficient weights, with aligned fold, probability, candidate-score, and conditional-
+  weight audit records.
+- Reproducible entity-level or declared-cluster Rademacher multiplier-bootstrap max-t
+  simultaneous event-study bands for both conventional and efficient DiD.
+- Exact nuisance recovery, multi-moment conditional-covariance, singular-refusal,
+  hand-reconstructed robust/cluster band, and seeded coverage-smoke tests.
+
+### Architecture
+
+- `EfficientDiD` still owns no regression or classification model. Fresh nuisance models
+  come from user-supplied factories, and every reported nuisance prediction is aligned
+  and out of fold.
+- Estimated cohort probabilities below the declared floor are refused, not clipped.
+  Singular observation-specific covariance systems are refused without a ridge,
+  eigenvalue repair, or pseudoinverse.
+- Pointwise influence-function standard errors remain in the main result tables;
+  simultaneous intervals and their realized critical value are exposed separately.
+
+### Known limitations
+
+- The covariate path requires a balanced short panel and numeric, entity-constant
+  covariates. Repeated cross-sections and sampling weights are not implemented.
+- The efficiency claim is conditional on PT-All and the overlap, consistency,
+  weighting, and nuisance-rate conditions in Assumption C.1 of Chen, Sant'Anna, and Xie.
+- Broader covariate parity, pre-trend/Hausman diagnostics, and publication-scale Monte
+  Carlo evidence remain promotion work.
+
 ## [0.6.0a1] - Unreleased
 
 ### Added

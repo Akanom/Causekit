@@ -2,7 +2,7 @@
 
 ## Status and decision
 
-The `0.6.0a1` milestone adds two separate estimators. The efficient estimator is an
+The `0.6.0a2` milestone keeps two separate estimators. The efficient estimator is an
 addition, not a replacement for conventional difference-in-differences (DiD).
 
 | Public estimator | Identifying restriction | Comparison observations | Weighting |
@@ -14,10 +14,10 @@ The conventional estimator is the safer default when the stronger pre-period and
 cross-cohort restrictions needed for efficiency are not substantively justified.
 `EfficientDiD` must never silently weaken or relabel those assumptions.
 
-The initial alpha implements the paper's closed-form no-covariate short-panel path. It
-does not copy nuisance estimators from `limiteddepkit`. A later covariate-adjusted path
-must consume causalkit's public nuisance protocols and cross-fitting orchestrator, and
-must also implement the paper's conditional covariance estimation contract.
+The efficient estimator supports both the paper's closed-form no-covariate path and a
+covariate-adjusted path. It does not copy nuisance estimators from `limiteddepkit`.
+Covariate adjustment consumes user-owned model factories through causalkit's public
+`CrossFitter` protocol and implements the paper's conditional covariance contract.
 
 ## Data and timing
 
@@ -93,6 +93,49 @@ with an undocumented ridge or pseudoinverse.
 boundary. A positive integer uses that many immediately preceding periods. The same
 choice is recorded in the result.
 
+## Covariate-adjusted efficient path
+
+Passing `covariates=` to `EfficientDiD.fit` requires an explicit `cross_fitter=`. Each
+covariate must be numeric, finite, and constant within entity. `EfficientDiD` supplies
+targets and group masks to the orchestrator; it never instantiates a regression or
+classifier itself.
+
+The first nuisance stage cross-fits one multiclass cohort model and group-specific
+conditional outcome-change regressions. For candidate `(g', t_pre)`, equation (4.4) is
+implemented as
+
+```text
+Gg/pi_g * (Yt-Y1 - m_inf,t,tpre(X) - m_g',tpre,1(X))
+- [p_g(X)/p_inf(X)] * Ginf/pi_g * (Yt-Ytpre - m_inf,t,tpre(X))
+- [p_g(X)/p_g'(X)] * Gg'/pi_g * (Ytpre-Y1 - m_g',tpre,1(X)).
+```
+
+The density ratios are formed from aligned out-of-fold multiclass probabilities. This is
+a supported implementation route in the paper, although direct ratio regression may be
+more stable near weak overlap. Every probability used in a ratio must exceed
+`nuisance_probability_floor`; the implementation refuses instead of clipping.
+
+For equation (3.12), conditional covariances are estimated as cross-fitted regressions of
+products of out-of-fold outcome-change residuals. A dedicated
+`second_moment_factory=` may be supplied on `CrossFitter`; otherwise its outcome factory
+is reused. For every entity and group-time cell, the resulting symmetric conditional
+covariance matrix must be finite and positive definite under `singularity_tolerance`.
+No ridge, diagonal clipping, eigenvalue repair, or pseudoinverse is applied.
+
+The observation-specific weights are
+
+```text
+w_i = solve(Omega_i, 1) / (1' solve(Omega_i, 1)).
+```
+
+`conditional_efficiency_weights` exposes every `w_i`; `efficiency_weights` reports its
+sample mean, minimum, maximum, and standard deviation by candidate. The result also
+exposes the shared nuisance fold and cohort-probability matrix. The semiparametric
+efficiency label is justified only when PT-All and the second-moment, proper-weighting,
+overlap, nuisance consistency, and product-rate conditions in the paper's Assumption C.1
+hold. Cross-fitting prevents own-observation training leakage; it does not prove those
+population conditions.
+
 ## Aggregation and target populations
 
 Group-time effects target the observed members of cohort `g`. Event-study effects use
@@ -106,7 +149,7 @@ therefore does not treat random aggregation weights as fixed.
 
 ## Uncertainty
 
-The alpha supports pointwise analytic influence-function inference:
+Both estimators support pointwise analytic influence-function inference:
 
 - `covariance="robust"` uses the package's HC1-style finite-sample scaling
   `sum(IF_i^2) / [n(n-1)]` with a normal reference distribution;
@@ -115,20 +158,28 @@ The alpha supports pointwise analytic influence-function inference:
 
 The paper's random-sampling unit is the panel entity. A higher-level cluster must be
 constant within entity and have at least two levels. Pointwise intervals do not control
-family-wise error across the event-study path. The paper's semiparametric efficiency-bound
-claim is retained only for independent entities; requesting higher-level clustered
-uncertainty does not establish efficiency under a cluster-dependent model.
-Multiplier-bootstrap simultaneous bands remain a promotion gate and are refused in this
-alpha.
+family-wise error across the event-study path. `inference="multiplier_bootstrap"`
+additionally constructs a studentized Rademacher max-t band over all reported event
+times. Multipliers are drawn at the entity level for robust inference and once per
+declared cluster for clustered inference. The existing HC1/cluster finite-sample scale is
+applied before studentization. The realized critical value, level, iteration count, seed,
+and lower/upper limits are recorded separately from the pointwise table. A band refuses
+if any included event-time standard error is zero or non-finite; no dimension is silently
+dropped.
+
+The paper's semiparametric efficiency-bound claim is retained only for independent
+entities; requesting higher-level clustered uncertainty does not establish efficiency
+under a cluster-dependent model.
 
 ## Refusals
 
 The public estimators refuse duplicate entity-time rows, unbalanced panels, non-finite
-outcomes or time values, varying treatment time or cluster within entity, an unobserved
+outcomes or time values, varying treatment time, covariates, or cluster within entity, an unobserved
 finite adoption time, missing never-treated observations, cohorts without a clean
 baseline, undersized cohorts, unsupported repeated cross-sections, sampling weights,
-covariate adjustment, invalid control labels, non-analytic inference, and singular
-efficient covariance systems.
+missing nuisance factories, invalid or near-zero cohort probabilities, invalid control
+labels, malformed multiplier settings, degenerate event paths requested for simultaneous
+bands, and singular unconditional or conditional efficient covariance systems.
 
 ## Validation and promotion gates
 
@@ -138,9 +189,11 @@ orthogonal generated-outcome scores with variances proportional to `1`, `4`, and
 the efficient weights must be exactly `16/21`, `4/21`, and `1/21`. Refusal behavior is
 part of this contract.
 
-Promotion beyond the no-covariate alpha requires covariate-adjusted nuisance integration,
-cross-fitting tests, conditional covariance estimation, multiplier-bootstrap simultaneous
-bands, coverage simulations, larger performance fixtures, and aligned external parity.
+The maintained promotion evidence now covers covariate nuisance integration, shared-fold
+cross-fitting, conditional covariance inversion and refusal, robust/clustered multiplier
+band identities, and a seeded coverage smoke. Remaining gates include pre-trend/Hausman
+diagnostics, repeated cross-sections, publication-scale Monte Carlo studies, larger
+covariate-performance fixtures, and aligned external parity for the covariate path.
 
 Primary methodology:
 

@@ -1,7 +1,10 @@
 """Identification-aware causal inference and instrumental-variable workflows."""
 
 from .crossfit import (
+    ClassProbabilityCrossFitResult,
     CrossFitResult,
+    CrossFitTask,
+    CrossFitTaskResult,
     CrossFitter,
     NuisanceEstimatorProtocol,
     OutcomeResultProtocol,
@@ -28,7 +31,10 @@ from .randomized import CovariateBalance, RandomizedATE, RandomizedATEResult
 __all__ = [
     "FirstStageDiagnostic",
     "CovariateBalance",
+    "ClassProbabilityCrossFitResult",
     "CrossFitResult",
+    "CrossFitTask",
+    "CrossFitTaskResult",
     "CrossFitter",
     "DiDResult",
     "DifferenceInDifferences",
@@ -59,4 +65,4 @@ __all__ = [
     "wald_test",
 ]
 
-__version__ = "0.6.0a1"
+__version__ = "0.6.0a2"
