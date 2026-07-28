@@ -24,6 +24,8 @@ PUBLIC_EXPORTS = {
     "NuisanceEstimatorProtocol",
     "PropensityResultProtocol",
     "OutcomeResultProtocol",
+    "NearestNeighborMatch",
+    "NearestNeighborMatchResult",
     "confint",
     "fitted_values",
     "predict",
@@ -59,6 +61,13 @@ def test_estimator_signatures_keep_identification_inputs_explicit() -> None:
     assert fit.parameters["instruments"].kind is inspect.Parameter.KEYWORD_ONLY
     assert fit.parameters["exogenous"].default is None
     assert fit.parameters["clusters"].default is None
+
+    matching = inspect.signature(causalkit.NearestNeighborMatch)
+    assert matching.parameters["estimand"].default == "att"
+    assert matching.parameters["replacement"].default is True
+    assert matching.parameters["caliper"].default == "auto"
+    assert matching.parameters["ties"].default == "all"
+    assert matching.parameters["inference"].default == "none"
 
 
 def test_fit_returns_the_public_result_type() -> None:

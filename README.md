@@ -1,9 +1,9 @@
 # causalkit
 
 `causalkit` is an identification-aware Python package for causal inference and
-instrumental-variable workflows. The `0.4.0a1` surface provides linear two-stage least
-squares, randomized-experiment effects, reusable nuisance cross-fitting, and IPW/AIPW
-ATE, ATT, and ATC.
+instrumental-variable workflows. The `0.5.0a1` surface provides linear two-stage least
+squares, randomized-experiment effects, reusable nuisance cross-fitting, IPW/AIPW ATE,
+ATT, and ATC, plus a point-estimation alpha for scalar propensity-score matching.
 
 This is alpha research software. A successful fit is not evidence that an instrument is
 valid, and an IV coefficient is not automatically an average treatment effect. State the
@@ -83,6 +83,40 @@ att = AIPWATE(estimand="att").fit(
 Folds are stratified by treatment, predictions retain the original index, and each arm
 must contain at least `n_splits` observations. Fold assignment is deterministic when
 `random_state` is fixed.
+
+### Nearest-neighbor matching point alpha
+
+`NearestNeighborMatch` consumes a supplied propensity rather than copying a binary model
+from `limiteddepkit`. The implemented slice supports ATT, ATC, and bidirectional-imputation
+ATE; logit-propensity distance; replacement; inclusive numeric or automatic calipers;
+intersection common support; deterministic fractional boundary ties; effect/reuse
+weights; and before/after covariate balance.
+
+```python
+from causalkit import NearestNeighborMatch
+
+matched = NearestNeighborMatch(
+    estimand="att",
+    inference="none",
+).fit(
+    outcome,
+    treatment=treated,
+    propensity=nuisance.propensity,
+    covariates=X,
+    propensity_provenance="CrossFitter:5-fold",
+)
+
+print(matched.summary_frame())
+print(matched.balance)
+print(matched.match_table)
+```
+
+This alpha returns a point estimate and deliberately leaves standard errors, statistics,
+and p-values undefined. Ordinary bootstrap, matching without replacement, arbitrary tie
+selection, clustered uncertainty, and unimplemented bias correction refuse explicitly.
+The reserved `inference="abadie_imbens"` path also refuses: valid uncertainty must account
+for comparison reuse and distinguish a fixed score from an estimated propensity. See the
+[matching contract](docs/MATCHING_CONTRACT.md) before publication-facing use.
 
 There is no formula API yet. Prepare numeric arrays, `Series`, or `DataFrame` objects
 explicitly, including categorical encoding and transformations. `add_constant=True` is
@@ -314,19 +348,19 @@ The packages remain separated by estimand:
 Applicable validation, indexing, covariance, diagnostics, and reporting conventions are
 reused conceptually without importing private source or coupling the packages at runtime.
 Existing `limiteddepkit` binary, count, censoring, duration, and ordinal estimators are
-not duplicated here. The supplied-nuisance IPW/AIPW API already lets their out-of-sample
-predictions participate while keeping causal identification and inference inside
-`causalkit`; built-in cross-fitting orchestration remains future work.
+not duplicated here. The supplied-nuisance IPW/AIPW and matching APIs let their
+out-of-sample predictions participate while keeping causal identification inside
+`causalkit`; `CrossFitter` owns only reusable fold orchestration and prediction adaptation.
 
 ## Roadmap
 
-The matching design is settled in the
-[nearest-neighbor matching contract](docs/MATCHING_CONTRACT.md); no matching estimator is
-exported until its analytical-inference, refusal, parity, and performance gates pass.
-Later releases may add matching,
-difference-in-differences and event studies, regression discontinuity, and panel IV. Each
-family must define its estimand, assumptions, failure behavior, diagnostics, and independent
-validation evidence before promotion.
+The point-estimation matching alpha follows the
+[nearest-neighbor matching contract](docs/MATCHING_CONTRACT.md). Analytical uncertainty,
+external parity, OutputHub adaptation, and the remaining promotion evidence are still
+required before it can be described as a completed matching release. Later releases may
+add difference-in-differences and event studies, regression discontinuity, and panel IV.
+Each family must define its estimand, assumptions, failure behavior, diagnostics, and
+independent validation evidence before promotion.
 
 DADPLM and BDCPM are outside the current package scope. The roadmap is directional, not a
 promise of API shape or release timing. See [Package scope](docs/PACKAGE_SCOPE.md).

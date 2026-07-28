@@ -10,6 +10,7 @@ from .crossfit import (
 from .diagnostics import FirstStageDiagnostic, SarganTest
 from .integrations import add_to_outputhub, to_outputhub_model
 from .iv import IV2SLS, IV2SLSResult
+from .matching import NearestNeighborMatch, NearestNeighborMatchResult
 from .observational import AIPWATE, IPWATE, ObservationalATEResult, OverlapDiagnostic
 from .postestimation import (
     confint,
@@ -35,6 +36,8 @@ __all__ = [
     "ObservationalATEResult",
     "OverlapDiagnostic",
     "NuisanceEstimatorProtocol",
+    "NearestNeighborMatch",
+    "NearestNeighborMatchResult",
     "OutcomeResultProtocol",
     "PropensityResultProtocol",
     "SarganTest",
@@ -52,4 +55,4 @@ __all__ = [
     "wald_test",
 ]
 
-__version__ = "0.4.0a1"
+__version__ = "0.5.0a1"

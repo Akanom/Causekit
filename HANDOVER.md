@@ -14,6 +14,19 @@ future task can resume without reconstructing intent from chat history.
 4. `0.4.0a1`: reusable deterministic `CrossFitter`, public nuisance fit/prediction
    protocols, and ATE/ATT/ATC support.
 
+## Active milestone
+
+5. `0.5.0a1` matching point alpha: contract tests were written and observed failing before
+   the engine existed. The current implementation covers supplied logit-propensity
+   ATT/ATC/ATE matching with replacement, sorted scalar neighbor search, support and
+   caliper attrition, deterministic fractional ties, effect/reuse weights, balance, strict
+   refusals, deterministic recovery tests, and a reproducible benchmark harness.
+
+   This milestone is not complete. `inference="none"` is intentionally the default.
+   Abadie–Imbens reuse-aware variance, the estimated-propensity first-step adjustment,
+   external Stata/R parity, OutputHub adaptation, and the remaining promotion matrix are
+   open. Do not substitute a generic sandwich, ordinary bootstrap, or cluster wrapper.
+
 ## Required implementation patterns
 
 - Reuse the strict alignment, labelled-result, covariance, post-estimation, OutputHub,
@@ -34,9 +47,10 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Matching: the pre-implementation contract is now settled in
-   `docs/MATCHING_CONTRACT.md`. Implement only its first stable slice and preserve every
-   refusal/inference boundary recorded there.
+1. Finish matching promotion from the implemented point alpha in
+   `docs/MATCHING_CONTRACT.md`: settle score-provenance-specific analytical inference,
+   then add variance identities/coverage, aligned external parity, OutputHub adaptation,
+   and the full benchmark matrix without weakening the current refusal boundaries.
 2. Difference-in-differences and event studies: define treatment timing, comparison
    cohorts, anticipation, staggered adoption, weighting, and clustered inference.
 3. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
@@ -44,6 +58,6 @@ future task can resume without reconstructing intent from chat history.
 4. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
    effects, and clustered covariance contracts.
 
-Matching implementation must begin with contract tests, not nearest-neighbor code. Do not
-weaken the tie/inference, target-population, or no-quadratic-matrix decisions merely to
-make an early demo run.
+Matching implementation began with contract tests, as required. Continue to preserve the
+tie/inference, target-population, and no-quadratic-matrix decisions; do not relabel the
+point alpha as a completed inferential estimator merely to make an early demo run.

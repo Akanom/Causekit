@@ -4,6 +4,37 @@ All notable changes to `causalkit` are recorded here. The project follows
 [Semantic Versioning](https://semver.org/) once a public contract is released. Alpha
 versions may refine APIs, but breaking changes must still be documented explicitly.
 
+## [0.5.0a1] - Unreleased
+
+### Added
+
+- `NearestNeighborMatch` and `NearestNeighborMatchResult` for supplied
+  logit-propensity ATT, ATC, and bidirectional-imputation ATE point estimation.
+- Replacement matching with inclusive automatic/numeric calipers, optional explicit
+  caliper opt-out, intersection common support, deterministic fractional boundary ties,
+  exact retained/excluded indices, target relabeling, effect weights, reuse counts, and
+  weighted balance diagnostics.
+- Hand-computed estimand identities, support/caliper/tie/reuse/balance tests,
+  deterministic heterogeneous-effect recovery, refusal-path coverage, and a reproducible
+  100,000-row sorted-scalar benchmark harness.
+
+### Architecture
+
+- The matcher consumes supplied propensity predictions and records their provenance; it
+  does not copy nuisance estimators from `limiteddepkit`.
+- Neighbor search sorts scalar arm scores and expands locally, avoiding a quadratic
+  treated-by-control distance matrix.
+
+### Known limitations
+
+- This is a point-estimation alpha. `inference="none"` is the default and inferential
+  result fields are undefined.
+- The reserved Abadie–Imbens path refuses until reuse-aware conditional variance and the
+  estimated-propensity first-step adjustment are implemented and validated. Ordinary
+  bootstrap and clustered matching inference also refuse.
+- Matching without replacement, alternative metrics, bias correction, external parity,
+  OutputHub adaptation, and the full promotion benchmark matrix remain deferred.
+
 ## [0.4.0a1] - Unreleased
 
 ### Added

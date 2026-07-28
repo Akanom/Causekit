@@ -1,7 +1,9 @@
 # Nearest-neighbor matching contract
 
-Status (2026-07-28): design approved for implementation planning; no public matching
-estimator exists yet. This document is normative for the first implementation slice.
+Status (2026-07-28): the public point-estimation alpha is implemented. Analytical
+uncertainty, external-software parity, OutputHub adaptation, and full promotion evidence
+remain open gates. This document is normative for both the implemented slice and those
+explicitly deferred gates.
 
 ## Problem and claim boundary
 
@@ -32,7 +34,7 @@ NearestNeighborMatch(
     common_support="intersection",
     ties="all",
     bias_correction="none",
-    inference="abadie_imbens",
+    inference="none",
 ).fit(
     y,
     treatment=...,
@@ -42,8 +44,10 @@ NearestNeighborMatch(
 ```
 
 The propensity input may come from `CrossFitter` or another auditable out-of-sample
-workflow. The matcher owns matching, matched-sample weights, diagnostics, estimand labels,
-and valid uncertainty; it does not own binary-response nuisance estimation.
+workflow. `propensity_provenance=` records that origin; it does not validate the model.
+The matcher owns matching, matched-sample weights, diagnostics, and estimand labels. It
+does not own binary-response nuisance estimation, and the current point alpha does not
+claim valid sampling uncertainty.
 
 ## Estimand and target population
 
@@ -130,11 +134,11 @@ estimate depend on an arbitrary ordering. Random tie-breaking is also excluded f
 stable slice because a seed does not make the resulting estimand scientifically less
 arbitrary.
 
-This tie rule creates an inference restriction: fixed-neighbor Abadie–Imbens analytical
-variance is available only when no boundary tie expands the realized neighbor count.
-When boundary ties occur, `inference="abadie_imbens"` must refuse with an actionable
-message. The user may report a point estimate with `inference="none"`; the package must
-not substitute an unvalidated standard error.
+This tie rule creates an inference restriction: a future fixed-neighbor Abadie–Imbens
+analytical variance can be available only when no boundary tie expands the realized
+neighbor count. When boundary ties occur, `inference="abadie_imbens"` refuses with an
+actionable message. The user may report a point estimate with `inference="none"`; the
+package does not substitute an unvalidated standard error.
 
 ## Common support
 
@@ -189,15 +193,27 @@ The matcher must not import or duplicate regression estimators from `limiteddepk
 
 ## Uncertainty
 
-Accepted values are `"abadie_imbens"` and `"none"`; the proposed default is
-`"abadie_imbens"`.
+Accepted values are `"abadie_imbens"` and `"none"`. The point-estimation alpha defaults
+to `"none"`. `"abadie_imbens"` is reserved but currently refuses rather than returning
+an incomplete standard error.
 
-The analytical variance implementation must follow the fixed-neighbor, replacement
-framework and account for comparison-unit reuse. It is available only when its maintained
-conditions hold: fixed realized neighbor count, no expanded boundary ties, independent
-sampling units, and adequate observations in both arms for conditional variance
-estimation. The result stores the variance method, neighbor count, reuse diagnostics,
-reference distribution, and every finite-sample convention.
+The future analytical variance implementation must follow the fixed-neighbor,
+replacement framework and account for comparison-unit reuse. It is available only when
+its maintained conditions hold: fixed realized neighbor count, no expanded boundary
+ties, independent sampling units, and adequate observations in both arms for conditional
+variance estimation. It also must distinguish a known/fixed score from an estimated
+propensity. Abadie and Imbens show that propensity-score estimation generally changes the
+asymptotic variance; for the ATT the adjustment can have either sign. A generic supplied
+or cross-fitted prediction does not expose the parametric score, information matrix, or
+other first-step structure needed to apply that correction. Therefore the package will
+not present the fixed-score variance as universally valid for supplied estimated scores.
+
+Promotion of `"abadie_imbens"` requires separate maintained contracts for (a) a declared
+known/fixed score and (b) supported estimated-propensity models with the required
+first-step information. Arbitrary cross-fitted machine-learning scores require their own
+justified inference result. When implemented, the result will store the variance method,
+score provenance, conditional-variance neighbor count, reuse diagnostics, reference
+distribution, and every finite-sample convention.
 
 Ordinary nonparametric bootstrap is prohibited for the stable fixed-neighbor estimator.
 Abadie and Imbens show that it is generally invalid even where the estimator is root-N
@@ -275,6 +291,13 @@ Implementation cannot be called complete until all gates pass:
 9. 100,000-row runtime/memory smoke without a quadratic distance matrix;
 10. OutputHub, artifact-content, clean-wheel, lint, format, typing, and full-suite gates.
 
+The current point alpha passes the hand-computed ATT/ATC/ATE, row-permutation, caliper,
+support, tie-weight, reuse-weight, balance-identity, deterministic paired-recovery, and
+documented refusal tests. `benchmarks/benchmark_matching.py` supplies the reproducible
+sorted-scalar performance harness. Analytical-variance identities and coverage,
+aligned external parity, OutputHub integration, and the complete benchmark matrix remain
+promotion gaps; the point alpha must not be described as a completed matching release.
+
 ## Pre-mortem
 
 | Likely failure | Early warning | Mitigation/required response |
@@ -295,6 +318,9 @@ Implementation cannot be called complete until all gates pass:
   <https://doi.org/10.3982/ECTA6474>.
 - Abadie and Imbens develop regression bias correction for matching estimators:
   <https://economics.mit.edu/sites/default/files/publications/Bias-Corrected%20Matching%20Estimators%20for.pdf>.
+- Abadie and Imbens show that estimating the propensity score changes matching-estimator
+  uncertainty and derive model-specific variance adjustments:
+  <https://doi.org/10.3982/ECTA11293>.
 - Rosenbaum and Rubin develop propensity-score-informed matched sampling:
   <https://doi.org/10.1080/00031305.1985.10479383>.
 - Austin's simulations motivate `0.2` standard deviations of the logit propensity as a

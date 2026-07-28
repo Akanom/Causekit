@@ -213,6 +213,28 @@ unreliable with few clusters, severe imbalance, or influential clusters; the pac
 not claim a few-cluster-robust correction. Cluster labels must be observed and aligned for
 every fitted row.
 
+## Matching identification boundary
+
+`NearestNeighborMatch` defines ATT, ATC, or ATE through observed-minus-imputed potential
+outcome contrasts. A causal interpretation requires consistency, no interference,
+conditional exchangeability given the measured pre-treatment covariates used to construct
+the supplied propensity, and positivity in the realized target population. The package
+cannot verify that the propensity model included all confounders or that its predictions
+are correctly specified.
+
+Support and caliper exclusions can change the target population. The result therefore
+separates `requested_estimand` from `realized_estimand`, exposes excluded indices and arm
+counts, and uses a `_matched_support` label when focal observations are removed. Better
+observed balance is a design diagnostic, not evidence that unmeasured confounding was
+eliminated. Caliper sensitivity and covariate-level balance should be reported together
+with focal attrition and comparison reuse.
+
+The `0.5.0a1` matching surface is point-estimation-only. `inference="none"` is not a claim
+that the design is uncertainty-free; it means the package has deliberately not attached a
+standard error. Ordinary bootstrap is not substituted because fixed-neighbor matching is
+nonsmooth, and fixed-score analytical variance is not silently applied to an estimated
+propensity without its required first-step adjustment.
+
 ## Missing values, indices, and sample definition
 
 The default policy is `missing="raise"`. Missing or non-finite numeric values trigger an

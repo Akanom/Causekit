@@ -17,6 +17,20 @@ used in empirical validation must record whether they are oracle, fixed low-comp
 held-out, or cross-fitted; in-sample adaptive predictions cannot be presented as validated
 cross-fitted inference.
 
+For nearest-neighbor matching, point-estimation evidence begins with hand-computed ATT,
+ATC, and bidirectional ATE examples. It must also reconstruct fractional tie weights,
+effect-weight identities, comparison reuse, inclusive caliper and support boundaries,
+target-population relabeling, weighted balance, row-permutation invariance, and exact
+paired heterogeneous-effect recovery. Refusal tests cover invalid scores, alignment,
+empty matches, unsupported replacement/metrics/ties/bias correction, ordinary bootstrap,
+clustered inference, and the not-yet-certified analytical variance path. Changing outcomes
+while holding the design inputs fixed must not change selected matches.
+
+The point tests are necessary but not sufficient for inferential promotion. The reserved
+Abadie–Imbens path still requires hand-reconstructed reuse-aware variance, conditional-
+variance matching, score-provenance-specific first-step adjustment, coverage simulations,
+and aligned Stata/R evidence. Until those pass, matching results use `inference="none"`.
+
 ## Claim boundary
 
 Validation can provide evidence that:
@@ -144,6 +158,9 @@ passing only after its tests have executed successfully in the recorded environm
 | Data contract | NumPy and pandas, missing/non-finite, misaligned indices, duplicate names | Stable success behavior or precise refusal; never silent sample drift |
 | Post-estimation | In-sample and new-data prediction, tables, Markdown | Schema enforcement, index preservation, numerical alignment |
 | Integrations | Optional dependency present and absent | Stable adapter output or actionable optional-dependency error |
+| Matching point estimate | ATT, ATC, ATE, ties, support/caliper attrition, reuse | Hand identities, design invariance, target labels, exact audit weights |
+| Matching uncertainty | Fixed score and supported estimated-score provenance | Abadie–Imbens variance identities, first-step adjustment, coverage, explicit refusals |
+| Matching performance | Balanced/imbalanced arms, ties, attrition, reuse at scale | Sorted-scalar behavior, elapsed time, peak memory, no quadratic distance matrix |
 
 ## Numerical tolerances
 
@@ -186,6 +203,7 @@ Run marked evidence subsets explicitly when reviewing them:
 ```bash
 python -m pytest -m validation
 python -m pytest -m simulation
+python benchmarks/benchmark_matching.py --scenario balanced_ate --n 100000 --measure-memory
 ```
 
 Run the README example in a clean installation and inspect both wheel and source

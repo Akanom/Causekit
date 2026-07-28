@@ -5,10 +5,10 @@ identification. Inclusion requires more than a method being common in applied ec
 the package must be able to state the estimand, identifying assumptions, supported data
 structure, inference target, diagnostics, and validation boundary.
 
-## Stable `0.4.0a1` surface
+## Public `0.5.0a1` alpha surface
 
-The first alpha release deliberately supports one model family: cross-sectional linear
-instrumental variables estimated by two-stage least squares.
+The surface is estimator-specific. Cross-sectional linear instrumental variables retain
+the following contract:
 
 | Capability | Supported contract |
 | --- | --- |
@@ -29,9 +29,17 @@ arms coded exactly 0/1 and does not infer or validate the assignment mechanism f
 The stable label describes the intended API surface within this alpha, not a claim that
 instrument validity or causal identification can be automated.
 
+The observational surface includes supplied-nuisance `IPWATE` and `AIPWATE`, reusable
+`CrossFitter` orchestration, and ATT/ATC/ATE target choices. The matching point alpha adds
+`NearestNeighborMatch` for supplied logit-propensity distance with replacement, explicit
+support/caliper/tie rules, bidirectional ATE imputation, audit weights, reuse counts, and
+balance diagnostics. It does not yet supply sampling uncertainty: `inference="none"` is
+the default, while analytical, bootstrap, and clustered alternatives refuse rather than
+returning a methodologically incomplete standard error.
+
 ## Deliberate boundaries in this release
 
-`0.1.0a1` does not provide:
+The current alpha does not provide:
 
 - a formula parser or stored preprocessing pipeline;
 - automatic categorical coding, interaction generation, scaling, or imputation; row
@@ -114,7 +122,7 @@ and validation gates:
 
 | Family | Required design questions before promotion |
 | --- | --- |
-| Matching | Distance and caliper rules, replacement, estimand, common support, balance, uncertainty, and matching-induced dependence |
+| Matching promotion | Reuse-aware analytical variance, estimated-propensity adjustment, external parity, OutputHub adaptation, and complete performance evidence |
 | Difference-in-differences and event studies | Treatment timing, comparison cohort, anticipation, staggered adoption, weighting, pre-trend diagnostics, and clustered inference |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
 | Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |
@@ -123,9 +131,10 @@ Roadmap status is not an implementation promise. A family remains experimental o
 until its public contract, failure behavior, tests, independent reference evidence, and
 documentation are complete.
 
-The normative pre-implementation matching decisions are recorded in
-[Nearest-neighbor matching contract](MATCHING_CONTRACT.md). This design record does not
-export a placeholder estimator or claim that matching is implemented.
+The normative matching decisions and point-alpha boundary are recorded in
+[Nearest-neighbor matching contract](MATCHING_CONTRACT.md). The exported estimator is
+implemented for audited point estimation only and is not a claim that the full matching
+promotion gates have passed.
 
 ## Out of current scope
 

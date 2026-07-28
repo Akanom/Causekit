@@ -1,6 +1,6 @@
 # Architecture
 
-`causalkit` is organized around small, auditable estimation paths. The `0.4.0a1`
+`causalkit` is organized around small, auditable estimation paths. The `0.5.0a1`
 architecture keeps causal assumptions visible, separates numerical estimation from
 inference and diagnostics, and returns frozen labelled result containers suitable for
 reporting. The pandas objects stored inside a result should be treated as read-only; helper
@@ -80,6 +80,7 @@ The installed source tree assigns one primary responsibility to each module:
 | `causalkit.randomized` | Two-arm difference-in-means and Lin-adjusted ATE execution path, balance records, and fitted result |
 | `causalkit.observational` | Supplied-nuisance IPW/AIPW scores, overlap diagnostics, vectorized influence-function and cluster inference |
 | `causalkit.crossfit` | Public nuisance protocols, deterministic stratified fold orchestration, fresh-model fitting, prediction adaptation, and aligned out-of-fold records |
+| `causalkit.matching` | Supplied-score ATT/ATC/ATE matching, sorted scalar neighbor search, support/caliper rules, fractional ties, weights, reuse, balance, and inference refusals |
 | `causalkit.postestimation` | Summary, covariance, confidence interval, prediction, residual, fitted-value, linear-combination, and Wald helpers |
 | `causalkit.integrations.outputhub` | Lazy optional conversion and insertion into Universal Output Hub |
 
@@ -185,10 +186,9 @@ Compatibility is structural rather than inheritance-based:
 - no result class is promised to be interchangeable where estimator semantics differ; and
 - shared conventions are verified through public fields and adapter behavior.
 
-Limited-outcome estimators are not copied into this package. When a future causal
-procedure needs a propensity or outcome nuisance model, integration should target a
+Limited-outcome estimators are not copied into this package. `CrossFitter` targets a
 documented fit/predict protocol so public `limiteddepkit` estimators can participate
-optionally without becoming a core dependency. The causal procedure must still own sample
+optionally without becoming a core dependency. The causal procedure still owns sample
 splitting, estimand construction, diagnostics, and valid uncertainty propagation.
 
 The current observational fast path performs one strict alignment pass, constructs the
@@ -196,6 +196,19 @@ IPW/AIPW score with vectorized array operations, and aggregates clustered influe
 with normalized integer codes. It does not loop over observations, refit nuisance models,
 or materialize quadratic matrices. This follows the high-throughput implementation
 patterns maintained in the sibling packages while keeping causal score semantics local.
+
+The matching fast path sorts each treatment arm once and uses binary search plus local
+left/right expansion for every focal unit. It materializes only selected match rows, not
+an arm-by-arm distance matrix. Matching decisions consume treatment, supplied propensity,
+and declared design settings; outcome values are used only after the match design is fixed
+to form observed-minus-imputed contrasts. Fractional tie weights and comparison reuse
+remain explicit in the result.
+
+Matching uncertainty is intentionally separate from generic covariance code. The point
+alpha defaults to `inference="none"`; the reserved Abadie–Imbens path refuses until both
+the reuse-aware conditional variance and propensity-estimation adjustment contracts are
+implemented and validated. It must not reuse the IV/ATE sandwich or CR1 kernels merely to
+populate standard-error fields.
 
 The historical `limiteddepkit.TreatmentEffect` snapshot is provenance for migration, not a
 code dependency. `IV2SLS` was designed around the explicit excluded-instrument contract and
@@ -241,6 +254,8 @@ architecture.
 
 - Do not materialize an `n x n` projection matrix when equivalent factorized operations are
   available.
+- Do not materialize a treated-by-control matching distance matrix for scalar scores; sort
+  once and inspect local neighbor groups.
 - Avoid unnecessary copies of large designs and residual arrays.
 - Aggregate cluster scores in one pass over normalized cluster codes.
 - Fail before expensive factorization when shapes, missing data, or exact rank make the
