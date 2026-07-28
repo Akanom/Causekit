@@ -1,6 +1,6 @@
 # Architecture
 
-`causalkit` is organized around small, auditable estimation paths. The `0.3.0a1`
+`causalkit` is organized around small, auditable estimation paths. The `0.4.0a1`
 architecture keeps causal assumptions visible, separates numerical estimation from
 inference and diagnostics, and returns frozen labelled result containers suitable for
 reporting. The pandas objects stored inside a result should be treated as read-only; helper
@@ -79,6 +79,7 @@ The installed source tree assigns one primary responsibility to each module:
 | `causalkit.iv` | Public `IV2SLS`, 2SLS execution path, and fitted `IV2SLSResult` |
 | `causalkit.randomized` | Two-arm difference-in-means and Lin-adjusted ATE execution path, balance records, and fitted result |
 | `causalkit.observational` | Supplied-nuisance IPW/AIPW scores, overlap diagnostics, vectorized influence-function and cluster inference |
+| `causalkit.crossfit` | Public nuisance protocols, deterministic stratified fold orchestration, fresh-model fitting, prediction adaptation, and aligned out-of-fold records |
 | `causalkit.postestimation` | Summary, covariance, confidence interval, prediction, residual, fitted-value, linear-combination, and Wald helpers |
 | `causalkit.integrations.outputhub` | Lazy optional conversion and insertion into Universal Output Hub |
 

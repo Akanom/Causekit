@@ -4,6 +4,20 @@ All notable changes to `causalkit` are recorded here. The project follows
 [Semantic Versioning](https://semver.org/) once a public contract is released. Alpha
 versions may refine APIs, but breaking changes must still be documented explicitly.
 
+## [0.4.0a1] - Unreleased
+
+### Added
+
+- `CrossFitter` with fresh per-fold propensity and arm-specific outcome factories,
+  deterministic treatment-stratified folds, exact index preservation, and complete
+  out-of-fold prediction records.
+- Public nuisance estimator, propensity-result, and outcome-result protocols plus explicit
+  prediction adapters for non-standard model APIs.
+- `estimand="att"` and `estimand="atc"` for IPW and AIPW, with normalized target-
+  population weighting and estimand-specific influence-function inference.
+- A repository `HANDOVER.md` recording completed milestones, sibling-package reuse rules,
+  performance constraints, validation gates, and the next development order.
+
 ## [0.3.0a1] - Unreleased
 
 ### Added

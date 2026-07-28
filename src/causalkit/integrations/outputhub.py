@@ -62,6 +62,7 @@ def to_outputhub_model(
             },
             metadata={
                 "estimator": result.estimator,
+                "estimand": result.estimand,
                 "backend": result.backend,
                 "covariance_type": result.covariance_type,
                 "inference_distribution": result.inference_distribution,

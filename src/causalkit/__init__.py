@@ -1,5 +1,12 @@
 """Identification-aware causal inference and instrumental-variable workflows."""
 
+from .crossfit import (
+    CrossFitResult,
+    CrossFitter,
+    NuisanceEstimatorProtocol,
+    OutcomeResultProtocol,
+    PropensityResultProtocol,
+)
 from .diagnostics import FirstStageDiagnostic, SarganTest
 from .integrations import add_to_outputhub, to_outputhub_model
 from .iv import IV2SLS, IV2SLSResult
@@ -19,12 +26,17 @@ from .randomized import CovariateBalance, RandomizedATE, RandomizedATEResult
 __all__ = [
     "FirstStageDiagnostic",
     "CovariateBalance",
+    "CrossFitResult",
+    "CrossFitter",
     "AIPWATE",
     "IV2SLS",
     "IV2SLSResult",
     "IPWATE",
     "ObservationalATEResult",
     "OverlapDiagnostic",
+    "NuisanceEstimatorProtocol",
+    "OutcomeResultProtocol",
+    "PropensityResultProtocol",
     "SarganTest",
     "RandomizedATE",
     "RandomizedATEResult",
@@ -40,4 +52,4 @@ __all__ = [
     "wald_test",
 ]
 
-__version__ = "0.3.0a1"
+__version__ = "0.4.0a1"

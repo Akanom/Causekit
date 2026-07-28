@@ -30,6 +30,12 @@ depends on nuisance convergence rates or justified low-complexity fitting. Clipp
 extreme weights but changes the score; report unclipped and alternative-bound sensitivity
 results rather than treating clipping as an invisible numerical repair.
 
+With `estimand="att"`, the target population is the treated group; controls are weighted
+by propensity odds. With `estimand="atc"`, the target is the control group; treated units
+are weighted by inverse propensity odds. These estimands can differ materially under
+effect heterogeneity. The software therefore labels the result with the requested target
+rather than treating ATT/ATC as aliases for ATE.
+
 This guide states what `IV2SLS` estimates, the conditions under which it is identified,
 and the limits of its diagnostics. It is not a substitute for a design-specific argument.
 

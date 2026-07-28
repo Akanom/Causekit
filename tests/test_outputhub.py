@@ -95,5 +95,6 @@ def test_observational_ate_converts_without_reestimating_nuisance_models() -> No
     )
     model = to_outputhub_model(result)
     assert model.metadata["estimator"] == "aipw_ate"
+    assert model.metadata["estimand"] == "ate"
     assert model.metadata["nuisance_predictions_supplied"] is True
     assert model.params.index.tolist() == ["ate"]

@@ -1,8 +1,9 @@
 # causalkit
 
 `causalkit` is an identification-aware Python package for causal inference and
-instrumental-variable workflows. The `0.3.0a1` surface provides linear two-stage least
-squares, randomized-experiment effects, and supplied-nuisance IPW/AIPW effects.
+instrumental-variable workflows. The `0.4.0a1` surface provides linear two-stage least
+squares, randomized-experiment effects, reusable nuisance cross-fitting, and IPW/AIPW
+ATE, ATT, and ATC.
 
 This is alpha research software. A successful fit is not evidence that an instrument is
 valid, and an IV coefficient is not automatically an average treatment effect. State the
@@ -51,6 +52,37 @@ robust to one nuisance family being correctly specified under regularity conditi
 is not robust to unmeasured confounding, positivity failure, leakage, or both nuisance
 families being invalid. Propensity clipping is never silent and requires sensitivity
 reporting because it changes the estimating equation.
+
+### Reusable cross-fitting
+
+`CrossFitter` accepts factories so every fold receives fresh models. A model may follow
+the `limiteddepkit` convention (`fit` returns a fitted result) or the scikit-learn
+convention (`fit` returns the estimator). Default fitted results expose `predict_proba`
+for propensity models and `predict` for outcome models; explicit adapters support other
+public APIs.
+
+```python
+from causalkit import AIPWATE, CrossFitter
+
+nuisance = CrossFitter(
+    propensity_factory=make_propensity_model,
+    outcome_factory=make_outcome_model,
+    n_splits=5,
+    random_state=2026,
+).fit_predict(X, treatment=treated, outcome=outcome)
+
+att = AIPWATE(estimand="att").fit(
+    outcome,
+    treatment=treated,
+    propensity=nuisance.propensity,
+    outcome_treated=nuisance.outcome_treated,
+    outcome_control=nuisance.outcome_control,
+)
+```
+
+Folds are stratified by treatment, predictions retain the original index, and each arm
+must contain at least `n_splits` observations. Fold assignment is deterministic when
+`random_state` is fixed.
 
 There is no formula API yet. Prepare numeric arrays, `Series`, or `DataFrame` objects
 explicitly, including categorical encoding and transformations. `add_constant=True` is
@@ -288,7 +320,7 @@ predictions participate while keeping causal identification and inference inside
 
 ## Roadmap
 
-Later releases may add built-in cross-fitting orchestration, ATT/ATC, matching,
+Later releases may add matching,
 difference-in-differences and event studies, regression discontinuity, and panel IV. Each
 family must define its estimand, assumptions, failure behavior, diagnostics, and independent
 validation evidence before promotion.
@@ -322,5 +354,6 @@ has passed them.
 - Cite the exact package version; machine-readable metadata is in
   [CITATION.cff](CITATION.cff).
 - Changes are recorded in [CHANGELOG.md](CHANGELOG.md).
+- The active milestone sequence and reuse rules are recorded in [HANDOVER.md](HANDOVER.md).
 
 `causalkit` is distributed under the [MIT License](LICENSE).

@@ -5,7 +5,7 @@ identification. Inclusion requires more than a method being common in applied ec
 the package must be able to state the estimand, identifying assumptions, supported data
 structure, inference target, diagnostics, and validation boundary.
 
-## Stable `0.3.0a1` surface
+## Stable `0.4.0a1` surface
 
 The first alpha release deliberately supports one model family: cross-sectional linear
 instrumental variables estimated by two-stage least squares.
@@ -80,6 +80,13 @@ augmented influence-function score. Both enforce exact row alignment and strict 
 support and expose weight effective sample sizes. Built-in nuisance fitting is deferred
 until a cross-fitting protocol can reuse transferred/public model infrastructure without
 duplicate estimators.
+
+`CrossFitter` now provides that protocol boundary. It generates out-of-fold propensity and
+arm-specific outcome predictions from fresh model factories and supports fitted results
+that either expose the default prediction methods or use explicit adapters. IPW/AIPW now
+support the analysis-population ATE, treated-population ATT, and control-population ATC.
+This is orchestration, not ownership transfer: nuisance estimators remain in their proper
+packages.
 
 ## `limiteddepkit.TreatmentEffect` migration provenance
 

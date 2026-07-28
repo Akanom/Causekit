@@ -10,6 +10,7 @@ import pandas as pd
 from scipy.stats import norm, t
 
 InferenceType = Literal["robust", "clustered"]
+EstimandType = Literal["ate", "att", "atc"]
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,7 @@ class ObservationalATEResult:
     inference_df: float | None
     n_clusters: int | None
     estimator: str
+    estimand: EstimandType
     estimation_index: pd.Index
     clipped_observations: int
     assumptions: tuple[str, ...]
@@ -51,15 +53,15 @@ class ObservationalATEResult:
 
     @property
     def params(self) -> pd.Series:
-        return pd.Series({"ate": self.estimate}, name="coef")
+        return pd.Series({self.estimand: self.estimate}, name="coef")
 
     @property
     def standard_errors(self) -> pd.Series:
-        return pd.Series({"ate": self.standard_error}, name="std_err")
+        return pd.Series({self.estimand: self.standard_error}, name="std_err")
 
     @property
     def pvalues(self) -> pd.Series:
-        return pd.Series({"ate": self.pvalue}, name="p_value")
+        return pd.Series({self.estimand: self.pvalue}, name="p_value")
 
     @property
     def causal_interpretation(self) -> str:
@@ -82,7 +84,7 @@ class ObservationalATEResult:
                 "lower": self.estimate - critical * self.standard_error,
                 "upper": self.estimate + critical * self.standard_error,
             },
-            name="ate",
+            name=self.estimand,
         )
 
     def summary_frame(self, level: float = 0.95) -> pd.DataFrame:
@@ -96,7 +98,7 @@ class ObservationalATEResult:
                 "ci_lower": [interval["lower"]],
                 "ci_upper": [interval["upper"]],
             },
-            index=pd.Index(["ate"], dtype="object"),
+            index=pd.Index([self.estimand], dtype="object"),
         )
 
 
@@ -179,19 +181,19 @@ def _effective_sample_size(weights: np.ndarray) -> float:
 
 
 def _result(
-    scores: np.ndarray,
+    estimate: float,
+    influence: np.ndarray,
     treatment: np.ndarray,
     propensity: np.ndarray,
     *,
     clusters: np.ndarray | None,
     covariance: InferenceType,
     estimator: str,
+    estimand: EstimandType,
     index: pd.Index,
     clipped: int,
 ) -> ObservationalATEResult:
-    estimate = float(np.mean(scores))
-    influence = scores - estimate
-    nobs = len(scores)
+    nobs = len(influence)
     n_clusters = None
     inference_df = None
     if covariance == "robust":
@@ -255,6 +257,7 @@ def _result(
         inference_df,
         n_clusters,
         estimator,
+        estimand,
         index.copy(),
         clipped,
         (
@@ -270,14 +273,20 @@ def _result(
 
 
 class IPWATE:
-    """Horvitz-Thompson ATE from supplied propensity predictions."""
+    """IPW ATE, ATT, or ATC from supplied propensity predictions."""
 
     def __init__(
-        self, *, covariance: InferenceType = "robust", clip: tuple[float, float] | None = None
+        self,
+        *,
+        estimand: EstimandType = "ate",
+        covariance: InferenceType = "robust",
+        clip: tuple[float, float] | None = None,
     ) -> None:
         if covariance not in {"robust", "clustered"}:
             raise ValueError("covariance must be 'robust' or 'clustered'.")
-        self.covariance, self.clip = covariance, clip
+        if estimand not in {"ate", "att", "atc"}:
+            raise ValueError("estimand must be 'ate', 'att', or 'atc'.")
+        self.estimand, self.covariance, self.clip = estimand, covariance, clip
 
     def fit(
         self, y: Any, *, treatment: Any, propensity: Any, clusters: Any | None = None
@@ -291,28 +300,59 @@ class IPWATE:
             clusters=clusters,
             clip=self.clip,
         )
-        scores = assigned * y_array / ps - (1 - assigned) * y_array / (1 - ps)
+        if self.estimand == "ate":
+            scores = assigned * y_array / ps - (1 - assigned) * y_array / (1 - ps)
+            estimate = float(np.mean(scores))
+            influence = scores - estimate
+        elif self.estimand == "att":
+            treated_weight = assigned
+            control_weight = (1 - assigned) * ps / (1 - ps)
+            treated_mean = float(treated_weight @ y_array / treated_weight.sum())
+            control_mean = float(control_weight @ y_array / control_weight.sum())
+            estimate = treated_mean - control_mean
+            influence = (
+                treated_weight * (y_array - treated_mean) / treated_weight.mean()
+                - control_weight * (y_array - control_mean) / control_weight.mean()
+            )
+        else:
+            treated_weight = assigned * (1 - ps) / ps
+            control_weight = 1 - assigned
+            treated_mean = float(treated_weight @ y_array / treated_weight.sum())
+            control_mean = float(control_weight @ y_array / control_weight.sum())
+            estimate = treated_mean - control_mean
+            influence = (
+                treated_weight * (y_array - treated_mean) / treated_weight.mean()
+                - control_weight * (y_array - control_mean) / control_weight.mean()
+            )
         return _result(
-            scores,
+            estimate,
+            influence,
             assigned,
             ps,
             clusters=cluster_array,
             covariance=self.covariance,
-            estimator="ipw_ate",
+            estimator=f"ipw_{self.estimand}",
+            estimand=self.estimand,
             index=index,
             clipped=clipped,
         )
 
 
 class AIPWATE:
-    """Augmented IPW ATE from supplied propensity and potential-outcome predictions."""
+    """Augmented IPW ATE, ATT, or ATC from supplied nuisance predictions."""
 
     def __init__(
-        self, *, covariance: InferenceType = "robust", clip: tuple[float, float] | None = None
+        self,
+        *,
+        estimand: EstimandType = "ate",
+        covariance: InferenceType = "robust",
+        clip: tuple[float, float] | None = None,
     ) -> None:
         if covariance not in {"robust", "clustered"}:
             raise ValueError("covariance must be 'robust' or 'clustered'.")
-        self.covariance, self.clip = covariance, clip
+        if estimand not in {"ate", "att", "atc"}:
+            raise ValueError("estimand must be 'ate', 'att', or 'atc'.")
+        self.estimand, self.covariance, self.clip = estimand, covariance, clip
 
     def fit(
         self,
@@ -334,22 +374,47 @@ class AIPWATE:
             clip=self.clip,
         )
         assert mu1 is not None and mu0 is not None
-        scores = (
-            mu1
-            - mu0
-            + assigned * (y_array - mu1) / ps
-            - (1 - assigned) * (y_array - mu0) / (1 - ps)
-        )
+        if self.estimand == "ate":
+            scores = (
+                mu1
+                - mu0
+                + assigned * (y_array - mu1) / ps
+                - (1 - assigned) * (y_array - mu0) / (1 - ps)
+            )
+            estimate = float(np.mean(scores))
+            influence = scores - estimate
+        elif self.estimand == "att":
+            numerator = assigned * (y_array - mu0) - (1 - assigned) * ps / (1 - ps) * (
+                y_array - mu0
+            )
+            denominator = assigned
+            estimate = float(numerator.mean() / denominator.mean())
+            influence = (numerator - estimate * denominator) / denominator.mean()
+        else:
+            numerator = assigned * (1 - ps) / ps * (y_array - mu1) - (1 - assigned) * (
+                y_array - mu1
+            )
+            denominator = 1 - assigned
+            estimate = float(numerator.mean() / denominator.mean())
+            influence = (numerator - estimate * denominator) / denominator.mean()
         return _result(
-            scores,
+            estimate,
+            influence,
             assigned,
             ps,
             clusters=cluster_array,
             covariance=self.covariance,
-            estimator="aipw_ate",
+            estimator=f"aipw_{self.estimand}",
+            estimand=self.estimand,
             index=index,
             clipped=clipped,
         )
 
 
-__all__ = ["AIPWATE", "IPWATE", "ObservationalATEResult", "OverlapDiagnostic"]
+__all__ = [
+    "AIPWATE",
+    "EstimandType",
+    "IPWATE",
+    "ObservationalATEResult",
+    "OverlapDiagnostic",
+]

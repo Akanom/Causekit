@@ -51,6 +51,39 @@ def test_aipw_matches_efficient_score_identity() -> None:
     assert result.estimate == pytest.approx(scores.mean(), abs=1e-14)
 
 
+@pytest.mark.parametrize("estimand", ["att", "atc"])
+def test_ipw_target_population_estimands_match_normalized_weight_identities(
+    estimand: str,
+) -> None:
+    y, treatment, propensity, _, _ = _sample(nobs=900)
+    result = IPWATE(estimand=estimand).fit(y, treatment=treatment, propensity=propensity)
+    if estimand == "att":
+        comparison_weights = (1 - treatment) * propensity / (1 - propensity)
+        expected = y[treatment == 1].mean() - np.average(y, weights=comparison_weights)
+    else:
+        comparison_weights = treatment * (1 - propensity) / propensity
+        expected = np.average(y, weights=comparison_weights) - y[treatment == 0].mean()
+    assert result.estimate == pytest.approx(expected, abs=1e-14)
+    assert result.params.index.tolist() == [estimand]
+    assert result.influence_function.mean() == pytest.approx(0, abs=1e-14)
+
+
+@pytest.mark.simulation
+@pytest.mark.parametrize("estimand", ["att", "atc"])
+def test_oracle_aipw_recovers_target_population_effect(estimand: str) -> None:
+    y, treatment, propensity, mu1, mu0 = _sample(nobs=16000, seed=704)
+    result = AIPWATE(estimand=estimand).fit(
+        y,
+        treatment=treatment,
+        propensity=propensity,
+        outcome_treated=mu1,
+        outcome_control=mu0,
+    )
+    target = (mu1 - mu0)[treatment == (1 if estimand == "att" else 0)].mean()
+    assert result.estimate == pytest.approx(target, abs=0.04)
+    assert result.estimand == estimand
+
+
 @pytest.mark.simulation
 def test_oracle_aipw_recovers_population_ate_and_is_more_precise() -> None:
     y, treatment, propensity, mu1, mu0 = _sample(nobs=12000)
