@@ -132,7 +132,7 @@ and validation gates:
 
 | Family | Required design questions before promotion |
 | --- | --- |
-| Matching promotion | Estimated-propensity adjustment, recorded Stata parity, and remaining publication-scale sensitivity/coverage evidence |
+| Matching promotion | Estimated-propensity adjustment and remaining publication-scale sensitivity/coverage evidence; fixed-score Python/R/Stata parity is recorded |
 | DiD promotion | Pre-trend/Hausman diagnostics, repeated cross-sections, publication-scale coverage, covariate performance, and broader parity |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
 | Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |

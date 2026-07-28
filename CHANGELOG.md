@@ -18,7 +18,8 @@ versions may refine APIs, but breaking changes must still be documented explicit
   expanded refusal coverage, OutputHub model/design-table adaptation, and a 100,000-row
   inference benchmark scenario.
 - Pinned R `Matching` 4.10-15 reference parity for estimates and standard errors, plus a
-  manually runnable Stata `teffects nnmatch` parity script for all three estimands.
+  Stata/MP 17 `teffects nnmatch` parity pass for all three estimands with its reviewed
+  machine-readable output retained in the repository.
 
 ### Architecture
 
@@ -35,9 +36,8 @@ versions may refine APIs, but breaking changes must still be documented explicit
 
 - Estimated-propensity adjustment, matching after target-changing support/caliper rules,
   bias correction, and clustered/paired/survey uncertainty are not implemented.
-- The Stata harness requires a manual run because Stata is not installed in the
-  development environment; its observed version/output must be pinned before matching
-  receives a three-ecosystem parity pass.
+- The fixed-score fixture has Python, R, and Stata parity, but estimated-propensity
+  first-step uncertainty and broader publication-scale sensitivity evidence remain open.
 
 ## [0.6.0a2] - Unreleased
 

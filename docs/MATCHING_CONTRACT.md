@@ -1,8 +1,9 @@
 # Nearest-neighbor matching contract
 
 Status (2026-07-28): point estimation and a fixed/known-score Abadie-Imbens analytical
-path are implemented. Estimated-propensity adjustment and a recorded Stata run remain
-open inferential/parity gates. R `Matching` parity, OutputHub adaptation, deterministic
+path are implemented. Fixed-score parity is recorded for Python, R, and Stata;
+estimated-propensity adjustment remains an open inferential gate. R `Matching` parity,
+OutputHub adaptation, deterministic
 coverage smoke, and 100,000-row inference performance evidence are maintained. This
 document is normative for both the implemented slice and explicitly deferred gates.
 
@@ -311,9 +312,10 @@ row-permutation, caliper, support, tie-weight, reuse-weight, balance, determinis
 recovery, refusal, and seeded coverage-smoke tests. It matches the pinned CRAN `Matching`
 4.10-15 pure-R reference for all three estimates and standard errors. OutputHub exports
 the model plus outcome-free match and balance tables. `benchmark_matching.py` includes a
-100,000-row known-score inference scenario. The Stata script is ready for a manual
-`teffects nnmatch` run, while estimated-propensity inference and the final recorded Stata
-result remain promotion gaps; this alpha is not a completed general matching release.
+100,000-row known-score inference scenario. The maintained Stata script has a recorded
+Stata/MP 17 `teffects nnmatch` pass in
+`benchmarks/validate_matching_stata_17_output.txt`. Estimated-propensity inference remains
+a promotion gap; this alpha is not a completed general matching release.
 
 ## Pre-mortem
 

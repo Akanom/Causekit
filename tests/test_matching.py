@@ -342,6 +342,35 @@ def test_hand_computed_known_score_abadie_imbens_variance(
     assert "fixed_by_simulation_design" in rendered
 
 
+@pytest.mark.parametrize(
+    ("estimand", "expected_variance"),
+    [("att", 26.0 / 27.0), ("atc", 26.0 / 27.0), ("ate", 133.0 / 27.0)],
+)
+def test_hand_computed_stata_aligned_two_neighbor_variance(
+    estimand: str, expected_variance: float
+) -> None:
+    y, treatment, propensity = _six_unit_variance_example()
+
+    result = NearestNeighborMatch(
+        estimand=estimand,
+        caliper=None,
+        common_support=None,
+        inference="abadie_imbens",
+        variance_neighbors=2,
+    ).fit(
+        y,
+        treatment=treatment,
+        propensity=propensity,
+        propensity_score_status="known",
+        propensity_provenance="fixed_by_stata_parity_fixture",
+    )
+
+    assert result.estimate == pytest.approx(16.0 / 3.0, abs=1e-14)
+    assert result.variance == pytest.approx(expected_variance, abs=1e-14)
+    assert result.standard_error == pytest.approx(np.sqrt(expected_variance), abs=1e-14)
+    assert result.variance_neighbors == 2
+
+
 def test_analytical_inference_refuses_support_or_caliper_target_selection() -> None:
     y, treatment, propensity = _six_unit_variance_example()
     for model in (

@@ -274,6 +274,14 @@ Rscript benchmarks/validate_matching_reference.R /path/to/Matching
 stata -b do benchmarks/validate_matching_stata.do
 ```
 
+The Stata harness uses one opposite-arm effect match and two same-arm variance
+neighbors. This is the smallest robust-variance contract accepted by Stata and maps to
+`NearestNeighborMatch(..., variance_neighbors=2)`; the R harness separately validates
+CausalKit's supported one-neighbor conditional-variance contract. The reviewed
+Stata/MP 17 result is preserved in
+`benchmarks/validate_matching_stata_17_output.txt`; its maximum absolute standard-error
+difference from CausalKit is `4.440892098500626e-16`.
+
 Run the README example in a clean installation and inspect both wheel and source
 distribution before release. Archive the commands, operating system, Python version,
 resolved dependency versions, commit identifier, test output, and artifact hashes with a

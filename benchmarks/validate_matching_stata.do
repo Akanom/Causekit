@@ -7,8 +7,9 @@ Run from the causalkit repository root:
 
 or open this file in Stata and choose Do. The script prints machine-readable
 key=value lines. It validates a fixed logit score with one match, replacement,
-no caliper, no support trimming, no bias correction, no boundary ties, and one
-same-arm neighbor for the Abadie-Imbens conditional-variance estimate.
+no caliper, no support trimming, no bias correction, no boundary ties, and two
+same-arm neighbors for the Abadie-Imbens conditional-variance estimate. Stata
+requires nn() to be at least 2 even though CausalKit also supports 1.
 
 This deliberately uses teffects nnmatch on logit_score. Do not replace it with
 teffects psmatch: that command estimates a treatment model and therefore targets
@@ -35,7 +36,7 @@ assert inlist(treatment, 0, 1)
 
 /* ATT: Stata calls this ATET. */
 quietly teffects nnmatch (outcome logit_score) (treatment), atet ///
-    nneighbor(1) metric(euclidean) vce(robust, nn(1))
+    nneighbor(1) metric(euclidean) vce(robust, nn(2))
 matrix b_att = e(b)
 matrix V_att = e(V)
 scalar att_estimate = el(b_att, 1, 1)
@@ -43,7 +44,7 @@ scalar att_standard_error = sqrt(el(V_att, 1, 1))
 
 /* ATE: bidirectional nearest-neighbor imputation. */
 quietly teffects nnmatch (outcome logit_score) (treatment), ate ///
-    nneighbor(1) metric(euclidean) vce(robust, nn(1))
+    nneighbor(1) metric(euclidean) vce(robust, nn(2))
 matrix b_ate = e(b)
 matrix V_ate = e(V)
 scalar ate_estimate = el(b_ate, 1, 1)
@@ -56,7 +57,7 @@ The variance and standard error are unchanged by that sign reversal.
 */
 generate byte treatment_reversed = 1 - treatment
 quietly teffects nnmatch (outcome logit_score) (treatment_reversed), atet ///
-    nneighbor(1) metric(euclidean) vce(robust, nn(1))
+    nneighbor(1) metric(euclidean) vce(robust, nn(2))
 matrix b_atc_reversed = e(b)
 matrix V_atc_reversed = e(V)
 scalar atc_estimate = -el(b_atc_reversed, 1, 1)
@@ -65,7 +66,7 @@ scalar atc_standard_error = sqrt(el(V_atc_reversed, 1, 1))
 /* Hand-computed CausalKit contract values. */
 scalar expected_estimate = 16 / 3
 scalar expected_att_atc_se = sqrt(26 / 27)
-scalar expected_ate_se = sqrt(137 / 54)
+scalar expected_ate_se = sqrt(133 / 27)
 
 if abs(att_estimate - expected_estimate) > 1e-10 {
     display as error "ATT estimate parity failed"
@@ -94,7 +95,7 @@ if abs(ate_standard_error - expected_ate_se) > 1e-10 {
 
 display as result "contract=fixed_known_logit_score_no_ties"
 display as result "neighbors=1"
-display as result "variance_neighbors=1"
+display as result "variance_neighbors=2"
 display as result "att_estimate=" %21.17g att_estimate
 display as result "att_standard_error=" %21.17g att_standard_error
 display as result "atc_estimate=" %21.17g atc_estimate

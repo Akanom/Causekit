@@ -459,8 +459,9 @@ out-of-sample predictions participate while keeping causal identification inside
 The matching alpha follows the
 [nearest-neighbor matching contract](docs/MATCHING_CONTRACT.md). Known-score analytical
 inference, R reference parity, OutputHub adaptation, and a 100,000-row inference smoke are
-implemented. Estimated-propensity adjustment and a recorded manual Stata result remain
-promotion gates. DiD promotion includes cross-fitted covariate nuisances and simultaneous
+implemented, with fixed-score parity against pinned R `Matching` 4.10-15 and Stata/MP 17.
+Estimated-propensity adjustment remains a promotion gate. DiD promotion includes
+cross-fitted covariate nuisances and simultaneous
 event-study bands; pre-trend/Hausman diagnostics, repeated cross-sections, and broader
 parity remain. Later releases may add regression discontinuity and panel IV. Each family
 must define its estimand, assumptions, failure behavior, diagnostics, and independent
