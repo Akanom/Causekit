@@ -13,12 +13,16 @@ from .postestimation import (
     vcov,
     wald_test,
 )
+from .randomized import CovariateBalance, RandomizedATE, RandomizedATEResult
 
 __all__ = [
     "FirstStageDiagnostic",
+    "CovariateBalance",
     "IV2SLS",
     "IV2SLSResult",
     "SarganTest",
+    "RandomizedATE",
+    "RandomizedATEResult",
     "add_to_outputhub",
     "confint",
     "fitted_values",
@@ -31,4 +35,4 @@ __all__ = [
     "wald_test",
 ]
 
-__version__ = "0.1.0a1"
+__version__ = "0.2.0a1"

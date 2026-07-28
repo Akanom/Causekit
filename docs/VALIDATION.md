@@ -5,7 +5,7 @@ success in one environment supports the tested version, fixture, specification, 
 and tolerance. It does not establish universal numerical parity or validate an empirical
 instrument.
 
-This document defines the `0.1.0a1` validation gate and how to report it. It does **not**
+This document defines the validation gate and how to report it. It does **not**
 assert that the commands below have passed for the current checkout. Release notes and
 review records must state the actual execution environment and outcome.
 

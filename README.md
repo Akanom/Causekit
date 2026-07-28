@@ -1,9 +1,8 @@
 # causalkit
 
 `causalkit` is an identification-aware Python package for causal inference and
-instrumental-variable workflows. The `0.1.0a1` surface is intentionally narrow: it
-provides a stable linear two-stage least-squares estimator with explicit instrument,
-covariance, diagnostic, and data-alignment contracts.
+instrumental-variable workflows. The `0.2.0a1` surface provides linear two-stage least
+squares and design-aware average treatment effects for two-arm randomized experiments.
 
 This is alpha research software. A successful fit is not evidence that an instrument is
 valid, and an IV coefficient is not automatically an average treatment effect. State the
@@ -11,7 +10,7 @@ estimand and defend the identifying assumptions before using causal language.
 
 ## Current scope
 
-The stable `0.1.0a1` API provides:
+The retained IV API provides:
 
 - `IV2SLS` with one or more endogenous regressors and excluded instruments;
 - an excluded-instrument API: exogenous regressors are added to the instrument matrix
@@ -23,6 +22,13 @@ The stable `0.1.0a1` API provides:
 - Sargan's overidentification test only for overidentified fits using
   `covariance="unadjusted"`.
 
+The `0.2.0a1` randomized-experiment layer adds:
+
+- `RandomizedATE(adjustment="none")` for the raw difference in arm means;
+- `RandomizedATE(adjustment="lin")` for fully interacted, mean-centered Lin adjustment;
+- HC1 or one-way CR1 inference, arm counts, balance diagnostics, strict binary assignment,
+  and explicit causal-assumption metadata.
+
 There is no formula API yet. Prepare numeric arrays, `Series`, or `DataFrame` objects
 explicitly, including categorical encoding and transformations. `add_constant=True` is
 the default; set it to `False` when the supplied exogenous design already contains the
@@ -31,6 +37,31 @@ desired intercept or the model should not have one.
 See [Package scope](docs/PACKAGE_SCOPE.md),
 [Identification and interpretation](docs/IDENTIFICATION.md),
 [Validation](docs/VALIDATION.md), and [Architecture](docs/ARCHITECTURE.md).
+
+## Randomized-experiment example
+
+```python
+from causalkit import RandomizedATE
+
+result = RandomizedATE(adjustment="lin", covariance="robust").fit(
+    outcome,
+    treatment=assigned,       # exactly 0/1 with both arms present
+    covariates=baseline_data, # pre-treatment covariates only
+)
+print(result.summary_frame())
+print(result.balance)
+```
+
+Lin adjustment centers covariates at the analysis-sample mean and interacts every
+covariate with treatment. The `ate` coefficient is therefore the covariate-averaged
+adjusted treatment contrast. It does not assume a common outcome slope across arms.
+Covariates supplied with `adjustment="none"` are used only for balance diagnostics.
+
+The causal interpretation requires genuine random assignment, consistency, no
+interference, a pre-specified analysis population, no post-treatment adjustment, and an
+inference choice matching the assignment/dependence structure. This release does not yet
+handle blocked probabilities, cluster-level assignment estimands, randomization tests,
+attrition correction, or multi-arm experiments.
 
 ## Installation
 
@@ -227,10 +258,14 @@ The packages remain separated by estimand:
 
 Applicable validation, indexing, covariance, diagnostics, and reporting conventions are
 reused conceptually without importing private source or coupling the packages at runtime.
+Existing `limiteddepkit` binary, count, censoring, duration, and ordinal estimators will
+not be duplicated here. Future IPW/AIPW work should use a public nuisance-model protocol
+that can adapt those estimators where appropriate while keeping causal identification and
+inference inside `causalkit`.
 
 ## Roadmap
 
-Later releases may add randomized-experiment adjustment, IPW and AIPW, matching,
+Later releases may add IPW and AIPW, matching,
 difference-in-differences and event studies, regression discontinuity, and panel IV. Each
 family must define its estimand, assumptions, failure behavior, diagnostics, and independent
 validation evidence before promotion.

@@ -1,6 +1,6 @@
 # Architecture
 
-`causalkit` is organized around a small, auditable estimation path. The `0.1.0a1`
+`causalkit` is organized around small, auditable estimation paths. The `0.2.0a1`
 architecture keeps causal assumptions visible, separates numerical estimation from
 inference and diagnostics, and returns frozen labelled result containers suitable for
 reporting. The pandas objects stored inside a result should be treated as read-only; helper
@@ -41,7 +41,7 @@ different rows.
 
 ## Public boundary
 
-The root package exports the supported estimator and result/diagnostic types. The stable
+The root package exports the supported estimator and result/diagnostic types. The IV
 entry point is:
 
 ```python
@@ -77,6 +77,7 @@ The installed source tree assigns one primary responsibility to each module:
 | `causalkit._covariance` | Homoskedastic, HC1, and one-way CR1 covariance kernels and inference metadata |
 | `causalkit.diagnostics` | First-stage diagnostic records and homoskedastic Sargan testing |
 | `causalkit.iv` | Public `IV2SLS`, 2SLS execution path, and fitted `IV2SLSResult` |
+| `causalkit.randomized` | Two-arm difference-in-means and Lin-adjusted ATE execution path, balance records, and fitted result |
 | `causalkit.postestimation` | Summary, covariance, confidence interval, prediction, residual, fitted-value, linear-combination, and Wald helpers |
 | `causalkit.integrations.outputhub` | Lazy optional conversion and insertion into Universal Output Hub |
 
@@ -181,6 +182,12 @@ Compatibility is structural rather than inheritance-based:
 - no private sibling module is imported;
 - no result class is promised to be interchangeable where estimator semantics differ; and
 - shared conventions are verified through public fields and adapter behavior.
+
+Limited-outcome estimators are not copied into this package. When a future causal
+procedure needs a propensity or outcome nuisance model, integration should target a
+documented fit/predict protocol so public `limiteddepkit` estimators can participate
+optionally without becoming a core dependency. The causal procedure must still own sample
+splitting, estimand construction, diagnostics, and valid uncertainty propagation.
 
 The historical `limiteddepkit.TreatmentEffect` snapshot is provenance for migration, not a
 code dependency. `IV2SLS` was designed around the explicit excluded-instrument contract and

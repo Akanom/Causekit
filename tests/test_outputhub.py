@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from causalkit import IV2SLS, add_to_outputhub, to_outputhub_model
+from causalkit import IV2SLS, RandomizedATE, add_to_outputhub, to_outputhub_model
 
 outputhub = pytest.importorskip("universal_output_hub")
 
@@ -56,7 +56,25 @@ def test_result_and_first_stage_can_be_added_to_outputhub(iv_result) -> None:
 
 
 def test_outputhub_adapter_validates_inputs(iv_result) -> None:
-    with pytest.raises(TypeError, match="IV2SLSResult"):
+    with pytest.raises(TypeError, match="IV2SLSResult or RandomizedATEResult"):
         to_outputhub_model(object())
     with pytest.raises(TypeError, match="add_model"):
         add_to_outputhub(object(), iv_result)
+
+
+def test_randomized_ate_converts_and_adds_balance_table() -> None:
+    rng = np.random.default_rng(73)
+    nobs = 200
+    treatment = rng.binomial(1, 0.5, nobs)
+    baseline = rng.normal(size=nobs)
+    outcome = 1.5 * treatment + baseline + rng.normal(size=nobs)
+    result = RandomizedATE(adjustment="lin").fit(
+        outcome, treatment=treatment, covariates=pd.DataFrame({"baseline": baseline})
+    )
+    model = to_outputhub_model(result)
+    assert model.metadata["estimator"] == "randomized_ate"
+    assert model.params.index.tolist() == ["ate"]
+    hub = outputhub.OutputHub("Experiment")
+    add_to_outputhub(hub, result)
+    assert len(hub.models) == 1
+    assert len(hub.tables) == 1

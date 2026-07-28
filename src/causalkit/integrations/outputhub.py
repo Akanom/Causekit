@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 
 from ..iv import IV2SLSResult
+from ..randomized import RandomizedATEResult
 
 
 def _regression_model_class() -> Any:
@@ -27,15 +28,47 @@ def _first_stage_table(result: IV2SLSResult) -> pd.DataFrame:
 
 
 def to_outputhub_model(
-    result: IV2SLSResult,
+    result: IV2SLSResult | RandomizedATEResult,
     *,
     name: str | None = None,
 ) -> Any:
-    """Convert a fitted IV result into Output Hub's canonical regression model."""
+    """Convert a fitted causal result into Output Hub's canonical regression model."""
 
-    if not isinstance(result, IV2SLSResult):
-        raise TypeError("result must be an IV2SLSResult.")
+    if not isinstance(result, (IV2SLSResult, RandomizedATEResult)):
+        raise TypeError("result must be an IV2SLSResult or RandomizedATEResult.")
     RegressionModel = _regression_model_class()
+    if isinstance(result, RandomizedATEResult):
+        return RegressionModel(
+            name=name or "Randomized ATE",
+            depvar=result.y_name,
+            params=pd.Series({"ate": result.estimate}, name="coef"),
+            std_errors=pd.Series({"ate": result.standard_error}, name="se"),
+            pvalues=pd.Series({"ate": result.pvalue}, name="pvalue"),
+            statistics={
+                "N": result.nobs,
+                "Treated": result.n_treated,
+                "Control": result.n_control,
+                "Residual df": result.df_resid,
+                "Converged": result.converged,
+            },
+            diagnostics={
+                f"Absolute standardized difference ({item.covariate})": abs(
+                    item.standardized_difference
+                )
+                for item in result.balance
+            },
+            metadata={
+                "estimator": "randomized_ate",
+                "backend": result.backend,
+                "adjustment": result.adjustment,
+                "covariance_type": result.covariance_type,
+                "inference_distribution": result.inference_distribution,
+                "n_clusters": result.n_clusters,
+                "causal_interpretation_requires_assumptions": True,
+                "assumptions": list(result.assumptions),
+            },
+            source="causalkit",
+        )
     diagnostics: dict[str, Any] = {}
     for endogenous, first_stage in result.first_stage.items():
         diagnostics[f"First-stage F ({endogenous})"] = first_stage.classical_f_statistic
@@ -77,7 +110,7 @@ def to_outputhub_model(
 
 def add_to_outputhub(
     hub: Any,
-    result: IV2SLSResult,
+    result: IV2SLSResult | RandomizedATEResult,
     *,
     name: str | None = None,
 ) -> Any:
@@ -85,10 +118,12 @@ def add_to_outputhub(
 
     if not hasattr(hub, "add_model"):
         raise TypeError("hub must provide an OutputHub-compatible add_model method.")
-    model_name = name or "IV/2SLS"
+    model_name = name or (
+        "Randomized ATE" if isinstance(result, RandomizedATEResult) else "IV/2SLS"
+    )
     model = to_outputhub_model(result, name=model_name)
     hub.add_model(model)
-    if hasattr(hub, "add_table"):
+    if isinstance(result, IV2SLSResult) and hasattr(hub, "add_table"):
         hub.add_table(
             f"{model_name} first-stage diagnostics",
             _first_stage_table(result).reset_index(),
@@ -98,6 +133,13 @@ def add_to_outputhub(
                 "weak-identification test."
             ),
             metadata={"source": "causalkit", "estimator": "iv_2sls"},
+        )
+    elif isinstance(result, RandomizedATEResult) and result.balance and hasattr(hub, "add_table"):
+        hub.add_table(
+            f"{model_name} covariate balance",
+            pd.DataFrame([item.__dict__ for item in result.balance]),
+            caption="Unadjusted pre-treatment covariate balance by randomized arm.",
+            metadata={"source": "causalkit", "estimator": "randomized_ate"},
         )
     return model
 

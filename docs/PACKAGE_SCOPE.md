@@ -5,7 +5,7 @@ identification. Inclusion requires more than a method being common in applied ec
 the package must be able to state the estimand, identifying assumptions, supported data
 structure, inference target, diagnostics, and validation boundary.
 
-## Stable `0.1.0a1` surface
+## Stable `0.2.0a1` surface
 
 The first alpha release deliberately supports one model family: cross-sectional linear
 instrumental variables estimated by two-stage least squares.
@@ -20,6 +20,11 @@ instrumental variables estimated by two-stage least squares.
 | First stage | Ordinary and partial R-squared, classical F, and covariance-aware joint exclusion test for each endogenous regressor |
 | Overidentification | Sargan only for overidentified `"unadjusted"` fits |
 | Results | Labelled estimates and inference, fitted values, residuals, diagnostics, prediction, tables, Markdown, and optional reporting adaptation |
+
+The randomized-experiment family supports two-arm individual-level assignment through
+`RandomizedATE`: exact difference in means or fully interacted Lin adjustment, HC1/CR1
+inference, arm counts, and pre-treatment covariate-balance diagnostics. It requires both
+arms coded exactly 0/1 and does not infer or validate the assignment mechanism from data.
 
 The stable label describes the intended API surface within this alpha, not a claim that
 instrument validity or causal identification can be automated.
@@ -60,6 +65,15 @@ reuse applicable `systemgmmkit` contracts instead of creating a disconnected par
 framework. Reuse does not require importing private sibling internals or adding a runtime
 dependency.
 
+`limiteddepkit` already owns binary logit/probit, count, censoring/truncation, duration,
+ordinal, and related limited-outcome likelihoods. `causalkit` must not add duplicate
+versions merely to obtain propensity scores or outcome regressions. Future IPW/AIPW or
+heterogeneous-outcome workflows should define a small public nuisance-model protocol and,
+where methodologically valid, adapt the public prediction interfaces of `limiteddepkit`
+as optional backends. Causal estimands, assignment/ignorability assumptions, overlap,
+cross-fitting, influence-function inference, and treatment-effect diagnostics remain the
+responsibility of `causalkit`.
+
 ## `limiteddepkit.TreatmentEffect` migration provenance
 
 The historical `TreatmentEffect` class implemented ordinary homoskedastic 2SLS inside
@@ -86,7 +100,6 @@ and validation gates:
 
 | Family | Required design questions before promotion |
 | --- | --- |
-| Randomized-experiment adjustment | Difference in means versus regression adjustment, treatment assignment contract, blocked/clustered randomization, and finite-sample inference |
 | IPW and AIPW | Target population, propensity overlap, nuisance estimation, cross-fitting, truncation, influence-function inference, and positivity diagnostics |
 | Matching | Distance and caliper rules, replacement, estimand, common support, balance, uncertainty, and matching-induced dependence |
 | Difference-in-differences and event studies | Treatment timing, comparison cohort, anticipation, staggered adoption, weighting, pre-trend diagnostics, and clustered inference |

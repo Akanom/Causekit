@@ -4,6 +4,24 @@ All notable changes to `causalkit` are recorded here. The project follows
 [Semantic Versioning](https://semver.org/) once a public contract is released. Alpha
 versions may refine APIs, but breaking changes must still be documented explicitly.
 
+## [0.2.0a1] - Unreleased
+
+### Added
+
+- `RandomizedATE` for two-arm experiments, with an exact difference-in-means path and
+  fully interacted, mean-centered Lin regression adjustment.
+- HC1 and one-way CR1 inference, strict binary-assignment and alignment checks, arm
+  counts, covariate-balance diagnostics, explicit design assumptions, and OutputHub
+  adaptation.
+- Analytical, deterministic simulation, refusal-path, and Statsmodels parity tests for
+  randomized-experiment estimation and covariance.
+
+### Known limitations
+
+- Supports individual-level two-arm assignment only. Blocking/stratification weights,
+  unequal assignment probabilities, cluster-level estimands, randomization inference,
+  repeated outcomes, attrition correction, and multi-arm experiments are not yet covered.
+
 ## [0.1.0a1] - Unreleased
 
 ### Added
@@ -45,7 +63,7 @@ versions may refine APIs, but breaking changes must still be documented explicit
   to homoskedastic inference.
 - No multiway clustering, few-cluster correction beyond CR1, sampling weights, or panel
   IV estimator in this release.
-- Randomized-experiment adjustment, IPW/AIPW, matching, difference-in-differences and
+- IPW/AIPW, matching, difference-in-differences and
   event studies, regression discontinuity, and panel IV remain roadmap items.
 - DADPLM and BDCPM are outside the current scope.
 

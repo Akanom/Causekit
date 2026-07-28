@@ -13,6 +13,8 @@ from causalkit import IV2SLS, IV2SLSResult
 PUBLIC_EXPORTS = {
     "IV2SLS",
     "IV2SLSResult",
+    "RandomizedATE",
+    "RandomizedATEResult",
     "confint",
     "fitted_values",
     "predict",

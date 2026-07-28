@@ -1,5 +1,21 @@
 # Identification and interpretation
 
+## Randomized experiments
+
+`RandomizedATE` targets the average treatment contrast in the retained analysis sample.
+Its causal interpretation requires a genuine randomized assignment mechanism, treatment
+consistency, no interference, an analysis population fixed independently of outcomes,
+and inference that matches assignment and outcome dependence. Covariates used for Lin
+adjustment must be pre-treatment. The fully interacted specification avoids imposing a
+common covariate slope across treatment arms; centering makes the treatment coefficient
+the sample-covariate-average adjusted contrast.
+
+The estimator cannot diagnose whether assignment was actually randomized. Covariate
+balance is descriptive and should not be used as a pass/fail test of randomization or as
+an outcome-driven model-selection rule. Clustered covariance permits within-cluster
+outcome dependence but does not, by itself, implement a cluster-randomized estimand or
+few-cluster randomization inference.
+
 This guide states what `IV2SLS` estimates, the conditions under which it is identified,
 and the limits of its diagnostics. It is not a substitute for a design-specific argument.
 
