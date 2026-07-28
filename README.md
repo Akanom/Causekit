@@ -320,6 +320,9 @@ predictions participate while keeping causal identification and inference inside
 
 ## Roadmap
 
+The matching design is settled in the
+[nearest-neighbor matching contract](docs/MATCHING_CONTRACT.md); no matching estimator is
+exported until its analytical-inference, refusal, parity, and performance gates pass.
 Later releases may add matching,
 difference-in-differences and event studies, regression discontinuity, and panel IV. Each
 family must define its estimand, assumptions, failure behavior, diagnostics, and independent

@@ -123,6 +123,10 @@ Roadmap status is not an implementation promise. A family remains experimental o
 until its public contract, failure behavior, tests, independent reference evidence, and
 documentation are complete.
 
+The normative pre-implementation matching decisions are recorded in
+[Nearest-neighbor matching contract](MATCHING_CONTRACT.md). This design record does not
+export a placeholder estimator or claim that matching is implemented.
+
 ## Out of current scope
 
 DADPLM and BDCPM are separate research/modeling lines and are outside the current

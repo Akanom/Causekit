@@ -34,8 +34,9 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Matching: settle estimand, distance metric, caliper, replacement, ties, common support,
-   balance, and matching-induced inference before implementation.
+1. Matching: the pre-implementation contract is now settled in
+   `docs/MATCHING_CONTRACT.md`. Implement only its first stable slice and preserve every
+   refusal/inference boundary recorded there.
 2. Difference-in-differences and event studies: define treatment timing, comparison
    cohorts, anticipation, staggered adoption, weighting, and clustered inference.
 3. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
@@ -43,5 +44,6 @@ future task can resume without reconstructing intent from chat history.
 4. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
    effects, and clustered covariance contracts.
 
-Matching must not begin by merely adding nearest-neighbor code. The public contract and
-validation design come first.
+Matching implementation must begin with contract tests, not nearest-neighbor code. Do not
+weaken the tie/inference, target-population, or no-quadratic-matrix decisions merely to
+make an early demo run.
