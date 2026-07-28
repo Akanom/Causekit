@@ -6,7 +6,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from causalkit import NearestNeighborMatch, NearestNeighborMatchResult
+from causalkit import (
+    FittedPropensityMLEProtocol,
+    NearestNeighborMatch,
+    NearestNeighborMatchResult,
+)
 
 
 def _three_unit_example():
@@ -29,6 +33,43 @@ def _six_unit_variance_example():
         pd.Series([0, 0, 0, 1, 1, 1], index=index, name="treatment"),
         pd.Series(1 / (1 + np.exp(-logits)), index=index, name="propensity"),
     )
+
+
+class _HandFittedLogit:
+    """Minimal fitted-result protocol for a hand-audited finite logit MLE."""
+
+    def __init__(self, params: pd.Series, nobs: int) -> None:
+        self.params = params
+        self.nobs = nobs
+        self.converged = True
+        self.feature_names = tuple(params.index)
+
+    def predict_proba(self, X):
+        design = np.asarray(X, dtype=float)
+        probability = 1 / (1 + np.exp(-(design @ self.params.to_numpy())))
+        return pd.DataFrame({0: 1 - probability, 1: probability}, index=X.index)
+
+
+def _estimated_score_example():
+    """Irregular no-tie design with a hand-recorded full-sample logit MLE."""
+
+    index = pd.Index([f"unit_{position}" for position in range(12)])
+    x = np.array([-2.60, -2.00, -1.35, -0.95, -0.62, -0.18, 0.13, 0.49, 0.91, 1.38, 1.92, 2.57])
+    design = pd.DataFrame({"const": 1.0, "x": x}, index=index)
+    treatment = pd.Series([0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1], index=index)
+    outcome = pd.Series(
+        [0.0, 1.0, 3.0, 2.0, 5.0, 4.0, 7.0, 6.0, 9.0, 11.0, 10.0, 14.0],
+        index=index,
+    )
+    model = _HandFittedLogit(
+        pd.Series(
+            [0.01321428027973149, 0.5124700999154841],
+            index=["const", "x"],
+            name="estimate",
+        ),
+        len(index),
+    )
+    return outcome, treatment, design, model
 
 
 @pytest.mark.parametrize(
@@ -240,6 +281,21 @@ def test_outcomes_do_not_change_the_selected_design() -> None:
         ({"inference": "bootstrap"}, ValueError, "inference"),
         ({"neighbors": 0}, ValueError, "neighbors"),
         ({"variance_neighbors": 0}, ValueError, "variance_neighbors"),
+        (
+            {"first_step_covariance_neighbors": 1},
+            ValueError,
+            "first_step_covariance_neighbors",
+        ),
+        (
+            {"first_step_regression_neighbors": 0},
+            ValueError,
+            "first_step_regression_neighbors",
+        ),
+        (
+            {"first_step_covariate_neighbors": False},
+            ValueError,
+            "first_step_covariate_neighbors",
+        ),
         ({"caliper": 0.0}, ValueError, "caliper"),
         ({"caliper": []}, ValueError, "caliper"),
         ({"common_support": "trim"}, ValueError, "common_support"),
@@ -315,6 +371,9 @@ def test_hand_computed_known_score_abadie_imbens_variance(
     assert result.estimate == pytest.approx(16.0 / 3.0, abs=1e-14)
     assert result.normalized_variance == pytest.approx(normalized_variance, abs=1e-14)
     assert result.variance == pytest.approx(expected_variance, abs=1e-14)
+    assert result.known_score_variance == pytest.approx(expected_variance, abs=1e-14)
+    assert result.known_score_normalized_variance == pytest.approx(normalized_variance, abs=1e-14)
+    assert np.isnan(result.first_step_variance_adjustment)
     assert result.standard_error == pytest.approx(np.sqrt(expected_variance), abs=1e-14)
     assert result.conditional_variance_component == pytest.approx(conditional_component, abs=1e-14)
     assert result.effect_variance_component == pytest.approx(-85.0 / 9.0, abs=1e-14)
@@ -369,6 +428,347 @@ def test_hand_computed_stata_aligned_two_neighbor_variance(
     assert result.variance == pytest.approx(expected_variance, abs=1e-14)
     assert result.standard_error == pytest.approx(np.sqrt(expected_variance), abs=1e-14)
     assert result.variance_neighbors == 2
+
+
+@pytest.mark.parametrize(
+    (
+        "estimand",
+        "expected_estimate",
+        "expected_known_variance",
+        "expected_adjustment",
+        "expected_variance",
+        "expected_standard_error",
+        "expected_adjustment_vector",
+        "expected_target_derivative",
+    ),
+    [
+        (
+            "ate",
+            2.3333333333333335,
+            1.0509259259259258,
+            -0.2958653270661526,
+            0.7550605988597732,
+            0.8689422298747904,
+            [0.0, 1.2312612242496257],
+            [0.0, 0.0],
+        ),
+        (
+            "att",
+            2.5,
+            1.1435185185185184,
+            -0.4568110092302016,
+            0.6867075092883168,
+            0.8286781699117679,
+            [-0.19284514030466185, 1.5160907870638312],
+            [-0.08123656658228982, -0.036881407085510076],
+        ),
+        (
+            "atc",
+            2.1666666666666665,
+            0.46759259259259256,
+            -0.17569523227580644,
+            0.29189736031678615,
+            0.5402752634692672,
+            [0.04675893228574632, 0.9504173105133439],
+            [-0.0648496414366257, 0.04086705616343389],
+        ),
+    ],
+)
+def test_hand_computed_estimated_logit_first_step_adjustment(
+    estimand: str,
+    expected_estimate: float,
+    expected_known_variance: float,
+    expected_adjustment: float,
+    expected_variance: float,
+    expected_standard_error: float,
+    expected_adjustment_vector: list[float],
+    expected_target_derivative: list[float],
+) -> None:
+    outcome, treatment, design, model = _estimated_score_example()
+    assert isinstance(model, FittedPropensityMLEProtocol)
+
+    result = NearestNeighborMatch(
+        estimand=estimand,
+        metric="propensity",
+        caliper=None,
+        common_support=None,
+        inference="abadie_imbens_estimated",
+        variance_neighbors=2,
+        first_step_covariance_neighbors=2,
+        first_step_regression_neighbors=1,
+        first_step_covariate_neighbors=1,
+    ).fit(
+        outcome,
+        treatment=treatment,
+        propensity=None,
+        propensity_model=model,
+        propensity_design=design,
+        propensity_score_status="estimated",
+        propensity_provenance="full_sample_unpenalized_logit_mle",
+    )
+
+    assert result.estimate == pytest.approx(expected_estimate, abs=2e-14)
+    assert result.known_score_variance == pytest.approx(expected_known_variance, abs=2e-14)
+    assert result.first_step_variance_adjustment == pytest.approx(expected_adjustment, abs=2e-14)
+    assert result.first_step_asymptotic_adjustment == pytest.approx(
+        len(outcome) * expected_adjustment, abs=2e-13
+    )
+    assert result.variance == pytest.approx(expected_variance, abs=2e-14)
+    target_size = (
+        len(outcome) if estimand == "ate" else int((treatment == (estimand == "att")).sum())
+    )
+    assert result.normalized_variance == pytest.approx(target_size * expected_variance, abs=2e-13)
+    assert result.standard_error == pytest.approx(expected_standard_error, abs=2e-14)
+    np.testing.assert_allclose(
+        result.propensity_adjustment_vector, expected_adjustment_vector, rtol=0, atol=2e-14
+    )
+    np.testing.assert_allclose(
+        result.propensity_target_derivative, expected_target_derivative, rtol=0, atol=2e-14
+    )
+    expected_information = (
+        design.to_numpy().T
+        @ (
+            (result.propensity_scores * (1 - result.propensity_scores)).to_numpy()[:, None]
+            * design.to_numpy()
+        )
+        / len(design)
+    )
+    np.testing.assert_allclose(result.propensity_information, expected_information, atol=2e-14)
+    assert result.propensity_model_name == "_HandFittedLogit"
+    assert result.propensity_link == "logit"
+    assert result.propensity_model_score_norm < 1e-12
+    assert "estimated-propensity" in result.to_markdown()
+
+
+def test_estimated_score_inference_refuses_unverifiable_first_steps() -> None:
+    outcome, treatment, design, model = _estimated_score_example()
+    estimator = NearestNeighborMatch(
+        metric="propensity",
+        caliper=None,
+        common_support=None,
+        inference="abadie_imbens_estimated",
+        variance_neighbors=2,
+    )
+
+    with pytest.raises(ValueError, match="propensity_model.*propensity_design"):
+        estimator.fit(
+            outcome,
+            treatment=treatment,
+            propensity=model.predict_proba(design)[1],
+            propensity_score_status="estimated",
+        )
+    with pytest.raises(TypeError, match="FittedPropensityMLEProtocol"):
+        estimator.fit(
+            outcome,
+            treatment=treatment,
+            propensity_model=object(),
+            propensity_design=design,
+            propensity_score_status="estimated",
+        )
+    with pytest.raises(ValueError, match="propensity_design requires propensity_model"):
+        NearestNeighborMatch().fit(
+            outcome,
+            treatment=treatment,
+            propensity=model.predict_proba(design)[1],
+            propensity_design=design,
+        )
+    with pytest.raises(ValueError, match="full-sample unpenalized logit MLE"):
+        estimator.fit(
+            outcome,
+            treatment=treatment,
+            propensity=None,
+            propensity_model=_HandFittedLogit(model.params + np.array([0.2, 0.0]), len(design)),
+            propensity_design=design,
+            propensity_score_status="estimated",
+        )
+    with pytest.raises(ValueError, match="propensity_score_status='estimated'"):
+        estimator.fit(
+            outcome,
+            treatment=treatment,
+            propensity=None,
+            propensity_model=model,
+            propensity_design=design,
+            propensity_score_status="known",
+        )
+    with pytest.raises(NotImplementedError, match="metric='propensity'"):
+        NearestNeighborMatch(
+            caliper=None,
+            common_support=None,
+            inference="abadie_imbens_estimated",
+            variance_neighbors=2,
+        ).fit(
+            outcome,
+            treatment=treatment,
+            propensity=None,
+            propensity_model=model,
+            propensity_design=design,
+            propensity_score_status="estimated",
+        )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("not_converged", "report convergence"),
+        ("wrong_nobs", "estimation-sample size"),
+        ("wrong_features", "feature_names"),
+        ("wrong_param_names", "params must align"),
+        ("wrong_probabilities", "logit linear-index predictions"),
+    ],
+)
+def test_estimated_score_inference_refuses_malformed_fitted_results(
+    mutation: str, message: str
+) -> None:
+    outcome, treatment, design, model = _estimated_score_example()
+    if mutation == "not_converged":
+        model.converged = False
+    elif mutation == "wrong_nobs":
+        model.nobs = len(design) + 1
+    elif mutation == "wrong_features":
+        model.feature_names = ("x", "const")
+    elif mutation == "wrong_param_names":
+        model.params.index = ["intercept", "x"]
+    else:
+        original_predict = model.predict_proba
+
+        def shifted_probabilities(X):
+            probabilities = original_predict(X)
+            probabilities[1] += 0.01
+            probabilities[0] = 1.0 - probabilities[1]
+            return probabilities
+
+        model.predict_proba = shifted_probabilities
+
+    with pytest.raises(ValueError, match=message):
+        NearestNeighborMatch(
+            metric="propensity",
+            caliper=None,
+            common_support=None,
+            inference="abadie_imbens_estimated",
+            variance_neighbors=2,
+        ).fit(
+            outcome,
+            treatment=treatment,
+            propensity_model=model,
+            propensity_design=design,
+            propensity_score_status="estimated",
+        )
+
+
+def test_estimated_score_inference_refuses_singular_information() -> None:
+    outcome, treatment, _, _ = _estimated_score_example()
+    design = pd.DataFrame(
+        {"const": 1.0, "duplicate_const": 1.0},
+        index=outcome.index,
+    )
+    model = _HandFittedLogit(
+        pd.Series([0.0, 0.0], index=design.columns, name="estimate"),
+        len(design),
+    )
+
+    with pytest.raises(ValueError, match="information matrix is singular"):
+        NearestNeighborMatch(
+            metric="propensity",
+            caliper=None,
+            common_support=None,
+            inference="abadie_imbens_estimated",
+            variance_neighbors=2,
+        ).fit(
+            outcome,
+            treatment=treatment,
+            propensity_model=model,
+            propensity_design=design,
+            propensity_score_status="estimated",
+        )
+
+
+def test_estimated_score_inference_refuses_prediction_index_drift() -> None:
+    outcome, treatment, design, model = _estimated_score_example()
+    original_predict = model.predict_proba
+
+    def misaligned_probabilities(X):
+        return original_predict(X).set_axis(pd.RangeIndex(len(X)))
+
+    model.predict_proba = misaligned_probabilities
+    with pytest.raises(ValueError, match="preserve.*index"):
+        NearestNeighborMatch(
+            metric="propensity",
+            caliper=None,
+            common_support=None,
+            inference="abadie_imbens_estimated",
+            variance_neighbors=2,
+        ).fit(
+            outcome,
+            treatment=treatment,
+            propensity_model=model,
+            propensity_design=design,
+            propensity_score_status="estimated",
+        )
+
+
+@pytest.mark.parametrize("estimand", ["att", "atc", "ate"])
+def test_estimated_score_adjustment_is_invariant_to_consistent_permutation(
+    estimand: str,
+) -> None:
+    outcome, treatment, design, model = _estimated_score_example()
+    estimator = NearestNeighborMatch(
+        estimand=estimand,
+        metric="propensity",
+        caliper=None,
+        common_support=None,
+        inference="abadie_imbens_estimated",
+        variance_neighbors=2,
+    )
+    original = estimator.fit(
+        outcome,
+        treatment=treatment,
+        propensity_model=model,
+        propensity_design=design,
+        propensity_score_status="estimated",
+    )
+    order = np.random.default_rng(20_260_728).permutation(len(outcome))
+    permuted = estimator.fit(
+        outcome.iloc[order],
+        treatment=treatment.iloc[order],
+        propensity_model=_HandFittedLogit(model.params.copy(), len(design)),
+        propensity_design=design.iloc[order],
+        propensity_score_status="estimated",
+    )
+
+    assert permuted.estimate == pytest.approx(original.estimate, abs=2e-14)
+    assert permuted.variance == pytest.approx(original.variance, abs=2e-14)
+    pd.testing.assert_series_equal(
+        permuted.propensity_adjustment_vector,
+        original.propensity_adjustment_vector,
+    )
+    pd.testing.assert_series_equal(
+        permuted.propensity_target_derivative,
+        original.propensity_target_derivative,
+    )
+
+
+@pytest.mark.parametrize(
+    "selection",
+    [
+        {"caliper": 1.0, "common_support": None},
+        {"caliper": None, "common_support": "intersection"},
+    ],
+)
+def test_estimated_score_inference_refuses_target_selection(selection) -> None:
+    outcome, treatment, design, model = _estimated_score_example()
+    with pytest.raises(NotImplementedError, match="caliper=None.*common_support=None"):
+        NearestNeighborMatch(
+            metric="propensity",
+            inference="abadie_imbens_estimated",
+            variance_neighbors=2,
+            **selection,
+        ).fit(
+            outcome,
+            treatment=treatment,
+            propensity_model=model,
+            propensity_design=design,
+            propensity_score_status="estimated",
+        )
 
 
 def test_analytical_inference_refuses_support_or_caliper_target_selection() -> None:

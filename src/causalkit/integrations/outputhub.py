@@ -76,6 +76,9 @@ def to_outputhub_model(
                 "Matched focal fraction": result.matched_focal_fraction,
                 "Maximum comparison reuse": result.maximum_reuse_count,
                 "Boundary tie events": result.boundary_tie_events,
+                "Known-score variance": result.known_score_variance,
+                "First-step variance adjustment": result.first_step_variance_adjustment,
+                "Propensity likelihood score norm": result.propensity_model_score_norm,
                 **{
                     f"{name.replace('_', ' ').title()}": value
                     for name, value in result.balance_summary.items()
@@ -97,6 +100,11 @@ def to_outputhub_model(
                 "propensity_score_status": result.propensity_score_status,
                 "inference": result.inference,
                 "variance_neighbors": result.variance_neighbors,
+                "first_step_covariance_neighbors": result.first_step_covariance_neighbors,
+                "first_step_regression_neighbors": result.first_step_regression_neighbors,
+                "first_step_covariate_neighbors": result.first_step_covariate_neighbors,
+                "propensity_model": result.propensity_model_name,
+                "propensity_link": result.propensity_link,
                 "inference_distribution": result.inference_distribution,
                 "causal_interpretation_requires_assumptions": True,
                 "assumptions": list(result.assumptions),

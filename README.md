@@ -1,10 +1,10 @@
 # causalkit
 
 `causalkit` is an identification-aware Python package for causal inference and
-instrumental-variable workflows. The `0.6.0a3` surface provides linear two-stage least
+instrumental-variable workflows. The `0.6.0a4` surface provides linear two-stage least
 squares, randomized-experiment effects, reusable nuisance cross-fitting, IPW/AIPW ATE,
-ATT, and ATC, scalar propensity-score matching with a maintained fixed-score analytical
-inference path, conventional staggered DiD, and cross-fitted covariate-adjusted
+ATT, and ATC, scalar propensity-score matching with separate fixed- and estimated-score
+analytical inference paths, conventional staggered DiD, and cross-fitted covariate-adjusted
 Chen-Sant'Anna-Xie efficient DiD for short panels.
 
 This is alpha research software. A successful fit is not evidence that an instrument is
@@ -119,7 +119,7 @@ print(matched.balance)
 print(matched.match_table)
 ```
 
-`inference="none"` remains the default and is required for supplied estimated or
+`inference="none"` remains the default and is required for arbitrary estimated or
 cross-fitted propensities. When the score is genuinely known/fixed by design, the
 maintained Abadie-Imbens path is explicit:
 
@@ -142,10 +142,40 @@ print(fixed_score_match.summary_frame())
 print(fixed_score_match.conditional_variances)
 ```
 
-This path uses same-arm nearest neighbors to estimate conditional outcome variances and
+For a regular full-sample unpenalized Logit MLE, use the separate fitted-result protocol.
+For example, `limiteddepkit.BinaryLogitResult` satisfies it directly:
+
+```python
+from limiteddepkit import BinaryLogit
+
+propensity_fit = BinaryLogit().fit(propensity_design, treated)
+estimated_score_match = NearestNeighborMatch(
+    estimand="att",
+    metric="propensity",
+    caliper=None,
+    common_support=None,
+    inference="abadie_imbens_estimated",
+    variance_neighbors=2,
+).fit(
+    outcome,
+    treatment=treated,
+    propensity_model=propensity_fit,
+    propensity_design=propensity_design,
+    propensity_score_status="estimated",
+    propensity_provenance="limiteddepkit.BinaryLogit full-sample MLE",
+)
+```
+
+CausalKit validates convergence, sample size, feature/parameter order, fitted Logit
+probabilities, the likelihood first-order condition, and Fisher-information conditioning.
+It then reports the known-score variance and Abadie–Imbens first-step adjustment separately.
+Cross-fitted, penalized, probit, or otherwise unverifiable scores do not satisfy this
+contract and must retain `inference="none"`.
+
+The fixed-score path uses same-arm nearest neighbors to estimate conditional outcome variances and
 accounts for comparison reuse for ATT, ATC, and ATE. It refuses caliper/support selection,
-expanded cross-arm or same-arm boundary ties, estimated scores, and inadequate same-arm
-samples. A descriptive provenance string does not activate inference; the machine-readable
+expanded cross-arm or same-arm boundary ties, non-fixed scores, and inadequate same-arm
+samples. Both analytical paths refuse target-changing support/caliper selection. A descriptive provenance string does not activate inference; the machine-readable
 score status is separate. Ordinary bootstrap, matching without replacement, arbitrary tie
 selection, clustered uncertainty, and unimplemented bias correction also refuse. See the
 [matching contract](docs/MATCHING_CONTRACT.md) before publication-facing use.
@@ -452,15 +482,18 @@ reused conceptually without importing private source or coupling the packages at
 Existing `limiteddepkit` binary, count, censoring, duration, and ordinal estimators are
 not duplicated here. The supplied-nuisance IPW/AIPW and matching APIs let their
 out-of-sample predictions participate while keeping causal identification inside
-`causalkit`; `CrossFitter` owns only reusable fold orchestration and prediction adaptation.
+`causalkit`; the narrow estimated-score matching path additionally consumes the public
+`BinaryLogitResult` directly for its full-sample first-step correction. `CrossFitter` owns
+only reusable fold orchestration and prediction adaptation.
 
 ## Roadmap
 
 The matching alpha follows the
 [nearest-neighbor matching contract](docs/MATCHING_CONTRACT.md). Known-score analytical
-inference, R reference parity, OutputHub adaptation, and a 100,000-row inference smoke are
-implemented, with fixed-score parity against pinned R `Matching` 4.10-15 and Stata/MP 17.
-Estimated-propensity adjustment remains a promotion gate. DiD promotion includes
+inference, R reference parity, OutputHub adaptation, and 100,000-row fixed- and estimated-
+score inference smokes are implemented, with fixed-score parity against pinned R `Matching`
+4.10-15 and Stata/MP 17. Full-sample Logit-MLE first-step adjustment is implemented and
+independently checked against `statsmodels`; its Stata harness awaits a manual run. DiD promotion includes
 cross-fitted covariate nuisances and simultaneous
 event-study bands; pre-trend/Hausman diagnostics, repeated cross-sections, and broader
 parity remain. Later releases may add regression discontinuity and panel IV. Each family

@@ -5,7 +5,7 @@ identification. Inclusion requires more than a method being common in applied ec
 the package must be able to state the estimand, identifying assumptions, supported data
 structure, inference target, diagnostics, and validation boundary.
 
-## Public `0.6.0a3` alpha surface
+## Public `0.6.0a4` alpha surface
 
 The surface is estimator-specific. Cross-sectional linear instrumental variables retain
 the following contract:
@@ -35,8 +35,10 @@ The observational surface includes supplied-nuisance `IPWATE` and `AIPWATE`, reu
 support/caliper/tie rules, bidirectional ATE imputation, audit weights, reuse counts, and
 balance diagnostics. `inference="none"` remains the default. A maintained Abadie-Imbens
 analytical path is available for a declared fixed score without support/caliper selection
-or expanded ties; estimated scores, bootstrap, and clustered alternatives refuse rather
-than returning a methodologically incomplete standard error.
+or expanded ties. A separately validated full-sample unpenalized Logit-MLE path consumes
+`FittedPropensityMLEProtocol` results and applies the Abadie–Imbens estimated-score
+correction. Arbitrary/cross-fitted/penalized scores, bootstrap, and clustered alternatives
+refuse rather than returning a methodologically incomplete standard error.
 
 The DiD surface adds `DifferenceInDifferences` and `EfficientDiD` for balanced short
 panels. The conventional class retains never-treated/not-yet-treated comparison choices;
@@ -106,6 +108,12 @@ support the analysis-population ATE, treated-population ATT, and control-populat
 This is orchestration, not ownership transfer: nuisance estimators remain in their proper
 packages.
 
+Matching inference uses a second, deliberately narrower protocol because the Abadie–Imbens
+first-step formula requires a regular full-sample parametric MLE rather than an arbitrary
+prediction learner. `limiteddepkit.BinaryLogitResult` satisfies the structural contract
+directly. CausalKit validates its public fit result and owns only matching, the causal
+estimand, diagnostics, and uncertainty correction.
+
 ## `limiteddepkit.TreatmentEffect` migration provenance
 
 The historical `TreatmentEffect` class implemented ordinary homoskedastic 2SLS inside
@@ -132,7 +140,7 @@ and validation gates:
 
 | Family | Required design questions before promotion |
 | --- | --- |
-| Matching promotion | Estimated-propensity adjustment and remaining publication-scale sensitivity/coverage evidence; fixed-score Python/R/Stata parity is recorded |
+| Matching promotion | Manual Stata validation of the new estimated-Logit harness and remaining publication-scale sensitivity/coverage evidence; fixed-score Python/R/Stata parity is recorded |
 | DiD promotion | Pre-trend/Hausman diagnostics, repeated cross-sections, publication-scale coverage, covariate performance, and broader parity |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
 | Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |
@@ -143,8 +151,8 @@ documentation are complete.
 
 The normative matching decisions and fixed-score inferential boundary are recorded in
 [Nearest-neighbor matching contract](MATCHING_CONTRACT.md). The exported estimator has an
-audited point path and a narrower known-score analytical path; this is not a claim that the
-full estimated-score matching promotion gates have passed.
+audited point path plus narrow fixed-score and full-sample Logit-MLE analytical paths; this
+is not a claim that arbitrary estimated or machine-learning scores have supported inference.
 
 The conventional/efficient distinction, timing rules, formulas, covariate nuisance path,
 and inference boundaries are recorded in [Difference-in-differences contract](DID_CONTRACT.md).

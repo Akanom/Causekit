@@ -232,11 +232,15 @@ with focal attrition and comparison reuse.
 `inference="none"` is not a claim that a matching design is uncertainty-free. The
 maintained `inference="abadie_imbens"` path applies only to a declared known/fixed scalar
 score, without caliper/support selection or expanded ties, and accounts for comparison
-reuse through same-arm conditional-variance matches. A fitted or cross-fitted propensity
-is not fixed merely because its predictions were supplied to the matcher; those scores
-continue to require `inference="none"` until their first-step-specific adjustment is
-implemented. Ordinary bootstrap is not substituted because fixed-neighbor matching is
-nonsmooth.
+reuse through same-arm conditional-variance matches. The separate
+`inference="abadie_imbens_estimated"` path applies only to a validated regular full-sample
+unpenalized Logit MLE on the matching sample. It incorporates the model-specific first-step
+variance adjustment; for ATE that adjustment is nonpositive asymptotically, while for
+ATT/ATC it can have either sign because the target itself depends on the propensity
+parameter. A fitted or cross-fitted propensity is not eligible merely because predictions
+were supplied: unverifiable, penalized, cross-fitted, and unsupported-link scores continue
+to require `inference="none"`. Ordinary bootstrap is not substituted because fixed-neighbor
+matching is nonsmooth.
 
 ## Difference-in-differences and event studies
 

@@ -4,6 +4,38 @@ All notable changes to `causalkit` are recorded here. The project follows
 [Semantic Versioning](https://semver.org/) once a public contract is released. Alpha
 versions may refine APIs, but breaking changes must still be documented explicitly.
 
+## [0.6.0a4] - Unreleased
+
+### Added
+
+- Public `FittedPropensityMLEProtocol` and `inference="abadie_imbens_estimated"` for
+  ATT, ATC, and ATE matching on a validated full-sample unpenalized Logit MLE.
+- Abadie–Imbens first-step covariance, target-derivative, and Fisher-information
+  corrections with separately reported known-score and adjustment components.
+- Hand-computed three-estimand contracts, malformed-model and unsupported-design
+  refusals, independent `statsmodels.Logit` parity, direct `limiteddepkit.BinaryLogitResult`
+  interoperability verification, a seeded coverage smoke, and a 100,000-row benchmark.
+- A manual Stata `teffects psmatch` parity harness for the estimated-score contract.
+
+### Architecture
+
+- CausalKit consumes the fitted nuisance result and never imports or duplicates the
+  binary Logit estimator owned by `limiteddepkit`.
+- The estimated-score path is intentionally narrower than `CrossFitter`: it validates
+  convergence, sample/feature alignment, Logit predictions, likelihood stationarity, and
+  nonsingular normalized information. Cross-fitted, penalized, probit, and generic scores
+  retain `inference="none"`.
+- Scalar local moments use sorted searches, and ATT/ATC target derivatives use `cKDTree`;
+  no treated-by-control or covariate pairwise distance matrix is allocated.
+
+### Known limitations
+
+- The estimated-score Stata harness requires a manual Stata run before parity can be
+  recorded. R `Matching` treats a supplied score as fixed and is non-comparable for the
+  fitted-Logit first-step correction.
+- Support/caliper selection, expanded ties, clustered/paired/survey uncertainty, bias
+  correction, and arbitrary machine-learning first steps remain unsupported analytically.
+
 ## [0.6.0a3] - Unreleased
 
 ### Added

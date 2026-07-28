@@ -32,7 +32,8 @@ uses different estimands or moments. Neither counts as a pass.
 | `RandomizedATE` | `statsmodels` regression/covariance identities | pending | pending | partial |
 | `IPWATE` / `AIPWATE` ATE/ATT/ATC | analytical score identities; external comparator pending | pending | pending | pending |
 | `CrossFitter` | protocol and leakage/alignment tests; not itself an estimand | non-comparable | non-comparable | internal protocol |
-| `NearestNeighborMatch` ATT/ATC/ATE | hand/reuse/variance identities pass | CRAN `Matching` 4.10-15 fixed-score fixture passes | Stata/MP 17 `teffects nnmatch` fixed-score fixture passes | fixed-score pass; estimated-score pending |
+| `NearestNeighborMatch` fixed-score ATT/ATC/ATE | hand/reuse/variance identities pass | CRAN `Matching` 4.10-15 fixture passes | Stata/MP 17 `teffects nnmatch` fixture passes | pass for recorded fixture |
+| `NearestNeighborMatch` estimated-Logit ATT/ATC/ATE | hand formulas, `statsmodels.Logit`, and `limiteddepkit.BinaryLogitResult` pass | `Matching` conditions on supplied scores: non-comparable | `teffects psmatch` harness written; manual run pending | partial |
 | Conventional staggered DiD | hand identities; external comparator pending | pending | pending | pending |
 | Efficient DiD, no covariates | native result checked against pinned fixture | public `edid` commit `f55a4a4aba14f0826f59ad7aa4af3bafaeba529b` | pending/unavailable pending audit | partial |
 | Efficient DiD, covariate adjusted | deterministic and simulation evidence only | pending | pending/unavailable pending audit | pending |
@@ -52,6 +53,18 @@ mapping reverses treatment, estimates ATET, and negates the coefficient while re
 its standard error. Stata requires at least two same-treatment neighbors in
 `vce(robust, nn(#))`, so that harness compares CausalKit's otherwise identical
 `variance_neighbors=2` contract; `nneighbor(1)` still governs the effect match.
+
+The estimated-Logit Python fixture independently fits the treatment model with
+`statsmodels.Logit`, passes that fitted result through `FittedPropensityMLEProtocol`, and
+compares all three effects and adjusted standard errors with hand-recorded values. The
+same protocol has been exercised directly with the current public
+`limiteddepkit.BinaryLogitResult`, without a CausalKit dependency or copied estimator;
+`benchmarks/validate_matching_limiteddepkit.py` retains that reproduction path.
+CRAN `Matching` accepts a supplied score but conditions on it for uncertainty, so it is
+not comparable to the fitted-score first-step correction. The maintained Stata harness is
+`benchmarks/validate_matching_estimated_stata.do`; it uses `teffects psmatch`, one effect
+neighbor, and `vce(robust, nn(2))`. Its status remains pending until the machine-readable
+output from a manual Stata run is reviewed and retained.
 
 ## Completion rule
 

@@ -76,6 +76,53 @@ def _known_score_ate_inference(nobs: int, rng: np.random.Generator) -> dict[str,
     }
 
 
+class _StatsmodelsLogitResult:
+    """Benchmark-only adapter for an independently fitted statsmodels Logit."""
+
+    def __init__(self, result: Any, design: pd.DataFrame) -> None:
+        self._result = result
+        self.params = pd.Series(result.params, index=design.columns, name="estimate")
+        self.converged = bool(result.mle_retvals["converged"])
+        self.nobs = len(design)
+        self.feature_names = tuple(design.columns)
+
+    def predict_proba(self, X: Any) -> pd.DataFrame:
+        probability = np.asarray(self._result.predict(X), dtype=float)
+        return pd.DataFrame({0: 1.0 - probability, 1: probability}, index=X.index)
+
+
+def _estimated_score_ate_inference(nobs: int, rng: np.random.Generator) -> dict[str, Any]:
+    try:
+        import statsmodels.api as sm
+    except ImportError as error:  # pragma: no cover - benchmark environment contract
+        raise RuntimeError(
+            "estimated_score_ate_inference requires the causalkit validation extra."
+        ) from error
+
+    covariate = rng.normal(size=nobs)
+    design = pd.DataFrame({"const": 1.0, "x": covariate})
+    propensity = _expit(-0.1 + 0.65 * covariate)
+    treatment = rng.binomial(1, propensity)
+    treatment[0], treatment[1] = 0, 1
+    outcome = 1.5 * treatment + 0.4 * covariate + rng.normal(size=nobs)
+    fitted = sm.Logit(treatment, design).fit(method="newton", maxiter=200, tol=1e-11, disp=False)
+    return {
+        "y": pd.Series(outcome),
+        "treatment": pd.Series(treatment),
+        "propensity_model": _StatsmodelsLogitResult(fitted, design),
+        "propensity_design": design,
+        "propensity_score_status": "estimated",
+        "model": NearestNeighborMatch(
+            estimand="ate",
+            metric="propensity",
+            caliper=None,
+            common_support=None,
+            inference="abadie_imbens_estimated",
+            variance_neighbors=2,
+        ),
+    }
+
+
 def _heavy_ties_att(nobs: int, rng: np.random.Generator) -> dict[str, Any]:
     del rng
     controls = max(2, (nobs + 1) // 2)
@@ -117,6 +164,7 @@ SCENARIOS: dict[str, Callable[[int, np.random.Generator], dict[str, Any]]] = {
     "balanced_ate": _balanced_ate,
     "imbalanced_att": _imbalanced_att,
     "known_score_ate_inference": _known_score_ate_inference,
+    "estimated_score_ate_inference": _estimated_score_ate_inference,
     "heavy_ties_att": _heavy_ties_att,
     "caliper_attrition_att": _caliper_attrition_att,
 }

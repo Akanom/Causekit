@@ -4,16 +4,36 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from numbers import Real
-from typing import Any, Literal
+from typing import Any, Literal, Protocol, runtime_checkable
 
 import numpy as np
 import pandas as pd
+from scipy.spatial import cKDTree
+from scipy.special import expit
 from scipy.stats import norm
 
 from ._data import _validate_pandas_indices
 
 MatchingEstimand = Literal["ate", "att", "atc"]
 PropensityScoreStatus = Literal["estimated", "known"]
+
+
+@runtime_checkable
+class FittedPropensityMLEProtocol(Protocol):
+    """Structural contract for a fitted full-sample parametric propensity MLE.
+
+    The matching estimator validates the fitted probabilities, likelihood score,
+    convergence flag, feature ordering, and sample size. This protocol is intentionally
+    compatible with ``limiteddepkit.BinaryLogitResult`` without importing or duplicating
+    the binary-response estimator in CausalKit.
+    """
+
+    params: Any
+    converged: bool
+    nobs: int
+    feature_names: tuple[str, ...]
+
+    def predict_proba(self, X: Any) -> Any: ...
 
 
 @dataclass(frozen=True)
@@ -72,10 +92,24 @@ class NearestNeighborMatchResult:
     inference: str
     variance: float
     normalized_variance: float
+    known_score_variance: float
+    known_score_normalized_variance: float
+    first_step_variance_adjustment: float
+    first_step_asymptotic_adjustment: float
     conditional_variances: pd.Series
     conditional_variance_component: float
     effect_variance_component: float
     variance_neighbors: int
+    first_step_covariance_neighbors: int
+    first_step_regression_neighbors: int
+    first_step_covariate_neighbors: int
+    propensity_scores: pd.Series
+    propensity_information: pd.DataFrame
+    propensity_adjustment_vector: pd.Series
+    propensity_target_derivative: pd.Series
+    propensity_model_name: str | None
+    propensity_model_score_norm: float
+    propensity_link: str | None
     inference_distribution: str | None
     inference_df: float | None
     notes: tuple[str, ...]
@@ -161,11 +195,13 @@ class NearestNeighborMatchResult:
             if np.isfinite(self.standard_error)
             else "not estimated"
         )
-        inference = (
-            "Abadie-Imbens known-score analytical variance"
-            if self.inference == "abadie_imbens"
-            else "none"
-        )
+        inference = {
+            "abadie_imbens": "Abadie-Imbens known-score analytical variance",
+            "abadie_imbens_estimated": (
+                "Abadie-Imbens estimated-propensity MLE analytical variance"
+            ),
+            "none": "none",
+        }[self.inference]
         requested_focal_count = (
             self.n_treated
             if self.requested_estimand == "att"
@@ -291,6 +327,136 @@ def _prepare(
     return outcome, assigned, score, frame
 
 
+def _propensity_design(value: Any) -> tuple[pd.DataFrame, bool]:
+    labeled = isinstance(value, (pd.Series, pd.DataFrame))
+    if isinstance(value, pd.Series):
+        frame = value.to_frame()
+    elif isinstance(value, pd.DataFrame):
+        frame = value.copy()
+    else:
+        try:
+            raw = np.asarray(value)
+        except (TypeError, ValueError) as error:
+            raise ValueError("propensity_design must contain only numeric values.") from error
+        if raw.ndim == 1:
+            raw = raw.reshape(-1, 1)
+        if raw.ndim != 2 or raw.shape[1] == 0:
+            raise ValueError("propensity_design must be one- or two-dimensional numeric data.")
+        frame = pd.DataFrame(raw, columns=[f"x_{position}" for position in range(raw.shape[1])])
+    if frame.shape[1] == 0:
+        raise ValueError("propensity_design must contain at least one column.")
+    names = tuple(
+        "propensity_covariate" if name is None and frame.shape[1] == 1 else str(name)
+        for name in frame.columns
+    )
+    if len(set(names)) != len(names):
+        raise ValueError("propensity_design column names must be unique after string conversion.")
+    frame.columns = names
+    try:
+        frame = frame.astype(float)
+    except (TypeError, ValueError) as error:
+        raise ValueError("propensity_design must contain only numeric values.") from error
+    if not np.isfinite(frame.to_numpy()).all():
+        raise ValueError("propensity_design must contain only finite values.")
+    return frame, labeled
+
+
+def _fitted_propensity_probabilities(
+    model: FittedPropensityMLEProtocol,
+    design: pd.DataFrame,
+) -> np.ndarray:
+    raw = model.predict_proba(design)
+    if isinstance(raw, (pd.Series, pd.DataFrame)) and not raw.index.equals(design.index):
+        raise ValueError(
+            "propensity_model.predict_proba() must preserve the propensity_design index."
+        )
+    if isinstance(raw, pd.DataFrame):
+        if 1 in raw.columns:
+            values = raw[1].to_numpy(dtype=float)
+        elif raw.shape[1] == 2:
+            values = raw.iloc[:, 1].to_numpy(dtype=float)
+        else:
+            raise ValueError(
+                "propensity_model.predict_proba() must expose the treated-class probability."
+            )
+    else:
+        values = np.asarray(raw, dtype=float)
+        if values.ndim == 2 and values.shape[1] == 2:
+            values = values[:, 1]
+    values = np.asarray(values, dtype=float)
+    if values.ndim != 1 or len(values) != len(design):
+        raise ValueError("propensity_model.predict_proba() must return one probability per row.")
+    if not np.isfinite(values).all() or np.any((values <= 0.0) | (values >= 1.0)):
+        raise ValueError(
+            "propensity_model probabilities must be finite and strictly between zero and one."
+        )
+    return values
+
+
+def _validate_full_sample_logit_mle(
+    model: FittedPropensityMLEProtocol,
+    design: pd.DataFrame,
+    treatment: np.ndarray,
+    probabilities: np.ndarray,
+) -> tuple[np.ndarray, float]:
+    """Validate the exact regular logit-MLE first step required by AI (2016)."""
+
+    if not isinstance(model.converged, (bool, np.bool_)) or not bool(model.converged):
+        raise ValueError("propensity_model must report convergence for analytical inference.")
+    if (
+        isinstance(model.nobs, (bool, np.bool_))
+        or not isinstance(model.nobs, (int, np.integer))
+        or int(model.nobs) != len(design)
+    ):
+        raise ValueError("propensity_model.nobs must equal the matching estimation-sample size.")
+    feature_names = tuple(str(name) for name in model.feature_names)
+    if feature_names != tuple(design.columns):
+        raise ValueError(
+            "propensity_model feature_names must match propensity_design columns exactly."
+        )
+    if isinstance(model.params, pd.Series):
+        parameter_names = tuple(str(name) for name in model.params.index)
+        if parameter_names != tuple(design.columns):
+            raise ValueError(
+                "propensity_model.params must align exactly with propensity_design columns."
+            )
+    parameters = np.asarray(model.params, dtype=float)
+    if parameters.ndim != 1 or len(parameters) != design.shape[1]:
+        raise ValueError("propensity_model.params has an invalid dimension.")
+    if not np.isfinite(parameters).all():
+        raise ValueError("propensity_model.params must contain only finite values.")
+
+    design_values = design.to_numpy(dtype=float)
+    implied = expit(design_values @ parameters)
+    if not np.allclose(probabilities, implied, rtol=1e-10, atol=1e-12):
+        raise ValueError(
+            "propensity_model probabilities must equal the declared logit linear-index "
+            "predictions on propensity_design."
+        )
+    normalized_score = design_values.T @ (treatment - probabilities) / len(design)
+    score_norm = float(np.max(np.abs(normalized_score)))
+    if not np.isfinite(score_norm) or score_norm > 1e-7:
+        raise ValueError(
+            "propensity_model must be a full-sample unpenalized logit MLE with a "
+            "near-zero likelihood score on the matching sample."
+        )
+
+    weights = probabilities * (1.0 - probabilities)
+    information = design_values.T @ (weights[:, None] * design_values) / len(design)
+    information = (information + information.T) / 2.0
+    eigenvalues = np.linalg.eigvalsh(information)
+    maximum = float(eigenvalues[-1]) if len(eigenvalues) else 0.0
+    if (
+        not np.isfinite(eigenvalues).all()
+        or maximum <= 0.0
+        or float(eigenvalues[0]) <= maximum * 1e-12
+    ):
+        raise ValueError(
+            "The normalized propensity information matrix is singular or ill-conditioned."
+        )
+    return information, score_norm
+
+
 def _neighbor_group(
     focal: float,
     sorted_metric: np.ndarray,
@@ -339,6 +505,144 @@ def _neighbor_group(
     if sum(item[4] for item in selected) < 1.0 - 1e-12:
         return None
     return selected, expanded_tie
+
+
+def _local_score_covariances(
+    outcome: np.ndarray,
+    treatment: np.ndarray,
+    score: np.ndarray,
+    design: np.ndarray,
+    *,
+    neighbors: int,
+) -> np.ndarray:
+    """Paper Section 4 local covariances of X and Y given score and arm."""
+
+    estimates = np.empty((len(outcome), 2, design.shape[1]), dtype=float)
+    for arm in (0, 1):
+        arm_positions = np.flatnonzero(treatment == arm)
+        if len(arm_positions) < neighbors:
+            raise ValueError(
+                "first_step_covariance_neighbors exceeds the observations available "
+                "in a treatment arm."
+            )
+        order = np.argsort(score[arm_positions], kind="stable")
+        sorted_positions = arm_positions[order]
+        sorted_score = score[sorted_positions]
+        for focal_position in range(len(outcome)):
+            found = _neighbor_group(
+                score[focal_position],
+                sorted_score,
+                sorted_positions,
+                neighbors=neighbors,
+                caliper=None,
+            )
+            if found is None:  # pragma: no cover - guarded by arm size
+                raise RuntimeError("First-step covariance neighbor search failed unexpectedly.")
+            matches, expanded = found
+            if expanded:
+                raise ValueError(
+                    "Estimated-propensity covariance matching encountered expanded "
+                    "boundary ties; analytical inference is unavailable."
+                )
+            positions = np.asarray([position for position, *_ in matches], dtype=int)
+            local_design = design[positions]
+            local_outcome = outcome[positions]
+            estimates[focal_position, arm] = (
+                (local_design - local_design.mean(axis=0))
+                * (local_outcome - local_outcome.mean())[:, None]
+            ).sum(axis=0) / (neighbors - 1)
+    return estimates
+
+
+def _local_score_means(
+    outcome: np.ndarray,
+    treatment: np.ndarray,
+    score: np.ndarray,
+    *,
+    neighbors: int,
+) -> np.ndarray:
+    """Leave-own-observation-out local score regressions for the ATT correction."""
+
+    estimates = np.empty((len(outcome), 2), dtype=float)
+    for arm in (0, 1):
+        arm_positions = np.flatnonzero(treatment == arm)
+        if len(arm_positions) <= neighbors:
+            raise ValueError(
+                "first_step_regression_neighbors requires more observations in each "
+                "treatment arm than the requested neighbor count."
+            )
+        order = np.argsort(score[arm_positions], kind="stable")
+        sorted_positions = arm_positions[order]
+        sorted_score = score[sorted_positions]
+        for focal_position in range(len(outcome)):
+            found = _neighbor_group(
+                score[focal_position],
+                sorted_score,
+                sorted_positions,
+                neighbors=neighbors,
+                caliper=None,
+                exclude_position=(focal_position if treatment[focal_position] == arm else None),
+            )
+            if found is None:  # pragma: no cover - guarded by arm size
+                raise RuntimeError("First-step regression neighbor search failed unexpectedly.")
+            matches, expanded = found
+            if expanded:
+                raise ValueError(
+                    "Estimated-propensity regression matching encountered expanded "
+                    "boundary ties; analytical inference is unavailable."
+                )
+            estimates[focal_position, arm] = sum(
+                outcome[position] * weight for position, _, _, _, weight in matches
+            )
+    return estimates
+
+
+def _covariate_matched_effect_residuals(
+    outcome: np.ndarray,
+    treatment: np.ndarray,
+    design: np.ndarray,
+    *,
+    estimate: float,
+    neighbors: int,
+) -> np.ndarray:
+    """Equation following (9): nearest-opposite-arm matching on X without N^2 storage."""
+
+    residuals = np.empty(len(outcome), dtype=float)
+    for arm in (0, 1):
+        focal_positions = np.flatnonzero(treatment == arm)
+        comparison_positions = np.flatnonzero(treatment == 1 - arm)
+        if len(comparison_positions) < neighbors:
+            raise ValueError(
+                "first_step_covariate_neighbors exceeds the observations available "
+                "in a treatment arm."
+            )
+        query_count = min(neighbors + 1, len(comparison_positions))
+        tree = cKDTree(design[comparison_positions])
+        distances, locations = tree.query(
+            design[focal_positions],
+            k=query_count,
+            workers=-1,
+        )
+        distances = np.asarray(distances, dtype=float)
+        locations = np.asarray(locations, dtype=int)
+        if distances.ndim == 1:
+            distances = distances[:, None]
+            locations = locations[:, None]
+        if len(comparison_positions) > neighbors:
+            boundary = distances[:, neighbors - 1]
+            next_distance = distances[:, neighbors]
+            tolerance = 32 * np.finfo(float).eps * np.maximum(1.0, np.abs(boundary))
+            if np.any(np.abs(next_distance - boundary) <= tolerance):
+                raise ValueError(
+                    "Estimated-propensity covariate matching encountered expanded "
+                    "boundary ties; analytical inference is unavailable."
+                )
+        selected = comparison_positions[locations[:, :neighbors]]
+        matched_mean = outcome[selected].mean(axis=1)
+        residuals[focal_positions] = (2 * arm - 1) * (
+            outcome[focal_positions] - matched_mean
+        ) - estimate
+    return residuals
 
 
 def _conditional_variances(
@@ -462,6 +766,131 @@ def _abadie_imbens_variance(
     )
 
 
+def _estimated_propensity_adjustment(
+    *,
+    estimand: MatchingEstimand,
+    estimate: float,
+    known_score_variance: float,
+    outcome: np.ndarray,
+    treatment: np.ndarray,
+    propensity: np.ndarray,
+    design: np.ndarray,
+    information: np.ndarray,
+    covariance_neighbors: int,
+    regression_neighbors: int,
+    covariate_neighbors: int,
+) -> tuple[float, float, float, float, np.ndarray, np.ndarray]:
+    """Abadie-Imbens (2016) full-sample parametric-MLE variance correction."""
+
+    inverse_information = np.linalg.inv(information)
+    density = propensity * (1.0 - propensity)
+    local_covariances = _local_score_covariances(
+        outcome,
+        treatment,
+        propensity,
+        design,
+        neighbors=covariance_neighbors,
+    )
+    if estimand == "ate":
+        adjustment_vector = np.mean(
+            (
+                local_covariances[:, 1] / propensity[:, None]
+                + local_covariances[:, 0] / (1.0 - propensity)[:, None]
+            )
+            * density[:, None],
+            axis=0,
+        )
+        target_derivative = np.zeros(design.shape[1], dtype=float)
+    else:
+        target_treatment = treatment if estimand == "att" else 1 - treatment
+        target_propensity = propensity if estimand == "att" else 1.0 - propensity
+        target_estimate = estimate if estimand == "att" else -estimate
+        target_density = target_propensity * (1.0 - target_propensity)
+        target_size = int(target_treatment.sum())
+        target_covariances = (
+            local_covariances
+            if estimand == "att"
+            else _local_score_covariances(
+                outcome,
+                target_treatment,
+                target_propensity,
+                design,
+                neighbors=covariance_neighbors,
+            )
+        )
+        local_means = _local_score_means(
+            outcome,
+            target_treatment,
+            target_propensity,
+            neighbors=regression_neighbors,
+        )
+        target_covariance_component = (
+            np.sum(
+                (
+                    target_covariances[:, 1]
+                    + target_propensity[:, None]
+                    / (1.0 - target_propensity)[:, None]
+                    * target_covariances[:, 0]
+                )
+                * target_density[:, None],
+                axis=0,
+            )
+            / target_size
+        )
+        target_regression_component = (
+            np.sum(
+                design
+                * target_density[:, None]
+                * (local_means[:, 1] - local_means[:, 0] - target_estimate)[:, None],
+                axis=0,
+            )
+            / target_size
+        )
+        adjustment_vector = target_regression_component + target_covariance_component
+        covariate_effect_residuals = _covariate_matched_effect_residuals(
+            outcome,
+            target_treatment,
+            design,
+            estimate=target_estimate,
+            neighbors=covariate_neighbors,
+        )
+        target_derivative = (
+            np.sum(
+                design * target_density[:, None] * covariate_effect_residuals[:, None],
+                axis=0,
+            )
+            / target_size
+        )
+
+    asymptotic_adjustment = float(
+        -adjustment_vector @ inverse_information @ adjustment_vector
+        + target_derivative @ inverse_information @ target_derivative
+    )
+    variance_adjustment = asymptotic_adjustment / len(outcome)
+    variance = known_score_variance + variance_adjustment
+    numerical_tolerance = 1e-12 * max(1.0, abs(known_score_variance), abs(variance_adjustment))
+    if not np.isfinite(variance) or variance <= numerical_tolerance:
+        raise ValueError(
+            "The estimated-propensity first-step correction produced a non-positive "
+            "sampling variance; analytical inference is unavailable for this sample."
+        )
+    target_size = (
+        len(outcome)
+        if estimand == "ate"
+        else int(treatment.sum())
+        if estimand == "att"
+        else int((1 - treatment).sum())
+    )
+    return (
+        variance,
+        variance * target_size,
+        variance_adjustment,
+        asymptotic_adjustment,
+        adjustment_vector,
+        target_derivative,
+    )
+
+
 def _weighted_mean(values: np.ndarray, weights: np.ndarray) -> float:
     return float(weights @ values / weights.sum())
 
@@ -569,11 +998,16 @@ class NearestNeighborMatch:
         bias_correction: str = "none",
         inference: str = "none",
         variance_neighbors: int = 1,
+        first_step_covariance_neighbors: int = 2,
+        first_step_regression_neighbors: int = 1,
+        first_step_covariate_neighbors: int = 1,
     ) -> None:
         if estimand not in {"ate", "att", "atc"}:
             raise ValueError("estimand must be 'ate', 'att', or 'atc'.")
-        if metric != "propensity_logit":
-            raise NotImplementedError("Only metric='propensity_logit' is implemented.")
+        if metric not in {"propensity", "propensity_logit"}:
+            raise NotImplementedError(
+                "Only metric='propensity' and metric='propensity_logit' are implemented."
+            )
         if (
             isinstance(neighbors, bool)
             or not isinstance(neighbors, (int, np.integer))
@@ -586,14 +1020,28 @@ class NearestNeighborMatch:
             raise ValueError("ties must be 'all'.")
         if bias_correction != "none":
             raise NotImplementedError("bias_correction other than 'none' is not implemented.")
-        if inference not in {"abadie_imbens", "none"}:
-            raise ValueError("inference must be 'abadie_imbens' or 'none'.")
+        if inference not in {"abadie_imbens", "abadie_imbens_estimated", "none"}:
+            raise ValueError(
+                "inference must be 'abadie_imbens', 'abadie_imbens_estimated', or 'none'."
+            )
         if (
             isinstance(variance_neighbors, bool)
             or not isinstance(variance_neighbors, (int, np.integer))
             or variance_neighbors < 1
         ):
             raise ValueError("variance_neighbors must be a positive integer.")
+        if (
+            isinstance(first_step_covariance_neighbors, bool)
+            or not isinstance(first_step_covariance_neighbors, (int, np.integer))
+            or first_step_covariance_neighbors < 2
+        ):
+            raise ValueError("first_step_covariance_neighbors must be an integer of at least two.")
+        for name, value in (
+            ("first_step_regression_neighbors", first_step_regression_neighbors),
+            ("first_step_covariate_neighbors", first_step_covariate_neighbors),
+        ):
+            if isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value < 1:
+                raise ValueError(f"{name} must be a positive integer.")
         if common_support not in {"intersection", None}:
             raise ValueError("common_support must be 'intersection' or None.")
         if isinstance(caliper, str) and caliper != "auto":
@@ -623,14 +1071,19 @@ class NearestNeighborMatch:
         self.bias_correction = bias_correction
         self.inference = inference
         self.variance_neighbors = int(variance_neighbors)
+        self.first_step_covariance_neighbors = int(first_step_covariance_neighbors)
+        self.first_step_regression_neighbors = int(first_step_regression_neighbors)
+        self.first_step_covariate_neighbors = int(first_step_covariate_neighbors)
 
     def fit(
         self,
         y: Any,
         *,
         treatment: Any,
-        propensity: Any,
+        propensity: Any | None = None,
         covariates: Any | None = None,
+        propensity_model: FittedPropensityMLEProtocol | None = None,
+        propensity_design: Any | None = None,
         propensity_provenance: str = "supplied_unspecified",
         propensity_score_status: PropensityScoreStatus = "estimated",
         clusters: Any | None = None,
@@ -641,13 +1094,95 @@ class NearestNeighborMatch:
             raise ValueError("propensity_provenance must be a nonempty string.")
         if propensity_score_status not in {"estimated", "known"}:
             raise ValueError("propensity_score_status must be 'estimated' or 'known'.")
+        model_design: pd.DataFrame | None = None
+        model_design_labeled = False
+        model_probabilities: np.ndarray | None = None
+        if propensity_model is not None:
+            if not isinstance(propensity_model, FittedPropensityMLEProtocol):
+                raise TypeError("propensity_model must satisfy FittedPropensityMLEProtocol.")
+            if propensity_design is None:
+                raise ValueError("propensity_model requires propensity_design.")
+            model_design, model_design_labeled = _propensity_design(propensity_design)
+            model_probabilities = _fitted_propensity_probabilities(propensity_model, model_design)
+            if propensity is None:
+                propensity = (
+                    pd.Series(
+                        model_probabilities,
+                        index=model_design.index,
+                        name="propensity",
+                    )
+                    if model_design_labeled
+                    else model_probabilities
+                )
+        else:
+            if propensity_design is not None:
+                raise ValueError("propensity_design requires propensity_model.")
+            if propensity is None:
+                raise ValueError(
+                    "propensity is required unless propensity_model and propensity_design are supplied."
+                )
         outcome, assigned, propensity_values, covariate_frame = _prepare(
             y, treatment, propensity, covariates
         )
         index = outcome.index
         treatment_values = assigned.to_numpy(dtype=int)
-        metric_values = np.log(propensity_values.to_numpy() / (1 - propensity_values.to_numpy()))
+        propensity_array = propensity_values.to_numpy(dtype=float)
+        metric_values = (
+            np.log(propensity_array / (1.0 - propensity_array))
+            if self.metric == "propensity_logit"
+            else propensity_array.copy()
+        )
         nobs = len(outcome)
+        propensity_information_values = np.empty((0, 0), dtype=float)
+        propensity_model_score_norm = float("nan")
+        propensity_model_name: str | None = None
+        propensity_feature_names: tuple[str, ...] = ()
+        if model_design is not None:
+            if len(model_design) != nobs:
+                raise ValueError(
+                    "propensity_design must contain the same number of observations as y."
+                )
+            if model_design_labeled and not model_design.index.equals(index):
+                raise ValueError("Pandas indices must match exactly and in the same order.")
+            model_design.index = index
+            if model_probabilities is None:  # pragma: no cover - established above
+                raise RuntimeError("Propensity-model prediction state is inconsistent.")
+            if not np.allclose(
+                propensity_array,
+                model_probabilities,
+                rtol=1e-10,
+                atol=1e-12,
+            ):
+                raise ValueError(
+                    "Supplied propensity values must equal propensity_model predictions."
+                )
+            propensity_model_name = type(propensity_model).__name__
+            propensity_feature_names = tuple(model_design.columns)
+        if self.inference == "abadie_imbens_estimated":
+            if propensity_score_status != "estimated":
+                raise ValueError(
+                    "inference='abadie_imbens_estimated' requires "
+                    "propensity_score_status='estimated'."
+                )
+            if self.metric != "propensity":
+                raise NotImplementedError(
+                    "Abadie-Imbens estimated-propensity inference requires "
+                    "metric='propensity' to match the paper's F(X' theta) contract."
+                )
+            if propensity_model is None or model_design is None:
+                raise ValueError(
+                    "Estimated-propensity inference requires both propensity_model and "
+                    "propensity_design."
+                )
+            (
+                propensity_information_values,
+                propensity_model_score_norm,
+            ) = _validate_full_sample_logit_mle(
+                propensity_model,
+                model_design,
+                treatment_values,
+                propensity_array,
+            )
         if self.caliper == "auto":
             realized_caliper = 0.2 * float(np.std(metric_values, ddof=1))
         elif self.caliper is None:
@@ -771,21 +1306,26 @@ class NearestNeighborMatch:
         for position, count in reuse_counts.items():
             comparison_reuse.iloc[int(position)] = int(count)
         variance = normalized_variance = float("nan")
+        known_score_variance = known_score_normalized_variance = float("nan")
+        first_step_variance_adjustment = float("nan")
+        first_step_asymptotic_adjustment = float("nan")
+        propensity_adjustment_values = np.empty(0, dtype=float)
+        propensity_target_derivative_values = np.empty(0, dtype=float)
         conditional_variance_component = effect_variance_component = float("nan")
         conditional_variance_values = np.full(nobs, np.nan)
         standard_error = statistic = pvalue = float("nan")
         inference_distribution = None
-        if self.inference == "abadie_imbens":
+        if self.inference in {"abadie_imbens", "abadie_imbens_estimated"}:
             if boundary_tie_events:
                 raise ValueError(
                     "Abadie-Imbens analytical inference is unavailable when boundary ties "
                     "expand the realized neighbor count; use inference='none'."
                 )
-            if propensity_score_status != "known":
+            if self.inference == "abadie_imbens" and propensity_score_status != "known":
                 raise NotImplementedError(
                     "Abadie-Imbens inference currently requires a declared known/fixed "
                     "propensity score. Estimated or cross-fitted scores require a "
-                    "first-step-specific variance adjustment; use inference='none'."
+                    "first-step-specific variance adjustment."
                 )
             if self.caliper is not None or self.common_support is not None:
                 raise NotImplementedError(
@@ -794,8 +1334,8 @@ class NearestNeighborMatch:
                     "the target or variance contract."
                 )
             (
-                variance,
-                normalized_variance,
+                known_score_variance,
+                known_score_normalized_variance,
                 conditional_variance_values,
                 conditional_variance_component,
                 effect_variance_component,
@@ -810,6 +1350,31 @@ class NearestNeighborMatch:
                 neighbors=self.neighbors,
                 variance_neighbors=self.variance_neighbors,
             )
+            variance = known_score_variance
+            normalized_variance = known_score_normalized_variance
+            if self.inference == "abadie_imbens_estimated":
+                if model_design is None:  # pragma: no cover - validated above
+                    raise RuntimeError("Propensity-model design state is inconsistent.")
+                (
+                    variance,
+                    normalized_variance,
+                    first_step_variance_adjustment,
+                    first_step_asymptotic_adjustment,
+                    propensity_adjustment_values,
+                    propensity_target_derivative_values,
+                ) = _estimated_propensity_adjustment(
+                    estimand=self.estimand,
+                    estimate=estimate,
+                    known_score_variance=known_score_variance,
+                    outcome=outcome_values,
+                    treatment=treatment_values,
+                    propensity=propensity_array,
+                    design=model_design.to_numpy(dtype=float),
+                    information=propensity_information_values,
+                    covariance_neighbors=self.first_step_covariance_neighbors,
+                    regression_neighbors=self.first_step_regression_neighbors,
+                    covariate_neighbors=self.first_step_covariate_neighbors,
+                )
             standard_error = float(np.sqrt(variance))
             if standard_error > 0.0:
                 statistic = estimate / standard_error
@@ -849,6 +1414,11 @@ class NearestNeighborMatch:
                 "Analytical variance conditions on the supplied score as known/fixed and "
                 "assumes independent sampling units."
             )
+        elif self.inference == "abadie_imbens_estimated":
+            notes.append(
+                "Analytical variance applies the Abadie-Imbens first-step correction for "
+                "a validated full-sample unpenalized logit propensity MLE."
+            )
         assumptions = [
             "Treatment consistency",
             "No interference",
@@ -861,6 +1431,14 @@ class NearestNeighborMatch:
                 [
                     "The supplied scalar score is known/fixed rather than estimated in this sample",
                     "Independent sampling units and fixed-neighbor replacement asymptotics",
+                ]
+            )
+        elif self.inference == "abadie_imbens_estimated":
+            assumptions.extend(
+                [
+                    "The propensity model is a correctly specified regular full-sample unpenalized logit MLE",
+                    "Independent sampling units and fixed-neighbor replacement asymptotics",
+                    "No caliper, common-support trimming, or expanded boundary ties alter the analytical contract",
                 ]
             )
         match_table = match_table_internal.copy()
@@ -924,6 +1502,10 @@ class NearestNeighborMatch:
             inference=self.inference,
             variance=variance,
             normalized_variance=normalized_variance,
+            known_score_variance=known_score_variance,
+            known_score_normalized_variance=known_score_normalized_variance,
+            first_step_variance_adjustment=first_step_variance_adjustment,
+            first_step_asymptotic_adjustment=first_step_asymptotic_adjustment,
             conditional_variances=pd.Series(
                 conditional_variance_values,
                 index=index,
@@ -932,6 +1514,32 @@ class NearestNeighborMatch:
             conditional_variance_component=conditional_variance_component,
             effect_variance_component=effect_variance_component,
             variance_neighbors=self.variance_neighbors,
+            first_step_covariance_neighbors=self.first_step_covariance_neighbors,
+            first_step_regression_neighbors=self.first_step_regression_neighbors,
+            first_step_covariate_neighbors=self.first_step_covariate_neighbors,
+            propensity_scores=pd.Series(
+                propensity_array,
+                index=index,
+                name="propensity_score",
+            ),
+            propensity_information=pd.DataFrame(
+                propensity_information_values,
+                index=pd.Index(propensity_feature_names, dtype="object"),
+                columns=pd.Index(propensity_feature_names, dtype="object"),
+            ),
+            propensity_adjustment_vector=pd.Series(
+                propensity_adjustment_values,
+                index=pd.Index(propensity_feature_names, dtype="object"),
+                name="propensity_adjustment",
+            ),
+            propensity_target_derivative=pd.Series(
+                propensity_target_derivative_values,
+                index=pd.Index(propensity_feature_names, dtype="object"),
+                name="target_derivative",
+            ),
+            propensity_model_name=propensity_model_name,
+            propensity_model_score_norm=propensity_model_score_norm,
+            propensity_link=("logit" if self.inference == "abadie_imbens_estimated" else None),
             inference_distribution=inference_distribution,
             inference_df=None,
             notes=tuple(notes),
@@ -940,6 +1548,7 @@ class NearestNeighborMatch:
 
 
 __all__ = [
+    "FittedPropensityMLEProtocol",
     "MatchingEstimand",
     "NearestNeighborMatch",
     "NearestNeighborMatchResult",

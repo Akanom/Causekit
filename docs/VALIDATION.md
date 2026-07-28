@@ -31,9 +31,18 @@ variance identities; exact same-arm conditional-variance values; a seeded ATE co
 smoke; and estimate/standard-error parity against CRAN `Matching` 4.10-15 commit
 `1208eaa7bfa888b1fc903481dddfb8c0dffa40d5`. It refuses estimated/cross-fitted scores,
 support/caliper selection, expanded design or variance ties, inadequate same-arm samples,
-and clustered inference. The estimated-propensity first-step adjustment remains open, so
-such scores must continue to use `inference="none"`. The Stata `teffects nnmatch` script
-is maintained but its manual output is not yet recorded.
+and clustered inference. Its Stata/MP 17 `teffects nnmatch` output is recorded.
+
+The estimated-Logit path has hand-reconstructed ATT, ATC, and ATE adjustment vectors,
+target derivatives, normalized information, variances, and standard errors. An independent
+`statsmodels.Logit` fixture verifies fitted-result consumption without re-estimation, and
+the public protocol has been exercised directly with `limiteddepkit.BinaryLogitResult`.
+Refusals cover missing first-step structure, nonstationary/penalized fits, convergence,
+sample/feature/parameter/prediction/index drift, singular information, wrong score status
+or metric, and support/caliper selection. A fixed-seed 40-replication ATE smoke checks
+recovery, standard-error scale, and interval coverage. This evidence does not extend to
+generic or cross-fitted learners. The Stata `teffects psmatch` harness awaits a manual run;
+R `Matching` is non-comparable because it treats the supplied score as fixed.
 
 For DiD, maintained evidence must keep the conventional and efficient estimators
 separate. Conventional tests hand-compute every `ATT(g,t)`, event-time, calendar-time, and
@@ -255,6 +264,8 @@ python -m pytest -m validation
 python -m pytest -m simulation
 python benchmarks/benchmark_matching.py --scenario balanced_ate --n 100000 --measure-memory
 python benchmarks/benchmark_matching.py --scenario known_score_ate_inference --n 100000 --measure-memory
+python benchmarks/benchmark_matching.py --scenario estimated_score_ate_inference --n 100000 --measure-memory
+python benchmarks/validate_matching_limiteddepkit.py
 python benchmarks/benchmark_did.py --scenario all --n-entities 20000
 ```
 
@@ -272,6 +283,7 @@ run the Stata script manually when Stata is available:
 CAUSALKIT_MATCHING_REFERENCE=/path/to/Matching python -m pytest tests/validation/test_matching_parity.py
 Rscript benchmarks/validate_matching_reference.R /path/to/Matching
 stata -b do benchmarks/validate_matching_stata.do
+stata -b do benchmarks/validate_matching_estimated_stata.do
 ```
 
 The Stata harness uses one opposite-arm effect match and two same-arm variance
@@ -281,6 +293,11 @@ CausalKit's supported one-neighbor conditional-variance contract. The reviewed
 Stata/MP 17 result is preserved in
 `benchmarks/validate_matching_stata_17_output.txt`; its maximum absolute standard-error
 difference from CausalKit is `4.440892098500626e-16`.
+
+The estimated-score Stata harness maps raw fitted propensity distance, one effect match,
+two robust-variance/local-covariance neighbors, and the default one-neighbor local
+regression/covariate derivative contract. Do not record it as a pass until its printed
+`parity_status=pass` and all ATT/ATC/ATE values have been reviewed.
 
 Run the README example in a clean installation and inspect both wheel and source
 distribution before release. Archive the commands, operating system, Python version,

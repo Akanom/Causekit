@@ -178,6 +178,10 @@ def test_matching_converts_and_adds_design_tables_without_reestimating() -> None
     assert model.metadata["realized_estimand"] == "att"
     assert model.metadata["propensity_score_status"] == "known"
     assert model.metadata["inference"] == "abadie_imbens"
+    assert model.metadata["first_step_covariance_neighbors"] == 2
+    assert model.metadata["propensity_model"] is None
+    assert model.diagnostics["Known-score variance"] == result.variance
+    assert np.isnan(model.diagnostics["First-step variance adjustment"])
     pd.testing.assert_series_equal(model.params, result.params.rename("coef"))
     pd.testing.assert_series_equal(model.std_errors, result.standard_errors.rename("se"))
     hub = outputhub.OutputHub("Matching analysis")

@@ -12,8 +12,8 @@ same-arm neighbors for the Abadie-Imbens conditional-variance estimate. Stata
 requires nn() to be at least 2 even though CausalKit also supports 1.
 
 This deliberately uses teffects nnmatch on logit_score. Do not replace it with
-teffects psmatch: that command estimates a treatment model and therefore targets
-the separate estimated-propensity variance contract that CausalKit still refuses.
+teffects psmatch: the estimated-treatment-model contract is maintained separately
+in validate_matching_estimated_stata.do.
 */
 
 clear all

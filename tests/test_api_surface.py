@@ -30,6 +30,7 @@ PUBLIC_EXPORTS = {
     "NearestNeighborMatch",
     "NearestNeighborMatchResult",
     "PropensityScoreStatus",
+    "FittedPropensityMLEProtocol",
     "DifferenceInDifferences",
     "EfficientDiD",
     "DiDResult",
@@ -76,9 +77,15 @@ def test_estimator_signatures_keep_identification_inputs_explicit() -> None:
     assert matching.parameters["ties"].default == "all"
     assert matching.parameters["inference"].default == "none"
     assert matching.parameters["variance_neighbors"].default == 1
+    assert matching.parameters["first_step_covariance_neighbors"].default == 2
+    assert matching.parameters["first_step_regression_neighbors"].default == 1
+    assert matching.parameters["first_step_covariate_neighbors"].default == 1
 
     matching_fit = inspect.signature(causalkit.NearestNeighborMatch.fit)
     assert matching_fit.parameters["propensity_score_status"].default == "estimated"
+    assert matching_fit.parameters["propensity"].default is None
+    assert matching_fit.parameters["propensity_model"].default is None
+    assert matching_fit.parameters["propensity_design"].default is None
 
     conventional_did = inspect.signature(causalkit.DifferenceInDifferences)
     assert conventional_did.parameters["control_group"].default == "never_treated"

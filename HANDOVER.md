@@ -55,11 +55,23 @@ future task can resume without reconstructing intent from chat history.
    harnesses plus the reviewed Stata output. The 100,000-row inference scenario completes
    in linear memory without a distance matrix.
 
+9. `0.6.0a4` matching estimated-Logit inference promotion: the public
+   `FittedPropensityMLEProtocol` consumes a regular full-sample unpenalized Logit result
+   such as `limiteddepkit.BinaryLogitResult`. CausalKit validates fit/sample/schema/score/
+   information identities and applies separate Abadie–Imbens ATE/ATT/ATC first-step
+   corrections. Hand contracts, strict refusals, independent `statsmodels` parity,
+   direct sibling-result interoperability, seeded coverage smoke, OutputHub audit fields,
+   and a 100,000-row 85.20 MiB benchmark are implemented. A Stata `teffects psmatch`
+   harness is written but still needs a manual recorded run.
+
 ## Open promotion gates
 
-- Matching still defaults to `inference="none"`. Known-score reuse-aware inference and
-  R/Stata parity are implemented; the estimated-propensity first-step adjustment remains
-  open. Do not substitute a generic sandwich, ordinary bootstrap, or cluster wrapper.
+- Matching still defaults to `inference="none"`. Known-score reuse-aware inference and a
+  separately validated full-sample Logit-MLE correction are implemented. Generic,
+  cross-fitted, penalized, and unsupported-link scores still refuse. Fixed-score R/Stata
+  parity is recorded; the estimated-score Stata harness remains pending and R `Matching`
+  is non-comparable. Do not substitute a generic sandwich, ordinary bootstrap, or cluster
+  wrapper.
 - Efficient DiD owns no nuisance model classes. The implemented covariate path must keep
   consuming public cross-fitting factories; direct density-ratio regression remains a
   possible future stability enhancement over ratios of multiclass probabilities.
@@ -86,10 +98,9 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Finish matching promotion from `docs/MATCHING_CONTRACT.md`: add a separately supported
-   estimated-propensity first-step contract if its required model information can be
-   exposed cleanly, and extend publication-scale sensitivity/coverage evidence without
-   weakening the fixed-score refusal boundaries.
+1. Finish matching promotion from `docs/MATCHING_CONTRACT.md`: manually run and retain the
+   estimated-Logit Stata parity output, then extend publication-scale sensitivity/coverage
+   evidence without weakening either analytical refusal boundary.
 2. Return to DiD for pre-trend/Hausman diagnostics, repeated cross-sections,
    publication-scale coverage, direct-ratio nuisance support if justified, and broader
    reference evidence.

@@ -1,6 +1,6 @@
 # Architecture
 
-`causalkit` is organized around small, auditable estimation paths. The `0.6.0a3`
+`causalkit` is organized around small, auditable estimation paths. The `0.6.0a4`
 architecture keeps causal assumptions visible, separates numerical estimation from
 inference and diagnostics, and returns frozen labelled result containers suitable for
 reporting. The pandas objects stored inside a result should be treated as read-only; helper
@@ -80,7 +80,7 @@ The installed source tree assigns one primary responsibility to each module:
 | `causalkit.randomized` | Two-arm difference-in-means and Lin-adjusted ATE execution path, balance records, and fitted result |
 | `causalkit.observational` | Supplied-nuisance IPW/AIPW scores, overlap diagnostics, vectorized influence-function and cluster inference |
 | `causalkit.crossfit` | Public nuisance protocols, deterministic stratified fold orchestration, binary/multiclass probabilities, masked scalar tasks, fresh-model fitting, prediction adaptation, and aligned out-of-fold records |
-| `causalkit.matching` | Supplied-score ATT/ATC/ATE matching, sorted scalar neighbor search, support/caliper rules, fractional ties, weights, reuse, balance, and fixed-score analytical inference |
+| `causalkit.matching` | Supplied-score ATT/ATC/ATE matching, sorted scalar neighbor search, support/caliper rules, fractional ties, weights, reuse, balance, and separate fixed-score or validated Logit-MLE analytical inference |
 | `causalkit.did` | Balanced-panel validation, conventional group-time DiD, cross-fitted covariate PT-All scores/conditional weights, pointwise and simultaneous influence inference, and cohort/event/calendar aggregation |
 | `causalkit.postestimation` | Summary, covariance, confidence interval, prediction, residual, fitted-value, linear-combination, and Wald helpers |
 | `causalkit.integrations.outputhub` | Lazy optional conversion and insertion into Universal Output Hub |
@@ -209,9 +209,12 @@ Matching uncertainty is intentionally separate from generic covariance code. The
 defaults to `inference="none"`. Its maintained Abadie–Imbens path estimates same-arm
 conditional variances, applies estimand-specific comparison-reuse formulas, and is exposed
 only for a declared fixed score without support/caliper selection or expanded ties.
-Estimated/cross-fitted scores still refuse until their first-step-specific adjustment is
-implemented. The matcher does not reuse IV/ATE sandwich or CR1 kernels merely to populate
-standard-error fields.
+The separate `FittedPropensityMLEProtocol` consumes a public fitted result such as
+`limiteddepkit.BinaryLogitResult`; it does not fit or copy a binary model. The estimated-
+score path validates the full-sample unpenalized Logit score and normalized Fisher
+information, then applies the Abadie–Imbens first-step correction. Generic, cross-fitted,
+penalized, or unverifiable predictions still refuse analytical inference. The matcher does
+not reuse IV/ATE sandwich or CR1 kernels merely to populate standard-error fields.
 
 The DiD path performs one long-to-wide balanced-panel validation and keeps the entity as
 the sampling unit. `DifferenceInDifferences` and `EfficientDiD` share this panel bundle,
@@ -275,6 +278,8 @@ architecture.
   available.
 - Do not materialize a treated-by-control matching distance matrix for scalar scores; sort
   once and inspect local neighbor groups.
+- For estimated-score matching, use sorted scalar searches for local score moments and a
+  `cKDTree` for ATT/ATC covariate-neighbor derivatives; do not allocate pairwise matrices.
 - Avoid unnecessary copies of large designs and residual arrays.
 - Aggregate cluster scores in one pass over normalized cluster codes.
 - Fail before expensive factorization when shapes, missing data, or exact rank make the

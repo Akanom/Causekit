@@ -1,11 +1,12 @@
 # Nearest-neighbor matching contract
 
-Status (2026-07-28): point estimation and a fixed/known-score Abadie-Imbens analytical
-path are implemented. Fixed-score parity is recorded for Python, R, and Stata;
-estimated-propensity adjustment remains an open inferential gate. R `Matching` parity,
-OutputHub adaptation, deterministic
-coverage smoke, and 100,000-row inference performance evidence are maintained. This
-document is normative for both the implemented slice and explicitly deferred gates.
+Status (2026-07-28): point estimation plus separate fixed/known-score and validated
+full-sample Logit-MLE Abadie–Imbens analytical paths are implemented. Fixed-score parity
+is recorded for Python, R, and Stata. The estimated-score path has hand identities,
+independent `statsmodels` first-step parity, direct `limiteddepkit.BinaryLogitResult`
+interoperability, deterministic coverage smoke, and 100,000-row performance evidence;
+its manual Stata comparator is written but not yet recorded. This document is normative
+for both the implemented slice and explicitly deferred gates.
 
 ## Problem and claim boundary
 
@@ -20,10 +21,10 @@ exchangeability given the declared pre-treatment covariates, and positivity for 
 requested target population. Matching can improve observed balance and reduce reliance on
 outcome extrapolation; balance is not evidence about unobserved confounding.
 
-## Proposed public boundary
+## Public boundary
 
-The first estimator should be named `NearestNeighborMatch`, with a fitted
-`NearestNeighborMatchResult`. The point-estimation API should accept supplied distance
+The estimator is named `NearestNeighborMatch`, with a fitted
+`NearestNeighborMatchResult`. The point-estimation API accepts supplied distance
 inputs rather than fit a duplicate propensity model:
 
 ```python
@@ -38,6 +39,9 @@ NearestNeighborMatch(
     bias_correction="none",
     inference="none",
     variance_neighbors=1,
+    first_step_covariance_neighbors=2,
+    first_step_regression_neighbors=1,
+    first_step_covariate_neighbors=1,
 ).fit(
     y,
     treatment=...,
@@ -52,8 +56,33 @@ The propensity input may come from `CrossFitter` or another auditable out-of-sam
 workflow. `propensity_provenance=` records that origin; it does not validate the model or
 activate fixed-score inference. `propensity_score_status=` is the machine-readable
 declaration and defaults to `"estimated"`. The matcher owns matching, matched-sample
-weights, diagnostics, estimand labels, and only the maintained known-score analytical
+weights, diagnostics, estimand labels, and maintained matching-specific analytical
 variance. It does not own binary-response nuisance estimation.
+
+The separate estimated-score boundary consumes, but does not fit, a public result:
+
+```python
+NearestNeighborMatch(
+    estimand="att",
+    metric="propensity",
+    caliper=None,
+    common_support=None,
+    inference="abadie_imbens_estimated",
+    variance_neighbors=2,
+).fit(
+    y,
+    treatment=...,
+    propensity_model=fitted_logit,
+    propensity_design=logit_design,
+    propensity_score_status="estimated",
+    propensity_provenance="full_sample_unpenalized_logit_mle",
+)
+```
+
+`FittedPropensityMLEProtocol` requires public `params`, `converged`, `nobs`,
+`feature_names`, and `predict_proba`. `limiteddepkit.BinaryLogitResult` satisfies this
+protocol directly. CausalKit validates the fitted result rather than trusting a provenance
+label or importing the nuisance package.
 
 ## Estimand and target population
 
@@ -77,10 +106,11 @@ population, with weights implied by that construction.
 
 ## Distance metric and scaling
 
-The first stable metric is `"propensity_logit"`: absolute distance on
-`log(p / (1 - p))` from a supplied propensity strictly between zero and one. Matching on
-the raw propensity may be added as `"propensity"` for sensitivity analysis, but it must
-not be an alias because raw and logit scales imply different neighborhoods and calipers.
+The default metric is `"propensity_logit"`: absolute distance on `log(p / (1 - p))` from
+a supplied propensity strictly between zero and one. Matching on the raw propensity is
+available as `"propensity"`; it is not an alias because raw and logit scales imply
+different neighborhoods and calipers. The maintained estimated-Logit inference path
+requires raw-propensity distance to match the Abadie–Imbens contract.
 
 Mahalanobis distance is deferred from the first implementation. It requires a separate
 contract for covariance estimation, singular or high-dimensional covariates, mixed data
@@ -200,7 +230,8 @@ The matcher must not import or duplicate regression estimators from `limiteddepk
 
 ## Uncertainty
 
-Accepted values are `"abadie_imbens"` and `"none"`; the default remains `"none"`.
+Accepted values are `"abadie_imbens"`, `"abadie_imbens_estimated"`, and `"none"`; the
+default remains `"none"`.
 `"abadie_imbens"` implements the fixed-neighbor, replacement variance of Abadie and
 Imbens (2006) for a declared known/fixed scalar score. For every observation, equation
 (14) is estimated with `variance_neighbors=J` nearest observations from the same treatment
@@ -218,18 +249,45 @@ The maintained analytical path requires all of the following:
   cross-arm or same-arm boundary ties; and
 - more than `variance_neighbors` observations in each treatment arm.
 
-The result reports the sampling `variance`, paper-scale `normalized_variance`, observation-
-level `conditional_variances`, the conditional variance component, the residual estimated
-effect-heterogeneity component, the variance-neighbor count, and a normal reference
-distribution. The estimated heterogeneity component can be negative in a finite sample
+The result reports the sampling `variance`, target-size-normalized
+`normalized_variance`, observation-level `conditional_variances`, the conditional variance
+component, the residual estimated effect-heterogeneity component, the variance-neighbor
+count, and a normal reference distribution. Target size is `N` for ATE, `N1` for ATT, and
+`N0` for ATC. The estimated heterogeneity component can be negative in a finite sample
 even though the combined variance estimator is nonnegative.
 
-Estimated and cross-fitted propensities still refuse. Abadie and Imbens show that
-propensity-score estimation generally changes the asymptotic variance; for ATT the
-adjustment can have either sign. A generic prediction does not expose the parametric score,
-information matrix, or other first-step structure needed for that correction. Supported
-parametric estimated-propensity inference and arbitrary cross-fitted machine-learning
-score inference therefore require separate maintained contracts.
+`"abadie_imbens_estimated"` implements the separate Abadie–Imbens (2016) first-step
+contract. It requires a regular, correctly specified, full-sample, unpenalized Logit MLE
+on the exact matching sample and validates:
+
+- convergence and exact observation count;
+- exact feature and parameter ordering;
+- fitted probabilities equal to `expit(X @ params)` and preserve the input index;
+- a near-zero normalized unpenalized likelihood score; and
+- a finite positive-definite normalized Fisher-information matrix.
+
+For ATE, the paper-scale correction is `-c' I^-1 c`. For ATT it is
+`-c_t' I^-1 c_t + d_t' I^-1 d_t`, where `d_t` is the propensity-parameter derivative
+of the treated target; ATC is implemented by treatment-label reversal. Local conditional
+covariances use `first_step_covariance_neighbors>=2`, local outcome regressions default to
+one leave-own-out score neighbor, and ATT/ATC derivatives default to one opposite-arm
+covariate neighbor. All neighbor counts are public result metadata.
+
+The result exposes the normalized information matrix, fitted scores, adjustment vector,
+target derivative, model/link metadata, likelihood-score norm, known-score variance,
+first-step sampling adjustment, and adjusted variance. The ATE correction is nonpositive
+asymptotically; ATT/ATC corrections can have either sign. A nonpositive final finite-
+sample variance refuses instead of being clipped.
+
+`first_step_asymptotic_adjustment` is on the paper's root-`N` variance scale and
+`first_step_variance_adjustment` divides it by full sample size `N` before adding it to
+`known_score_variance`. The `normalized_variance` fields retain CausalKit's target-size
+normalization and therefore are not aliases for the root-`N` scale for ATT or ATC.
+
+A generic fitted or cross-fitted prediction does not expose the parametric score and
+information contract. Cross-fitted, penalized, probit, and otherwise unverifiable scores
+therefore retain `inference="none"`; the new path must not be described as generic
+estimated-propensity or machine-learning inference.
 
 Ordinary nonparametric bootstrap is prohibited for the stable fixed-neighbor estimator.
 Abadie and Imbens show that it is generally invalid even where the estimator is root-N
@@ -246,6 +304,8 @@ inference raises `NotImplementedError`.
 - Treatment is one-dimensional, contains both arms, and is coded exactly `0/1`.
 - Outcome, treatment, propensity, covariates, and any future cluster input have identical
   row counts and exact pandas index order.
+- A fitted propensity result must preserve the `propensity_design` index and exactly match
+  its feature names, parameter order, prediction values, and matching-sample size.
 - Missing or non-finite values raise in the stable first slice; no implicit complete-case
   deletion or imputation occurs.
 - Propensities are finite and strictly between zero and one.
@@ -270,6 +330,9 @@ inference raises `NotImplementedError`.
 - observation-level analysis weights and comparison reuse counts;
 - metric, propensity provenance, caliper, replacement, tie, support, neighbor, and bias-
   correction metadata;
+- for estimated-score inference, fitted propensities, information matrix, adjustment and
+  derivative vectors, likelihood-score norm, first-step neighbor counts, and separate
+  known-score/first-step variance components;
 - before/after balance diagnostics;
 - assumptions, warnings, and refusal-relevant notes; and
 - dependency-free Markdown plus optional OutputHub adaptation without re-estimation.
@@ -283,6 +346,13 @@ For scalar propensity distance, sort treated and control metrics once and use bi
 search/local expansion; do not materialize the full `n_treated x n_control` distance
 matrix. The target is approximately `O(n log n + n * local_candidates)` time and `O(n +
 matches)` memory. Tie and caliper logic must operate on sorted local neighborhoods.
+
+Estimated-score local moments reuse the sorted scalar search. ATT/ATC target derivatives
+use `scipy.spatial.cKDTree`, querying only the requested local covariate neighbors rather
+than allocating an `n_treated x n_control` matrix. On 2026-07-28, the seeded 100,000-row
+ATE estimated-score scenario completed the uninstrumented fit in 19.80 seconds and used
+85.20 MiB peak Python memory under a separate tracemalloc pass on Python 3.14.6, NumPy
+2.4.6, pandas 3.0.3, and Windows 11. This is a smoke result, not a universal guarantee.
 
 Benchmarks must include balanced and highly imbalanced arms, weak and strong overlap,
 heavy ties, caliper failure, and comparison-unit reuse. Record sample sizes, realized
@@ -307,15 +377,20 @@ Implementation cannot be called complete until all gates pass:
 9. 100,000-row runtime/memory smoke without a quadratic distance matrix;
 10. OutputHub, artifact-content, clean-wheel, lint, format, typing, and full-suite gates.
 
-The current alpha passes hand-computed ATT/ATC/ATE point and variance identities,
+The current alpha passes hand-computed ATT/ATC/ATE point, fixed-score variance, and
+estimated-Logit first-step identities,
 row-permutation, caliper, support, tie-weight, reuse-weight, balance, deterministic
 recovery, refusal, and seeded coverage-smoke tests. It matches the pinned CRAN `Matching`
 4.10-15 pure-R reference for all three estimates and standard errors. OutputHub exports
 the model plus outcome-free match and balance tables. `benchmark_matching.py` includes a
 100,000-row known-score inference scenario. The maintained Stata script has a recorded
 Stata/MP 17 `teffects nnmatch` pass in
-`benchmarks/validate_matching_stata_17_output.txt`. Estimated-propensity inference remains
-a promotion gap; this alpha is not a completed general matching release.
+`benchmarks/validate_matching_stata_17_output.txt`. The estimated-score Python comparator
+uses `statsmodels.Logit`, and the public protocol has been exercised directly with
+`limiteddepkit.BinaryLogitResult`. Its Stata `teffects psmatch` harness is
+`benchmarks/validate_matching_estimated_stata.do` and remains pending manual execution.
+R `Matching` conditions on its supplied score and is non-comparable for this first-step
+correction. This alpha is not a completed general matching release.
 
 ## Pre-mortem
 
@@ -340,6 +415,9 @@ a promotion gap; this alpha is not a completed general matching release.
 - Abadie and Imbens show that estimating the propensity score changes matching-estimator
   uncertainty and derive model-specific variance adjustments:
   <https://doi.org/10.3982/ECTA11293>.
+- Stata's official `teffects psmatch` manual documents raw estimated-propensity distance,
+  AI robust uncertainty, and the `vce(robust, nn(#))` neighbor convention used by the
+  manual comparator: <https://www.stata.com/manuals/causalteffectspsmatch.pdf>.
 - Rosenbaum and Rubin develop propensity-score-informed matched sampling:
   <https://doi.org/10.1080/00031305.1985.10479383>.
 - Austin's simulations motivate `0.2` standard deviations of the logit propensity as a
