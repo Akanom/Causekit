@@ -26,6 +26,9 @@ PUBLIC_EXPORTS = {
     "OutcomeResultProtocol",
     "NearestNeighborMatch",
     "NearestNeighborMatchResult",
+    "DifferenceInDifferences",
+    "EfficientDiD",
+    "DiDResult",
     "confint",
     "fitted_values",
     "predict",
@@ -68,6 +71,18 @@ def test_estimator_signatures_keep_identification_inputs_explicit() -> None:
     assert matching.parameters["caliper"].default == "auto"
     assert matching.parameters["ties"].default == "all"
     assert matching.parameters["inference"].default == "none"
+
+    conventional_did = inspect.signature(causalkit.DifferenceInDifferences)
+    assert conventional_did.parameters["control_group"].default == "never_treated"
+    assert conventional_did.parameters["anticipation"].default == 0
+    assert conventional_did.parameters["covariance"].default == "robust"
+    assert conventional_did.parameters["inference"].default == "analytic"
+
+    efficient_did = inspect.signature(causalkit.EfficientDiD)
+    assert efficient_did.parameters["pre_periods"].default == "all"
+    assert efficient_did.parameters["anticipation"].default == 0
+    assert efficient_did.parameters["covariance"].default == "robust"
+    assert efficient_did.parameters["inference"].default == "analytic"
 
 
 def test_fit_returns_the_public_result_type() -> None:

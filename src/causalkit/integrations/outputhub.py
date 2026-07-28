@@ -6,6 +6,7 @@ from typing import Any
 
 import pandas as pd
 
+from ..did import DiDResult
 from ..iv import IV2SLSResult
 from ..observational import ObservationalATEResult
 from ..randomized import RandomizedATEResult
@@ -29,17 +30,63 @@ def _first_stage_table(result: IV2SLSResult) -> pd.DataFrame:
 
 
 def to_outputhub_model(
-    result: IV2SLSResult | RandomizedATEResult | ObservationalATEResult,
+    result: IV2SLSResult | RandomizedATEResult | ObservationalATEResult | DiDResult,
     *,
     name: str | None = None,
 ) -> Any:
     """Convert a fitted causal result into Output Hub's canonical regression model."""
 
-    if not isinstance(result, (IV2SLSResult, RandomizedATEResult, ObservationalATEResult)):
+    if not isinstance(
+        result, (IV2SLSResult, RandomizedATEResult, ObservationalATEResult, DiDResult)
+    ):
         raise TypeError(
-            "result must be an IV2SLSResult, RandomizedATEResult, or ObservationalATEResult."
+            "result must be an IV2SLSResult, RandomizedATEResult, "
+            "ObservationalATEResult, or DiDResult."
         )
     RegressionModel = _regression_model_class()
+    if isinstance(result, DiDResult):
+        negative_weights = (
+            int((result.efficiency_weights["weight"] < 0).sum())
+            if not result.efficiency_weights.empty
+            else 0
+        )
+        return RegressionModel(
+            name=name
+            or (
+                "Efficient DiD"
+                if result.method == "chen_santanna_xie_efficient"
+                else "Difference-in-Differences"
+            ),
+            depvar=result.outcome_name,
+            params=result.params.rename("coef"),
+            std_errors=result.standard_errors.rename("se"),
+            pvalues=result.pvalues.rename("pvalue"),
+            statistics={
+                "Entities": result.n_entities,
+                "Periods": result.n_periods,
+                "Treated cohorts": len(result.cohort_sizes),
+                "Converged": result.converged,
+            },
+            diagnostics={
+                "Group-time effects": len(result.group_time),
+                "Event-time effects": len(result.event_study),
+                "Negative efficiency weights": negative_weights,
+            },
+            metadata={
+                "estimator": result.method,
+                "backend": result.backend,
+                "parallel_trends": result.parallel_trends,
+                "control_group": result.control_group,
+                "anticipation": result.anticipation,
+                "pre_periods": result.pre_periods,
+                "covariance_type": result.covariance_type,
+                "inference_distribution": result.inference_distribution,
+                "n_clusters": result.n_clusters,
+                "causal_interpretation_requires_assumptions": True,
+                "assumptions": list(result.assumptions),
+            },
+            source="causalkit",
+        )
     if isinstance(result, ObservationalATEResult):
         return RegressionModel(
             name=name or result.estimator.upper(),
@@ -146,7 +193,7 @@ def to_outputhub_model(
 
 def add_to_outputhub(
     hub: Any,
-    result: IV2SLSResult | RandomizedATEResult | ObservationalATEResult,
+    result: IV2SLSResult | RandomizedATEResult | ObservationalATEResult | DiDResult,
     *,
     name: str | None = None,
 ) -> Any:
@@ -157,6 +204,10 @@ def add_to_outputhub(
     model_name = name or (
         result.estimator.upper()
         if isinstance(result, ObservationalATEResult)
+        else "Efficient DiD"
+        if isinstance(result, DiDResult) and result.method == "chen_santanna_xie_efficient"
+        else "Difference-in-Differences"
+        if isinstance(result, DiDResult)
         else "Randomized ATE"
         if isinstance(result, RandomizedATEResult)
         else "IV/2SLS"
@@ -181,6 +232,36 @@ def add_to_outputhub(
             caption="Unadjusted pre-treatment covariate balance by randomized arm.",
             metadata={"source": "causalkit", "estimator": "randomized_ate"},
         )
+    elif isinstance(result, DiDResult) and hasattr(hub, "add_table"):
+        table_metadata = {"source": "causalkit", "estimator": result.method}
+        hub.add_table(
+            f"{model_name} group-time effects",
+            result.group_time.reset_index(),
+            caption="Cohort-time average treatment effects and pointwise inference.",
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} event study",
+            result.event_study.reset_index(),
+            caption="Cohort-share-weighted event-time effects; intervals are pointwise.",
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} calendar-time effects",
+            result.calendar_time.reset_index(),
+            caption="Cohort-share-weighted post-adoption calendar-time effects.",
+            metadata=table_metadata,
+        )
+        if not result.efficiency_weights.empty:
+            hub.add_table(
+                f"{model_name} efficiency weights",
+                result.efficiency_weights.copy(),
+                caption=(
+                    "Realized PT-All generated-outcome weights; negative values are "
+                    "permitted by the homogeneous-moment contract."
+                ),
+                metadata=table_metadata,
+            )
     return model
 
 

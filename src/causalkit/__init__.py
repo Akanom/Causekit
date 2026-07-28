@@ -8,6 +8,7 @@ from .crossfit import (
     PropensityResultProtocol,
 )
 from .diagnostics import FirstStageDiagnostic, SarganTest
+from .did import DiDResult, DifferenceInDifferences, EfficientDiD
 from .integrations import add_to_outputhub, to_outputhub_model
 from .iv import IV2SLS, IV2SLSResult
 from .matching import NearestNeighborMatch, NearestNeighborMatchResult
@@ -29,6 +30,9 @@ __all__ = [
     "CovariateBalance",
     "CrossFitResult",
     "CrossFitter",
+    "DiDResult",
+    "DifferenceInDifferences",
+    "EfficientDiD",
     "AIPWATE",
     "IV2SLS",
     "IV2SLSResult",
@@ -55,4 +59,4 @@ __all__ = [
     "wald_test",
 ]
 
-__version__ = "0.5.0a1"
+__version__ = "0.6.0a1"

@@ -1,9 +1,10 @@
 # causalkit
 
 `causalkit` is an identification-aware Python package for causal inference and
-instrumental-variable workflows. The `0.5.0a1` surface provides linear two-stage least
+instrumental-variable workflows. The `0.6.0a1` surface provides linear two-stage least
 squares, randomized-experiment effects, reusable nuisance cross-fitting, IPW/AIPW ATE,
-ATT, and ATC, plus a point-estimation alpha for scalar propensity-score matching.
+ATT, and ATC, a point-estimation alpha for scalar propensity-score matching, conventional
+staggered DiD, and Chen-Sant'Anna-Xie efficient DiD for no-covariate short panels.
 
 This is alpha research software. A successful fit is not evidence that an instrument is
 valid, and an IV coefficient is not automatically an average treatment effect. State the
@@ -118,6 +119,54 @@ The reserved `inference="abadie_imbens"` path also refuses: valid uncertainty mu
 for comparison reuse and distinguish a fixed score from an estimated propensity. See the
 [matching contract](docs/MATCHING_CONTRACT.md) before publication-facing use.
 
+### Conventional and efficient difference-in-differences
+
+The conventional estimator remains first-class. It reports cohort-time effects using a
+never-treated comparison by default, or adds valid not-yet-treated entities when requested.
+The efficient estimator is a separate PT-All procedure: it uses all admissible
+pre-treatment periods and auxiliary cohorts to estimate the Chen-Sant'Anna-Xie
+inverse-covariance weights. It is not a silent default because PT-All is stronger than the
+conventional post-treatment parallel-trends contract.
+
+```python
+from causalkit import DifferenceInDifferences, EfficientDiD
+
+conventional = DifferenceInDifferences(
+    control_group="never_treated",
+    covariance="robust",
+).fit(
+    panel,
+    outcome="outcome",
+    entity="unit",
+    time="period",
+    treatment_time="first_treated",
+)
+
+efficient = EfficientDiD(pre_periods="all").fit(
+    panel,
+    outcome="outcome",
+    entity="unit",
+    time="period",
+    treatment_time="first_treated",
+)
+
+print(conventional.group_time)
+print(conventional.event_study)
+print(efficient.efficiency_weights)
+```
+
+The data must be a balanced long panel with one row per entity-period, an absorbing first
+treatment time, and an explicit never-treated sentinel (positive infinity by default).
+`anticipation=` moves the effective treatment boundary back by an integer number of
+periods. Robust inference treats the panel entity as the sampling unit; higher-level
+one-way clustering is available through `covariance="clustered"` and `cluster=`.
+
+The current efficient claim is deliberately narrow: no covariates, short balanced panels,
+and PT-All. Covariate adjustment, repeated cross-sections, sampling weights, and
+multiplier-bootstrap simultaneous bands refuse rather than falling back to a different
+estimator. See the [DiD contract](docs/DID_CONTRACT.md) for formulas, assumptions, target
+populations, and promotion gates.
+
 There is no formula API yet. Prepare numeric arrays, `Series`, or `DataFrame` objects
 explicitly, including categorical encoding and transformations. `add_constant=True` is
 the default; set it to `False` when the supplied exogenous design already contains the
@@ -125,7 +174,8 @@ desired intercept or the model should not have one.
 
 See [Package scope](docs/PACKAGE_SCOPE.md),
 [Identification and interpretation](docs/IDENTIFICATION.md),
-[Validation](docs/VALIDATION.md), and [Architecture](docs/ARCHITECTURE.md).
+[Validation](docs/VALIDATION.md), [DiD contract](docs/DID_CONTRACT.md), and
+[Architecture](docs/ARCHITECTURE.md).
 
 ## Randomized-experiment example
 

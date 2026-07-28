@@ -235,6 +235,44 @@ standard error. Ordinary bootstrap is not substituted because fixed-neighbor mat
 nonsmooth, and fixed-score analytical variance is not silently applied to an estimated
 propensity without its required first-step adjustment.
 
+## Difference-in-differences and event studies
+
+`DifferenceInDifferences` targets cohort-time average treatment effects on the treated,
+`ATT(g,t)`, and cohort-share-weighted event/calendar summaries. Identification requires
+an absorbing treatment definition, a clean baseline, no anticipation outside the declared
+window, overlap with the chosen comparisons, consistency, no interference, and parallel
+untreated trends for each reported comparison. The estimator cannot establish these
+conditions from fitted pre-period outcomes.
+
+With `control_group="never_treated"`, the conventional estimator compares each treated
+cohort's change from the period immediately before its effective treatment boundary with
+the same change among never-treated entities. With `control_group="not_yet_treated"`, it
+also uses entities whose effective treatment boundary is after the target time. An entity
+is never retained as a control after its anticipation window begins. These choices can
+target the same `ATT(g,t)` under their respective assumptions but need not be equally
+credible in a given application.
+
+`EfficientDiD` imposes the stronger PT-All condition used by Chen, Sant'Anna, and Xie
+(2025): conditional mean untreated trends are common across every retained period and
+cohort. In the implemented no-covariate path this overidentifies each `ATT(g,t)`, allowing
+the estimator to combine admissible pre-period/auxiliary-cohort moments using their
+inverse covariance. The resulting weights may be negative without creating the
+heterogeneous-effect contamination associated with TWFE weights, because every weighted
+moment identifies the same cohort-time effect under PT-All. If PT-All is false, the
+precision claim and possibly consistency fail; smaller standard errors are not evidence
+that the stronger restriction is true.
+
+The event-study table uses observed cohort shares among cohorts available at each event
+time. Calendar summaries use shares among adopted cohorts and exclude declared
+anticipation periods. `ESavg` is the simple average of non-anticipation event-time
+effects. These are explicit target populations, not interchangeable labels.
+
+Analytic intervals are pointwise. Robust inference treats the panel entity as the random
+sampling unit; higher-level clustered inference assumes independent clusters and many
+clusters. Neither option supplies simultaneous coverage for an event-study path. The
+current alpha has no covariate adjustment, pre-trend test, Hausman test, or repeated-
+cross-section interpretation, and refuses those unsupported paths.
+
 ## Missing values, indices, and sample definition
 
 The default policy is `missing="raise"`. Missing or non-finite numeric values trigger an

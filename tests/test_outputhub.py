@@ -6,7 +6,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from causalkit import AIPWATE, IV2SLS, RandomizedATE, add_to_outputhub, to_outputhub_model
+from causalkit import (
+    AIPWATE,
+    IV2SLS,
+    DifferenceInDifferences,
+    RandomizedATE,
+    add_to_outputhub,
+    to_outputhub_model,
+)
 
 outputhub = pytest.importorskip("universal_output_hub")
 
@@ -98,3 +105,48 @@ def test_observational_ate_converts_without_reestimating_nuisance_models() -> No
     assert model.metadata["estimand"] == "ate"
     assert model.metadata["nuisance_predictions_supplied"] is True
     assert model.params.index.tolist() == ["ate"]
+
+
+def test_did_converts_and_adds_auditable_effect_tables() -> None:
+    rows = []
+    for entity, cohort, level, effect in (
+        ("t0", 2.0, 0.0, 2.0),
+        ("t1", 2.0, 1.0, 2.0),
+        ("c0", np.inf, 0.0, 0.0),
+        ("c1", np.inf, 1.0, 0.0),
+    ):
+        rows.extend(
+            [
+                {
+                    "entity": entity,
+                    "time": 1,
+                    "treatment_time": cohort,
+                    "outcome": level,
+                },
+                {
+                    "entity": entity,
+                    "time": 2,
+                    "treatment_time": cohort,
+                    "outcome": level + 1.0 + effect,
+                },
+            ]
+        )
+    result = DifferenceInDifferences().fit(
+        pd.DataFrame(rows),
+        outcome="outcome",
+        entity="entity",
+        time="time",
+        treatment_time="treatment_time",
+    )
+    model = to_outputhub_model(result)
+    assert model.metadata["estimator"] == "conventional_group_time"
+    assert model.metadata["parallel_trends"] == "post"
+    assert model.params.index.tolist() == ["esavg"]
+    hub = outputhub.OutputHub("DiD analysis")
+    add_to_outputhub(hub, result)
+    assert len(hub.models) == 1
+    assert [table.name for table in hub.tables] == [
+        "Difference-in-Differences group-time effects",
+        "Difference-in-Differences event study",
+        "Difference-in-Differences calendar-time effects",
+    ]

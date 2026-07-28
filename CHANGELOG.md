@@ -4,6 +4,42 @@ All notable changes to `causalkit` are recorded here. The project follows
 [Semantic Versioning](https://semver.org/) once a public contract is released. Alpha
 versions may refine APIs, but breaking changes must still be documented explicitly.
 
+## [0.6.0a1] - Unreleased
+
+### Added
+
+- `DifferenceInDifferences` for conventional no-covariate cohort-time effects using
+  never-treated or not-yet-treated comparisons, explicit anticipation windows,
+  cohort-share event/calendar aggregations, and analytic robust or clustered inference.
+- `EfficientDiD` implementing the no-covariate PT-All estimator of Chen, Sant'Anna, and
+  Xie (2025), including generated-outcome candidates, inverse-covariance efficiency
+  weights, event-study aggregation, and complete influence-function audit records.
+- `DiDResult` with scalar ESavg summaries, group-time/event/calendar tables, candidate and
+  aggregate influence functions, realized efficiency weights, pointwise confidence
+  intervals, and OutputHub tables.
+- Hand-computed conventional effects and aggregations, exact non-uniform efficient-weight
+  identities, anticipation/control/cluster tests, refusal coverage, and optional pinned
+  parity against the public R `edid` implementation.
+
+### Architecture
+
+- Conventional and efficient DiD share one strict balanced-panel/treatment-timing
+  validator and one aggregation/inference layer while retaining separate identifying
+  assumptions and public estimator classes.
+- Fixed-T cohort/period loops contain vectorized entity-level NumPy operations. Cluster
+  labels are normalized once and influence scores are summed without row-level loops.
+- The efficient path solves covariance systems and refuses singular designs; it does not
+  hide instability with a ridge, pseudoinverse, or clipped weights.
+
+### Known limitations
+
+- The alpha is for balanced short panels without covariates or sampling weights.
+  Covariate-adjusted efficient estimation must use the public nuisance/cross-fitting
+  protocols and implement conditional covariance estimation before promotion.
+- Confidence intervals are pointwise. Multiplier-bootstrap simultaneous event-study
+  bands, pre-trend/Hausman diagnostics, repeated cross-sections, and coverage simulations
+  remain open gates.
+
 ## [0.5.0a1] - Unreleased
 
 ### Added

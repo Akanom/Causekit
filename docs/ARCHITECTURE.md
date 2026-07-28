@@ -1,6 +1,6 @@
 # Architecture
 
-`causalkit` is organized around small, auditable estimation paths. The `0.5.0a1`
+`causalkit` is organized around small, auditable estimation paths. The `0.6.0a1`
 architecture keeps causal assumptions visible, separates numerical estimation from
 inference and diagnostics, and returns frozen labelled result containers suitable for
 reporting. The pandas objects stored inside a result should be treated as read-only; helper
@@ -81,6 +81,7 @@ The installed source tree assigns one primary responsibility to each module:
 | `causalkit.observational` | Supplied-nuisance IPW/AIPW scores, overlap diagnostics, vectorized influence-function and cluster inference |
 | `causalkit.crossfit` | Public nuisance protocols, deterministic stratified fold orchestration, fresh-model fitting, prediction adaptation, and aligned out-of-fold records |
 | `causalkit.matching` | Supplied-score ATT/ATC/ATE matching, sorted scalar neighbor search, support/caliper rules, fractional ties, weights, reuse, balance, and inference refusals |
+| `causalkit.did` | Balanced-panel validation, conventional group-time DiD, PT-All efficient generated outcomes/weights, influence inference, and cohort/event/calendar aggregation |
 | `causalkit.postestimation` | Summary, covariance, confidence interval, prediction, residual, fitted-value, linear-combination, and Wald helpers |
 | `causalkit.integrations.outputhub` | Lazy optional conversion and insertion into Universal Output Hub |
 
@@ -209,6 +210,20 @@ alpha defaults to `inference="none"`; the reserved Abadie–Imbens path refuses 
 the reuse-aware conditional variance and propensity-estimation adjustment contracts are
 implemented and validated. It must not reuse the IV/ATE sandwich or CR1 kernels merely to
 populate standard-error fields.
+
+The DiD path performs one long-to-wide balanced-panel validation and keeps the entity as
+the sampling unit. `DifferenceInDifferences` and `EfficientDiD` share this panel bundle,
+cohort-share aggregation, labelled influence-function results, and robust/clustered
+inference. Their point estimators remain separate: the conventional class uses one
+pre-treatment baseline with never-treated or not-yet-treated comparisons, while the
+efficient class constructs the PT-All generated outcomes and solves their covariance
+system. Fixed-T cohort/period loops are permitted; all entity-level arithmetic is
+vectorized and cluster scores are aggregated after one factorization of the labels.
+
+No nuisance learner lives in `did.py`. The covariate-adjusted efficient path remains
+closed until it can consume public nuisance predictions/cross-fitting and implement the
+paper's conditional covariance estimator. A singular weight system refuses rather than
+silently applying a ridge or pseudoinverse.
 
 The historical `limiteddepkit.TreatmentEffect` snapshot is provenance for migration, not a
 code dependency. `IV2SLS` was designed around the explicit excluded-instrument contract and

@@ -31,6 +31,22 @@ Abadie–Imbens path still requires hand-reconstructed reuse-aware variance, con
 variance matching, score-provenance-specific first-step adjustment, coverage simulations,
 and aligned Stata/R evidence. Until those pass, matching results use `inference="none"`.
 
+For DiD, maintained evidence must keep the conventional and efficient estimators
+separate. Conventional tests hand-compute every `ATT(g,t)`, event-time, calendar-time, and
+ESavg aggregation for both never-treated and not-yet-treated comparisons. Efficient tests
+must reconstruct every generated-outcome candidate, verify weights sum to one, reproduce
+the inverse-covariance solution, reconstruct the efficient influence function, and refuse
+singular systems without hidden regularization. Anticipation, control contamination,
+balanced-panel validation, entity-level HC scaling, cluster-summed covariance, and random
+cohort-share influence terms require direct tests.
+
+The recorded efficient reference is `david-loeb/edid` commit
+`f55a4a4aba14f0826f59ad7aa4af3bafaeba529b`. On the eight-entity orthogonal-score fixture,
+the public R implementation returns candidate effects `(10, 10, 10)`, weights
+`(16/21, 4/21, 1/21)`, efficient ATT `10`, and HC1 standard error
+`0.46656947481584343`. `benchmarks/validate_edid_reference.R` reproduces the reference
+values, and the optional validation test compares them with the native result.
+
 ## Claim boundary
 
 Validation can provide evidence that:
@@ -161,6 +177,9 @@ passing only after its tests have executed successfully in the recorded environm
 | Matching point estimate | ATT, ATC, ATE, ties, support/caliper attrition, reuse | Hand identities, design invariance, target labels, exact audit weights |
 | Matching uncertainty | Fixed score and supported estimated-score provenance | Abadie–Imbens variance identities, first-step adjustment, coverage, explicit refusals |
 | Matching performance | Balanced/imbalanced arms, ties, attrition, reuse at scale | Sorted-scalar behavior, elapsed time, peak memory, no quadratic distance matrix |
+| Conventional DiD | Single/staggered cohorts, never/not-yet controls, anticipation | Hand `ATT(g,t)`, event/calendar/ESavg targets, uncontaminated controls, influence identities |
+| Efficient DiD | Multiple pre-periods and auxiliary cohorts under PT-All | Candidate effects, inverse-covariance weights, efficient influence, singular refusal, R parity |
+| DiD inference | Entity and higher-level clustered sampling | HC1/cluster score identities, reference distribution metadata, pointwise-only disclosure |
 
 ## Numerical tolerances
 
@@ -204,6 +223,14 @@ Run marked evidence subsets explicitly when reviewing them:
 python -m pytest -m validation
 python -m pytest -m simulation
 python benchmarks/benchmark_matching.py --scenario balanced_ate --n 100000 --measure-memory
+python benchmarks/benchmark_did.py --scenario all --n-entities 20000
+```
+
+Run pinned R `edid` parity from a checkout at the recorded commit:
+
+```bash
+CAUSALKIT_EDID_REFERENCE=/path/to/edid python -m pytest tests/validation/test_edid_parity.py
+Rscript benchmarks/validate_edid_reference.R /path/to/edid
 ```
 
 Run the README example in a clean installation and inspect both wheel and source
