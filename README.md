@@ -1,8 +1,8 @@
 # causalkit
 
 `causalkit` is an identification-aware Python package for causal inference and
-instrumental-variable workflows. The `0.2.0a1` surface provides linear two-stage least
-squares and design-aware average treatment effects for two-arm randomized experiments.
+instrumental-variable workflows. The `0.3.0a1` surface provides linear two-stage least
+squares, randomized-experiment effects, and supplied-nuisance IPW/AIPW effects.
 
 This is alpha research software. A successful fit is not evidence that an instrument is
 valid, and an IV coefficient is not automatically an average treatment effect. State the
@@ -28,6 +28,29 @@ The `0.2.0a1` randomized-experiment layer adds:
 - `RandomizedATE(adjustment="lin")` for fully interacted, mean-centered Lin adjustment;
 - HC1 or one-way CR1 inference, arm counts, balance diagnostics, strict binary assignment,
   and explicit causal-assumption metadata.
+
+The `0.3.0a1` observational layer adds `IPWATE` and `AIPWATE`. It deliberately accepts
+propensity and potential-outcome predictions rather than duplicating the binary and
+limited-outcome estimators already maintained by `limiteddepkit`.
+
+```python
+from causalkit import AIPWATE
+
+result = AIPWATE().fit(
+    outcome,
+    treatment=treated,
+    propensity=cross_fitted_propensity,
+    outcome_treated=cross_fitted_mu1,
+    outcome_control=cross_fitted_mu0,
+)
+```
+
+For adaptive nuisance models, predictions should be cross-fitted: every observation's
+prediction must come from a model that did not train on that observation. AIPW is doubly
+robust to one nuisance family being correctly specified under regularity conditions; it
+is not robust to unmeasured confounding, positivity failure, leakage, or both nuisance
+families being invalid. Propensity clipping is never silent and requires sensitivity
+reporting because it changes the estimating equation.
 
 There is no formula API yet. Prepare numeric arrays, `Series`, or `DataFrame` objects
 explicitly, including categorical encoding and transformations. `add_constant=True` is
@@ -258,14 +281,14 @@ The packages remain separated by estimand:
 
 Applicable validation, indexing, covariance, diagnostics, and reporting conventions are
 reused conceptually without importing private source or coupling the packages at runtime.
-Existing `limiteddepkit` binary, count, censoring, duration, and ordinal estimators will
-not be duplicated here. Future IPW/AIPW work should use a public nuisance-model protocol
-that can adapt those estimators where appropriate while keeping causal identification and
-inference inside `causalkit`.
+Existing `limiteddepkit` binary, count, censoring, duration, and ordinal estimators are
+not duplicated here. The supplied-nuisance IPW/AIPW API already lets their out-of-sample
+predictions participate while keeping causal identification and inference inside
+`causalkit`; built-in cross-fitting orchestration remains future work.
 
 ## Roadmap
 
-Later releases may add IPW and AIPW, matching,
+Later releases may add built-in cross-fitting orchestration, ATT/ATC, matching,
 difference-in-differences and event studies, regression discontinuity, and panel IV. Each
 family must define its estimand, assumptions, failure behavior, diagnostics, and independent
 validation evidence before promotion.

@@ -16,6 +16,20 @@ an outcome-driven model-selection rule. Clustered covariance permits within-clus
 outcome dependence but does not, by itself, implement a cluster-randomized estimand or
 few-cluster randomization inference.
 
+## Observational IPW and AIPW
+
+`IPWATE` and `AIPWATE` target the population ATE represented by the analysis sample.
+Identification requires consistency, no interference, conditional exchangeability given
+the pre-treatment information used by the nuisance functions, and positivity. These are
+substantive assumptions; fitted propensity support cannot detect omitted confounders.
+
+Supplied nuisance predictions preserve ownership boundaries with `limiteddepkit` and make
+data leakage auditable. Adaptive nuisance fits should be cross-fitted. The AIPW score has
+the usual double-robust property only under regularity conditions and valid inference also
+depends on nuisance convergence rates or justified low-complexity fitting. Clipping limits
+extreme weights but changes the score; report unclipped and alternative-bound sensitivity
+results rather than treating clipping as an invisible numerical repair.
+
 This guide states what `IV2SLS` estimates, the conditions under which it is identified,
 and the limits of its diagnostics. It is not a substitute for a design-specific argument.
 

@@ -5,7 +5,7 @@ identification. Inclusion requires more than a method being common in applied ec
 the package must be able to state the estimand, identifying assumptions, supported data
 structure, inference target, diagnostics, and validation boundary.
 
-## Stable `0.2.0a1` surface
+## Stable `0.3.0a1` surface
 
 The first alpha release deliberately supports one model family: cross-sectional linear
 instrumental variables estimated by two-stage least squares.
@@ -74,6 +74,13 @@ as optional backends. Causal estimands, assignment/ignorability assumptions, ove
 cross-fitting, influence-function inference, and treatment-effect diagnostics remain the
 responsibility of `causalkit`.
 
+The first observational slice therefore consumes supplied propensity and potential-
+outcome predictions. `IPWATE` uses the Horvitz-Thompson ATE score; `AIPWATE` uses the
+augmented influence-function score. Both enforce exact row alignment and strict propensity
+support and expose weight effective sample sizes. Built-in nuisance fitting is deferred
+until a cross-fitting protocol can reuse transferred/public model infrastructure without
+duplicate estimators.
+
 ## `limiteddepkit.TreatmentEffect` migration provenance
 
 The historical `TreatmentEffect` class implemented ordinary homoskedastic 2SLS inside
@@ -100,7 +107,6 @@ and validation gates:
 
 | Family | Required design questions before promotion |
 | --- | --- |
-| IPW and AIPW | Target population, propensity overlap, nuisance estimation, cross-fitting, truncation, influence-function inference, and positivity diagnostics |
 | Matching | Distance and caliper rules, replacement, estimand, common support, balance, uncertainty, and matching-induced dependence |
 | Difference-in-differences and event studies | Treatment timing, comparison cohort, anticipation, staggered adoption, weighting, pre-trend diagnostics, and clustered inference |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |

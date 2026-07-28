@@ -1,6 +1,6 @@
 # Architecture
 
-`causalkit` is organized around small, auditable estimation paths. The `0.2.0a1`
+`causalkit` is organized around small, auditable estimation paths. The `0.3.0a1`
 architecture keeps causal assumptions visible, separates numerical estimation from
 inference and diagnostics, and returns frozen labelled result containers suitable for
 reporting. The pandas objects stored inside a result should be treated as read-only; helper
@@ -78,6 +78,7 @@ The installed source tree assigns one primary responsibility to each module:
 | `causalkit.diagnostics` | First-stage diagnostic records and homoskedastic Sargan testing |
 | `causalkit.iv` | Public `IV2SLS`, 2SLS execution path, and fitted `IV2SLSResult` |
 | `causalkit.randomized` | Two-arm difference-in-means and Lin-adjusted ATE execution path, balance records, and fitted result |
+| `causalkit.observational` | Supplied-nuisance IPW/AIPW scores, overlap diagnostics, vectorized influence-function and cluster inference |
 | `causalkit.postestimation` | Summary, covariance, confidence interval, prediction, residual, fitted-value, linear-combination, and Wald helpers |
 | `causalkit.integrations.outputhub` | Lazy optional conversion and insertion into Universal Output Hub |
 
@@ -188,6 +189,12 @@ procedure needs a propensity or outcome nuisance model, integration should targe
 documented fit/predict protocol so public `limiteddepkit` estimators can participate
 optionally without becoming a core dependency. The causal procedure must still own sample
 splitting, estimand construction, diagnostics, and valid uncertainty propagation.
+
+The current observational fast path performs one strict alignment pass, constructs the
+IPW/AIPW score with vectorized array operations, and aggregates clustered influence sums
+with normalized integer codes. It does not loop over observations, refit nuisance models,
+or materialize quadratic matrices. This follows the high-throughput implementation
+patterns maintained in the sibling packages while keeping causal score semantics local.
 
 The historical `limiteddepkit.TreatmentEffect` snapshot is provenance for migration, not a
 code dependency. `IV2SLS` was designed around the explicit excluded-instrument contract and

@@ -4,6 +4,23 @@ All notable changes to `causalkit` are recorded here. The project follows
 [Semantic Versioning](https://semver.org/) once a public contract is released. Alpha
 versions may refine APIs, but breaking changes must still be documented explicitly.
 
+## [0.3.0a1] - Unreleased
+
+### Added
+
+- `IPWATE` and `AIPWATE` for the observational-population ATE using externally supplied,
+  preferably cross-fitted nuisance predictions.
+- Strict propensity support checks, optional explicit clipping, effective-sample-size and
+  overlap diagnostics, influence-function HC inference, and one-way clustered inference.
+- Vectorized large-sample execution, exact score-identity tests, oracle recovery,
+  clustered aggregation checks, and OutputHub adaptation.
+
+### Architecture
+
+- Nuisance estimation remains external: existing `limiteddepkit` binary/outcome models
+  can generate predictions without being copied into `causalkit`. This package owns the
+  causal score, estimand, diagnostics, and inference.
+
 ## [0.2.0a1] - Unreleased
 
 ### Added

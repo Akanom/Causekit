@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 
 from ..iv import IV2SLSResult
+from ..observational import ObservationalATEResult
 from ..randomized import RandomizedATEResult
 
 
@@ -28,15 +29,49 @@ def _first_stage_table(result: IV2SLSResult) -> pd.DataFrame:
 
 
 def to_outputhub_model(
-    result: IV2SLSResult | RandomizedATEResult,
+    result: IV2SLSResult | RandomizedATEResult | ObservationalATEResult,
     *,
     name: str | None = None,
 ) -> Any:
     """Convert a fitted causal result into Output Hub's canonical regression model."""
 
-    if not isinstance(result, (IV2SLSResult, RandomizedATEResult)):
-        raise TypeError("result must be an IV2SLSResult or RandomizedATEResult.")
+    if not isinstance(result, (IV2SLSResult, RandomizedATEResult, ObservationalATEResult)):
+        raise TypeError(
+            "result must be an IV2SLSResult, RandomizedATEResult, or ObservationalATEResult."
+        )
     RegressionModel = _regression_model_class()
+    if isinstance(result, ObservationalATEResult):
+        return RegressionModel(
+            name=name or result.estimator.upper(),
+            depvar="outcome",
+            params=result.params.rename("coef"),
+            std_errors=result.standard_errors.rename("se"),
+            pvalues=result.pvalues.rename("pvalue"),
+            statistics={
+                "N": result.nobs,
+                "Treated": result.n_treated,
+                "Control": result.n_control,
+                "Converged": result.converged,
+            },
+            diagnostics={
+                "Propensity minimum": result.overlap.propensity_min,
+                "Propensity maximum": result.overlap.propensity_max,
+                "Treated effective N": result.overlap.treated_effective_sample_size,
+                "Control effective N": result.overlap.control_effective_sample_size,
+                "Clipped observations": result.clipped_observations,
+            },
+            metadata={
+                "estimator": result.estimator,
+                "backend": result.backend,
+                "covariance_type": result.covariance_type,
+                "inference_distribution": result.inference_distribution,
+                "n_clusters": result.n_clusters,
+                "nuisance_predictions_supplied": True,
+                "causal_interpretation_requires_assumptions": True,
+                "assumptions": list(result.assumptions),
+            },
+            source="causalkit",
+        )
     if isinstance(result, RandomizedATEResult):
         return RegressionModel(
             name=name or "Randomized ATE",
@@ -110,7 +145,7 @@ def to_outputhub_model(
 
 def add_to_outputhub(
     hub: Any,
-    result: IV2SLSResult | RandomizedATEResult,
+    result: IV2SLSResult | RandomizedATEResult | ObservationalATEResult,
     *,
     name: str | None = None,
 ) -> Any:
@@ -119,7 +154,11 @@ def add_to_outputhub(
     if not hasattr(hub, "add_model"):
         raise TypeError("hub must provide an OutputHub-compatible add_model method.")
     model_name = name or (
-        "Randomized ATE" if isinstance(result, RandomizedATEResult) else "IV/2SLS"
+        result.estimator.upper()
+        if isinstance(result, ObservationalATEResult)
+        else "Randomized ATE"
+        if isinstance(result, RandomizedATEResult)
+        else "IV/2SLS"
     )
     model = to_outputhub_model(result, name=model_name)
     hub.add_model(model)

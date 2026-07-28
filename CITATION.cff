@@ -3,13 +3,13 @@ message: "If you use causalkit in research, please cite the software and the exa
 type: software
 title: "causalkit: Identification-aware causal inference and instrumental variables for Python"
 abstract: >-
-  An identification-aware Python toolkit for causal inference. Version 0.2.0a1
-  provides linear two-stage least squares and two-arm randomized-experiment
-  average treatment effects with robust inference and strict data contracts.
+  An identification-aware Python toolkit for causal inference. Version 0.3.0a1
+  provides linear two-stage least squares, randomized-experiment effects, and
+  supplied-nuisance IPW/AIPW effects with robust inference and strict contracts.
 authors:
   - family-names: Akanbi
     given-names: "Oluwajuwon Mayomi"
-version: 0.2.0a1
+version: 0.3.0a1
 repository-code: "https://github.com/Akanom/causalkit"
 url: "https://github.com/Akanom/causalkit"
 license: MIT
@@ -20,4 +20,5 @@ keywords:
   - two-stage least squares
   - 2SLS
   - randomized experiments
+  - inverse probability weighting
   - identification

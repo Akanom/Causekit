@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from causalkit import IV2SLS, RandomizedATE, add_to_outputhub, to_outputhub_model
+from causalkit import AIPWATE, IV2SLS, RandomizedATE, add_to_outputhub, to_outputhub_model
 
 outputhub = pytest.importorskip("universal_output_hub")
 
@@ -56,7 +56,7 @@ def test_result_and_first_stage_can_be_added_to_outputhub(iv_result) -> None:
 
 
 def test_outputhub_adapter_validates_inputs(iv_result) -> None:
-    with pytest.raises(TypeError, match="IV2SLSResult or RandomizedATEResult"):
+    with pytest.raises(TypeError, match="ObservationalATEResult"):
         to_outputhub_model(object())
     with pytest.raises(TypeError, match="add_model"):
         add_to_outputhub(object(), iv_result)
@@ -78,3 +78,22 @@ def test_randomized_ate_converts_and_adds_balance_table() -> None:
     add_to_outputhub(hub, result)
     assert len(hub.models) == 1
     assert len(hub.tables) == 1
+
+
+def test_observational_ate_converts_without_reestimating_nuisance_models() -> None:
+    rng = np.random.default_rng(82)
+    treatment = rng.binomial(1, 0.5, 300)
+    mu0 = rng.normal(size=300)
+    mu1 = mu0 + 1.2
+    outcome = np.where(treatment == 1, mu1, mu0) + rng.normal(size=300)
+    result = AIPWATE().fit(
+        outcome,
+        treatment=treatment,
+        propensity=np.full(300, 0.5),
+        outcome_treated=mu1,
+        outcome_control=mu0,
+    )
+    model = to_outputhub_model(result)
+    assert model.metadata["estimator"] == "aipw_ate"
+    assert model.metadata["nuisance_predictions_supplied"] is True
+    assert model.params.index.tolist() == ["ate"]

@@ -9,6 +9,14 @@ This document defines the validation gate and how to report it. It does **not**
 assert that the commands below have passed for the current checkout. Release notes and
 review records must state the actual execution environment and outcome.
 
+For supplied-nuisance IPW/AIPW, maintained tests must include the exact score identity,
+influence-function centering and variance identity, deterministic recovery under a known
+data-generating process, propensity-bound refusal, clipping disclosure, exact index
+alignment, cluster-sum covariance, and a large vectorized smoke path. Nuisance predictions
+used in empirical validation must record whether they are oracle, fixed low-complexity,
+held-out, or cross-fitted; in-sample adaptive predictions cannot be presented as validated
+cross-fitted inference.
+
 ## Claim boundary
 
 Validation can provide evidence that:
