@@ -14,7 +14,7 @@ from .diagnostics import FirstStageDiagnostic, SarganTest
 from .did import DiDResult, DifferenceInDifferences, EfficientDiD
 from .integrations import add_to_outputhub, to_outputhub_model
 from .iv import IV2SLS, IV2SLSResult
-from .matching import NearestNeighborMatch, NearestNeighborMatchResult
+from .matching import NearestNeighborMatch, NearestNeighborMatchResult, PropensityScoreStatus
 from .observational import AIPWATE, IPWATE, ObservationalATEResult, OverlapDiagnostic
 from .postestimation import (
     confint,
@@ -50,6 +50,7 @@ __all__ = [
     "NearestNeighborMatchResult",
     "OutcomeResultProtocol",
     "PropensityResultProtocol",
+    "PropensityScoreStatus",
     "SarganTest",
     "RandomizedATE",
     "RandomizedATEResult",
@@ -65,4 +66,4 @@ __all__ = [
     "wald_test",
 ]
 
-__version__ = "0.6.0a2"
+__version__ = "0.6.0a3"

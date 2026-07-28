@@ -56,6 +56,26 @@ def _imbalanced_att(nobs: int, rng: np.random.Generator) -> dict[str, Any]:
     }
 
 
+def _known_score_ate_inference(nobs: int, rng: np.random.Generator) -> dict[str, Any]:
+    logits = rng.normal(scale=0.8, size=nobs)
+    propensity = _expit(logits)
+    treatment = rng.binomial(1, propensity)
+    treatment[0], treatment[1] = 0, 1
+    outcome = 1.5 * treatment + 0.4 * logits + rng.normal(size=nobs)
+    return {
+        "y": outcome,
+        "treatment": treatment,
+        "propensity": propensity,
+        "propensity_score_status": "known",
+        "model": NearestNeighborMatch(
+            estimand="ate",
+            caliper=None,
+            common_support=None,
+            inference="abadie_imbens",
+        ),
+    }
+
+
 def _heavy_ties_att(nobs: int, rng: np.random.Generator) -> dict[str, Any]:
     del rng
     controls = max(2, (nobs + 1) // 2)
@@ -96,6 +116,7 @@ def _caliper_attrition_att(nobs: int, rng: np.random.Generator) -> dict[str, Any
 SCENARIOS: dict[str, Callable[[int, np.random.Generator], dict[str, Any]]] = {
     "balanced_ate": _balanced_ate,
     "imbalanced_att": _imbalanced_att,
+    "known_score_ate_inference": _known_score_ate_inference,
     "heavy_ties_att": _heavy_ties_att,
     "caliper_attrition_att": _caliper_attrition_att,
 }
@@ -118,6 +139,8 @@ def _run(name: str, nobs: int, *, measure_memory: bool) -> dict[str, Any]:
         "requested_n": nobs,
         "realized_n": result.nobs,
         "estimate": result.estimate,
+        "standard_error": result.standard_error,
+        "inference": result.inference,
         "matched_focal": result.n_matched_focal,
         "caliper_unmatched": result.n_caliper_unmatched,
         "match_rows": len(result.match_table),

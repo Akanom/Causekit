@@ -1,6 +1,6 @@
 # Architecture
 
-`causalkit` is organized around small, auditable estimation paths. The `0.6.0a2`
+`causalkit` is organized around small, auditable estimation paths. The `0.6.0a3`
 architecture keeps causal assumptions visible, separates numerical estimation from
 inference and diagnostics, and returns frozen labelled result containers suitable for
 reporting. The pandas objects stored inside a result should be treated as read-only; helper
@@ -80,7 +80,7 @@ The installed source tree assigns one primary responsibility to each module:
 | `causalkit.randomized` | Two-arm difference-in-means and Lin-adjusted ATE execution path, balance records, and fitted result |
 | `causalkit.observational` | Supplied-nuisance IPW/AIPW scores, overlap diagnostics, vectorized influence-function and cluster inference |
 | `causalkit.crossfit` | Public nuisance protocols, deterministic stratified fold orchestration, binary/multiclass probabilities, masked scalar tasks, fresh-model fitting, prediction adaptation, and aligned out-of-fold records |
-| `causalkit.matching` | Supplied-score ATT/ATC/ATE matching, sorted scalar neighbor search, support/caliper rules, fractional ties, weights, reuse, balance, and inference refusals |
+| `causalkit.matching` | Supplied-score ATT/ATC/ATE matching, sorted scalar neighbor search, support/caliper rules, fractional ties, weights, reuse, balance, and fixed-score analytical inference |
 | `causalkit.did` | Balanced-panel validation, conventional group-time DiD, cross-fitted covariate PT-All scores/conditional weights, pointwise and simultaneous influence inference, and cohort/event/calendar aggregation |
 | `causalkit.postestimation` | Summary, covariance, confidence interval, prediction, residual, fitted-value, linear-combination, and Wald helpers |
 | `causalkit.integrations.outputhub` | Lazy optional conversion and insertion into Universal Output Hub |
@@ -205,11 +205,13 @@ and declared design settings; outcome values are used only after the match desig
 to form observed-minus-imputed contrasts. Fractional tie weights and comparison reuse
 remain explicit in the result.
 
-Matching uncertainty is intentionally separate from generic covariance code. The point
-alpha defaults to `inference="none"`; the reserved Abadie–Imbens path refuses until both
-the reuse-aware conditional variance and propensity-estimation adjustment contracts are
-implemented and validated. It must not reuse the IV/ATE sandwich or CR1 kernels merely to
-populate standard-error fields.
+Matching uncertainty is intentionally separate from generic covariance code. The alpha
+defaults to `inference="none"`. Its maintained Abadie–Imbens path estimates same-arm
+conditional variances, applies estimand-specific comparison-reuse formulas, and is exposed
+only for a declared fixed score without support/caliper selection or expanded ties.
+Estimated/cross-fitted scores still refuse until their first-step-specific adjustment is
+implemented. The matcher does not reuse IV/ATE sandwich or CR1 kernels merely to populate
+standard-error fields.
 
 The DiD path performs one long-to-wide balanced-panel validation and keeps the entity as
 the sampling unit. `DifferenceInDifferences` and `EfficientDiD` share this panel bundle,

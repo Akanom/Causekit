@@ -1,9 +1,10 @@
 # Nearest-neighbor matching contract
 
-Status (2026-07-28): the public point-estimation alpha is implemented. Analytical
-uncertainty, external-software parity, OutputHub adaptation, and full promotion evidence
-remain open gates. This document is normative for both the implemented slice and those
-explicitly deferred gates.
+Status (2026-07-28): point estimation and a fixed/known-score Abadie-Imbens analytical
+path are implemented. Estimated-propensity adjustment and a recorded Stata run remain
+open inferential/parity gates. R `Matching` parity, OutputHub adaptation, deterministic
+coverage smoke, and 100,000-row inference performance evidence are maintained. This
+document is normative for both the implemented slice and explicitly deferred gates.
 
 ## Problem and claim boundary
 
@@ -35,19 +36,23 @@ NearestNeighborMatch(
     ties="all",
     bias_correction="none",
     inference="none",
+    variance_neighbors=1,
 ).fit(
     y,
     treatment=...,
     propensity=...,
     covariates=...,
+    propensity_score_status="estimated",
+    propensity_provenance="CrossFitter:5-fold",
 )
 ```
 
 The propensity input may come from `CrossFitter` or another auditable out-of-sample
-workflow. `propensity_provenance=` records that origin; it does not validate the model.
-The matcher owns matching, matched-sample weights, diagnostics, and estimand labels. It
-does not own binary-response nuisance estimation, and the current point alpha does not
-claim valid sampling uncertainty.
+workflow. `propensity_provenance=` records that origin; it does not validate the model or
+activate fixed-score inference. `propensity_score_status=` is the machine-readable
+declaration and defaults to `"estimated"`. The matcher owns matching, matched-sample
+weights, diagnostics, estimand labels, and only the maintained known-score analytical
+variance. It does not own binary-response nuisance estimation.
 
 ## Estimand and target population
 
@@ -134,11 +139,12 @@ estimate depend on an arbitrary ordering. Random tie-breaking is also excluded f
 stable slice because a seed does not make the resulting estimand scientifically less
 arbitrary.
 
-This tie rule creates an inference restriction: a future fixed-neighbor Abadie–Imbens
-analytical variance can be available only when no boundary tie expands the realized
-neighbor count. When boundary ties occur, `inference="abadie_imbens"` refuses with an
-actionable message. The user may report a point estimate with `inference="none"`; the
-package does not substitute an unvalidated standard error.
+This tie rule creates an inference restriction: fixed-neighbor Abadie–Imbens analytical
+variance is available only when no boundary tie expands either the cross-arm matching
+count or the same-arm conditional-variance matching count. When such ties occur,
+`inference="abadie_imbens"` refuses with an actionable message. The user may report a
+point estimate with `inference="none"`; the package does not substitute an unvalidated
+standard error.
 
 ## Common support
 
@@ -193,27 +199,36 @@ The matcher must not import or duplicate regression estimators from `limiteddepk
 
 ## Uncertainty
 
-Accepted values are `"abadie_imbens"` and `"none"`. The point-estimation alpha defaults
-to `"none"`. `"abadie_imbens"` is reserved but currently refuses rather than returning
-an incomplete standard error.
+Accepted values are `"abadie_imbens"` and `"none"`; the default remains `"none"`.
+`"abadie_imbens"` implements the fixed-neighbor, replacement variance of Abadie and
+Imbens (2006) for a declared known/fixed scalar score. For every observation, equation
+(14) is estimated with `variance_neighbors=J` nearest observations from the same treatment
+arm. The marginal ATT and ATE variances then combine imputed unit effects, those
+conditional variances, and the exact comparison reuse counts. ATC uses the treatment-label
+reversal of the ATT formula.
 
-The future analytical variance implementation must follow the fixed-neighbor,
-replacement framework and account for comparison-unit reuse. It is available only when
-its maintained conditions hold: fixed realized neighbor count, no expanded boundary
-ties, independent sampling units, and adequate observations in both arms for conditional
-variance estimation. It also must distinguish a known/fixed score from an estimated
-propensity. Abadie and Imbens show that propensity-score estimation generally changes the
-asymptotic variance; for the ATT the adjustment can have either sign. A generic supplied
-or cross-fitted prediction does not expose the parametric score, information matrix, or
-other first-step structure needed to apply that correction. Therefore the package will
-not present the fixed-score variance as universally valid for supplied estimated scores.
+The maintained analytical path requires all of the following:
 
-Promotion of `"abadie_imbens"` requires separate maintained contracts for (a) a declared
-known/fixed score and (b) supported estimated-propensity models with the required
-first-step information. Arbitrary cross-fitted machine-learning scores require their own
-justified inference result. When implemented, the result will store the variance method,
-score provenance, conditional-variance neighbor count, reuse diagnostics, reference
-distribution, and every finite-sample convention.
+- `propensity_score_status="known"`; a provenance string containing the word “known” is
+  not sufficient;
+- `caliper=None` and `common_support=None`, so the current variance result is not attached
+  after a data-dependent target-selection rule;
+- independent sampling units, replacement, fixed requested match counts, and no expanded
+  cross-arm or same-arm boundary ties; and
+- more than `variance_neighbors` observations in each treatment arm.
+
+The result reports the sampling `variance`, paper-scale `normalized_variance`, observation-
+level `conditional_variances`, the conditional variance component, the residual estimated
+effect-heterogeneity component, the variance-neighbor count, and a normal reference
+distribution. The estimated heterogeneity component can be negative in a finite sample
+even though the combined variance estimator is nonnegative.
+
+Estimated and cross-fitted propensities still refuse. Abadie and Imbens show that
+propensity-score estimation generally changes the asymptotic variance; for ATT the
+adjustment can have either sign. A generic prediction does not expose the parametric score,
+information matrix, or other first-step structure needed for that correction. Supported
+parametric estimated-propensity inference and arbitrary cross-fitted machine-learning
+score inference therefore require separate maintained contracts.
 
 Ordinary nonparametric bootstrap is prohibited for the stable fixed-neighbor estimator.
 Abadie and Imbens show that it is generally invalid even where the estimator is root-N
@@ -291,12 +306,14 @@ Implementation cannot be called complete until all gates pass:
 9. 100,000-row runtime/memory smoke without a quadratic distance matrix;
 10. OutputHub, artifact-content, clean-wheel, lint, format, typing, and full-suite gates.
 
-The current point alpha passes the hand-computed ATT/ATC/ATE, row-permutation, caliper,
-support, tie-weight, reuse-weight, balance-identity, deterministic paired-recovery, and
-documented refusal tests. `benchmarks/benchmark_matching.py` supplies the reproducible
-sorted-scalar performance harness. Analytical-variance identities and coverage,
-aligned external parity, OutputHub integration, and the complete benchmark matrix remain
-promotion gaps; the point alpha must not be described as a completed matching release.
+The current alpha passes hand-computed ATT/ATC/ATE point and variance identities,
+row-permutation, caliper, support, tie-weight, reuse-weight, balance, deterministic
+recovery, refusal, and seeded coverage-smoke tests. It matches the pinned CRAN `Matching`
+4.10-15 pure-R reference for all three estimates and standard errors. OutputHub exports
+the model plus outcome-free match and balance tables. `benchmark_matching.py` includes a
+100,000-row known-score inference scenario. The Stata script is ready for a manual
+`teffects nnmatch` run, while estimated-propensity inference and the final recorded Stata
+result remain promotion gaps; this alpha is not a completed general matching release.
 
 ## Pre-mortem
 

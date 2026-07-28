@@ -229,11 +229,14 @@ observed balance is a design diagnostic, not evidence that unmeasured confoundin
 eliminated. Caliper sensitivity and covariate-level balance should be reported together
 with focal attrition and comparison reuse.
 
-The `0.5.0a1` matching surface is point-estimation-only. `inference="none"` is not a claim
-that the design is uncertainty-free; it means the package has deliberately not attached a
-standard error. Ordinary bootstrap is not substituted because fixed-neighbor matching is
-nonsmooth, and fixed-score analytical variance is not silently applied to an estimated
-propensity without its required first-step adjustment.
+`inference="none"` is not a claim that a matching design is uncertainty-free. The
+maintained `inference="abadie_imbens"` path applies only to a declared known/fixed scalar
+score, without caliper/support selection or expanded ties, and accounts for comparison
+reuse through same-arm conditional-variance matches. A fitted or cross-fitted propensity
+is not fixed merely because its predictions were supplied to the matcher; those scores
+continue to require `inference="none"` until their first-step-specific adjustment is
+implemented. Ordinary bootstrap is not substituted because fixed-neighbor matching is
+nonsmooth.
 
 ## Difference-in-differences and event studies
 

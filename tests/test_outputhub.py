@@ -10,6 +10,7 @@ from causalkit import (
     AIPWATE,
     IV2SLS,
     DifferenceInDifferences,
+    NearestNeighborMatch,
     RandomizedATE,
     add_to_outputhub,
     to_outputhub_model,
@@ -151,4 +152,38 @@ def test_did_converts_and_adds_auditable_effect_tables() -> None:
         "Difference-in-Differences group-time effects",
         "Difference-in-Differences event study",
         "Difference-in-Differences calendar-time effects",
+    ]
+
+
+def test_matching_converts_and_adds_design_tables_without_reestimating() -> None:
+    logits = np.array([0.0, 4.0, 10.0, 1.0, 6.0, 9.0])
+    result = NearestNeighborMatch(
+        estimand="att",
+        caliper=None,
+        common_support=None,
+        inference="abadie_imbens",
+    ).fit(
+        [0.0, 2.0, 5.0, 3.0, 8.0, 12.0],
+        treatment=[0, 0, 0, 1, 1, 1],
+        propensity=1 / (1 + np.exp(-logits)),
+        covariates=pd.DataFrame({"baseline": logits}),
+        propensity_score_status="known",
+        propensity_provenance="fixed_by_test_design",
+    )
+
+    model = to_outputhub_model(result)
+
+    assert model.metadata["estimator"] == "nearest_neighbor_match"
+    assert model.metadata["requested_estimand"] == "att"
+    assert model.metadata["realized_estimand"] == "att"
+    assert model.metadata["propensity_score_status"] == "known"
+    assert model.metadata["inference"] == "abadie_imbens"
+    pd.testing.assert_series_equal(model.params, result.params.rename("coef"))
+    pd.testing.assert_series_equal(model.std_errors, result.standard_errors.rename("se"))
+    hub = outputhub.OutputHub("Matching analysis")
+    add_to_outputhub(hub, result)
+    assert len(hub.models) == 1
+    assert [table.name for table in hub.tables] == [
+        "Nearest-neighbor matching matches",
+        "Nearest-neighbor matching balance",
     ]

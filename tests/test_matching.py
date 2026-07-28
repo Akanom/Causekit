@@ -19,6 +19,18 @@ def _three_unit_example():
     )
 
 
+def _six_unit_variance_example():
+    """No-tie scalar design with hand-computable Abadie-Imbens variance."""
+
+    index = pd.Index(["c0", "c1", "c2", "t0", "t1", "t2"])
+    logits = np.array([0.0, 4.0, 10.0, 1.0, 6.0, 9.0])
+    return (
+        pd.Series([0.0, 2.0, 5.0, 3.0, 8.0, 12.0], index=index, name="outcome"),
+        pd.Series([0, 0, 0, 1, 1, 1], index=index, name="treatment"),
+        pd.Series(1 / (1 + np.exp(-logits)), index=index, name="propensity"),
+    )
+
+
 @pytest.mark.parametrize(
     ("estimand", "expected"),
     [("att", 6.0), ("atc", 3.0), ("ate", 5.0)],
@@ -227,6 +239,7 @@ def test_outcomes_do_not_change_the_selected_design() -> None:
         ({"bias_correction": "linear"}, NotImplementedError, "bias_correction"),
         ({"inference": "bootstrap"}, ValueError, "inference"),
         ({"neighbors": 0}, ValueError, "neighbors"),
+        ({"variance_neighbors": 0}, ValueError, "variance_neighbors"),
         ({"caliper": 0.0}, ValueError, "caliper"),
         ({"caliper": []}, ValueError, "caliper"),
         ({"common_support": "trim"}, ValueError, "common_support"),
@@ -249,12 +262,178 @@ def test_analytical_inference_refuses_expanded_boundary_ties() -> None:
 
 def test_analytical_inference_is_not_approximated_without_propensity_provenance() -> None:
     y, treatment, propensity, _ = _three_unit_example()
-    with pytest.raises(NotImplementedError, match="propensity-score estimation"):
+    with pytest.raises(NotImplementedError, match="known/fixed"):
         NearestNeighborMatch(
             caliper=None,
             common_support=None,
             inference="abadie_imbens",
-        ).fit(y, treatment=treatment, propensity=propensity)
+        ).fit(
+            y,
+            treatment=treatment,
+            propensity=propensity,
+            propensity_provenance="known is not a machine-readable declaration",
+        )
+
+
+@pytest.mark.parametrize(
+    ("estimand", "normalized_variance", "variance_denominator", "conditional_component"),
+    [
+        ("att", 26.0 / 9.0, 3, 37.0 / 3.0),
+        ("atc", 26.0 / 9.0, 3, 37.0 / 3.0),
+        ("ate", 137.0 / 9.0, 6, 74.0 / 3.0),
+    ],
+)
+def test_hand_computed_known_score_abadie_imbens_variance(
+    estimand: str,
+    normalized_variance: float,
+    variance_denominator: int,
+    conditional_component: float,
+) -> None:
+    y, treatment, propensity = _six_unit_variance_example()
+
+    result = NearestNeighborMatch(
+        estimand=estimand,
+        caliper=None,
+        common_support=None,
+        inference="abadie_imbens",
+        variance_neighbors=1,
+    ).fit(
+        y,
+        treatment=treatment,
+        propensity=propensity,
+        propensity_score_status="known",
+        propensity_provenance="fixed_by_simulation_design",
+    )
+
+    expected_conditional_variances = pd.Series(
+        [2.0, 2.0, 4.5, 12.5, 8.0, 8.0],
+        index=y.index,
+        name="conditional_variance",
+    )
+    expected_variance = normalized_variance / variance_denominator
+    pd.testing.assert_series_equal(result.conditional_variances, expected_conditional_variances)
+    assert result.estimate == pytest.approx(16.0 / 3.0, abs=1e-14)
+    assert result.normalized_variance == pytest.approx(normalized_variance, abs=1e-14)
+    assert result.variance == pytest.approx(expected_variance, abs=1e-14)
+    assert result.standard_error == pytest.approx(np.sqrt(expected_variance), abs=1e-14)
+    assert result.conditional_variance_component == pytest.approx(conditional_component, abs=1e-14)
+    assert result.effect_variance_component == pytest.approx(-85.0 / 9.0, abs=1e-14)
+    assert result.statistic == pytest.approx(result.estimate / result.standard_error, abs=1e-14)
+    assert 0.0 < result.pvalue < 1.0
+    assert result.propensity_score_status == "known"
+    assert result.variance_neighbors == 1
+    assert result.inference_distribution == "normal"
+    assert result.inference_df is None
+    interval = result.conf_int()
+    assert interval.name == estimand
+    assert interval["lower"] < result.estimate < interval["upper"]
+    assert result.summary_frame().columns.tolist() == [
+        "coef",
+        "std_err",
+        "stat",
+        "p_value",
+        "ci_lower",
+        "ci_upper",
+    ]
+    rendered = result.to_markdown()
+    assert "Abadie-Imbens" in rendered
+    assert "known" in rendered
+    assert result.realized_estimand.upper() in rendered
+    assert "fixed_by_simulation_design" in rendered
+
+
+def test_analytical_inference_refuses_support_or_caliper_target_selection() -> None:
+    y, treatment, propensity = _six_unit_variance_example()
+    for model in (
+        NearestNeighborMatch(
+            common_support="intersection",
+            caliper=None,
+            inference="abadie_imbens",
+        ),
+        NearestNeighborMatch(
+            common_support=None,
+            caliper=20.0,
+            inference="abadie_imbens",
+        ),
+    ):
+        with pytest.raises(NotImplementedError, match="caliper=None.*common_support=None"):
+            model.fit(
+                y,
+                treatment=treatment,
+                propensity=propensity,
+                propensity_score_status="known",
+            )
+
+
+def test_analytical_inference_requires_adequate_same_arm_variance_matches() -> None:
+    y, treatment, propensity = _six_unit_variance_example()
+    with pytest.raises(ValueError, match="variance_neighbors.*same-arm"):
+        NearestNeighborMatch(
+            caliper=None,
+            common_support=None,
+            inference="abadie_imbens",
+            variance_neighbors=3,
+        ).fit(
+            y,
+            treatment=treatment,
+            propensity=propensity,
+            propensity_score_status="known",
+        )
+
+
+def test_analytical_inference_refuses_expanded_same_arm_variance_ties() -> None:
+    logits = np.array([0.0, 2.0, 4.0, 0.0, 2.0, 4.0])
+    propensity = 1 / (1 + np.exp(-logits))
+    with pytest.raises(ValueError, match="conditional-variance.*boundary ties"):
+        NearestNeighborMatch(
+            estimand="att",
+            caliper=None,
+            common_support=None,
+            inference="abadie_imbens",
+            variance_neighbors=1,
+        ).fit(
+            [0.0, 1.0, 2.0, 4.0, 6.0, 9.0],
+            treatment=[0, 0, 0, 1, 1, 1],
+            propensity=propensity,
+            propensity_score_status="known",
+        )
+
+
+@pytest.mark.simulation
+def test_known_score_ate_analytical_intervals_have_seeded_coverage_smoke() -> None:
+    rng = np.random.default_rng(20_260_728)
+    true_effect = 1.5
+    estimates = []
+    standard_errors = []
+    covered = []
+    for _ in range(100):
+        covariate = rng.uniform(-2.0, 2.0, 600)
+        propensity = 1 / (1 + np.exp(-0.8 * covariate))
+        treatment = rng.binomial(1, propensity)
+        outcome = 0.5 * covariate + true_effect * treatment + rng.normal(size=600)
+        result = NearestNeighborMatch(
+            estimand="ate",
+            caliper=None,
+            common_support=None,
+            inference="abadie_imbens",
+        ).fit(
+            outcome,
+            treatment=treatment,
+            propensity=propensity,
+            propensity_score_status="known",
+            propensity_provenance="known_simulation_dgp",
+        )
+        interval = result.conf_int()
+        estimates.append(result.estimate)
+        standard_errors.append(result.standard_error)
+        covered.append(interval["lower"] <= true_effect <= interval["upper"])
+
+    coverage = float(np.mean(covered))
+    empirical_standard_deviation = float(np.std(estimates, ddof=1))
+    mean_standard_error = float(np.mean(standard_errors))
+    assert 0.86 <= coverage <= 0.99
+    assert np.mean(estimates) == pytest.approx(true_effect, abs=0.08)
+    assert mean_standard_error / empirical_standard_deviation == pytest.approx(1.0, abs=0.3)
 
 
 def test_clustered_matching_inference_is_not_silently_approximated() -> None:
@@ -362,6 +541,14 @@ def test_empty_propensity_provenance_is_refused() -> None:
             treatment=treatment,
             propensity=propensity,
             propensity_provenance="  ",
+        )
+
+    with pytest.raises(ValueError, match="propensity_score_status"):
+        NearestNeighborMatch(caliper=None, common_support=None).fit(
+            y,
+            treatment=treatment,
+            propensity=propensity,
+            propensity_score_status="cross_fitted",
         )
 
 

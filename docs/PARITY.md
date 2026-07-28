@@ -32,7 +32,7 @@ uses different estimands or moments. Neither counts as a pass.
 | `RandomizedATE` | `statsmodels` regression/covariance identities | pending | pending | partial |
 | `IPWATE` / `AIPWATE` ATE/ATT/ATC | analytical score identities; external comparator pending | pending | pending | pending |
 | `CrossFitter` | protocol and leakage/alignment tests; not itself an estimand | non-comparable | non-comparable | internal protocol |
-| `NearestNeighborMatch` ATT/ATC/ATE | pending | pending | pending | blocked on inference promotion |
+| `NearestNeighborMatch` ATT/ATC/ATE | hand/reuse/variance identities pass | CRAN `Matching` 4.10-15 fixed-score fixture passes | manual `teffects nnmatch` script pending run | partial |
 | Conventional staggered DiD | hand identities; external comparator pending | pending | pending | pending |
 | Efficient DiD, no covariates | native result checked against pinned fixture | public `edid` commit `f55a4a4aba14f0826f59ad7aa4af3bafaeba529b` | pending/unavailable pending audit | partial |
 | Efficient DiD, covariate adjusted | deterministic and simulation evidence only | pending | pending/unavailable pending audit | pending |
@@ -41,6 +41,15 @@ The no-covariate efficient-DiD R harness is
 `benchmarks/validate_edid_reference.R`; its maintained fixture compares every candidate
 effect, the inverse-covariance weights, combined ATT, and HC1 standard error. This is not
 evidence for the covariate-adjusted path or for Stata.
+
+The fixed-score matching R harness is `benchmarks/validate_matching_reference.R`. It
+pins CRAN `Matching` commit `1208eaa7bfa888b1fc903481dddfb8c0dffa40d5`
+(version 4.10-15) and compares ATT, ATC, and ATE estimates plus Abadie-Imbens standard
+errors on the no-tie, one-neighbor contract fixture. The maintained Stata script is
+`benchmarks/validate_matching_stata.do`; Stata is not installed in the development
+environment, so its version and observed output remain pending. The Stata ATC mapping
+reverses treatment, estimates ATET, and negates the coefficient while retaining its
+standard error.
 
 ## Completion rule
 

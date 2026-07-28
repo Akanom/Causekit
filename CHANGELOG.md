@@ -4,6 +4,41 @@ All notable changes to `causalkit` are recorded here. The project follows
 [Semantic Versioning](https://semver.org/) once a public contract is released. Alpha
 versions may refine APIs, but breaking changes must still be documented explicitly.
 
+## [0.6.0a3] - Unreleased
+
+### Added
+
+- Fixed/known-score Abadie-Imbens analytical variance for scalar nearest-neighbor ATT,
+  ATC, and ATE matching with replacement, including same-arm conditional-variance
+  matching, comparison-reuse adjustments, normal inference, and confidence intervals.
+- Machine-readable `propensity_score_status=` and `variance_neighbors=` contracts plus
+  result-level normalized variance, sampling variance, conditional variances, and
+  conditional/effect variance components.
+- Hand-computed ATT/ATC/ATE variance identities, a deterministic coverage smoke test,
+  expanded refusal coverage, OutputHub model/design-table adaptation, and a 100,000-row
+  inference benchmark scenario.
+- Pinned R `Matching` 4.10-15 reference parity for estimates and standard errors, plus a
+  manually runnable Stata `teffects nnmatch` parity script for all three estimands.
+
+### Architecture
+
+- The analytical path is intentionally limited to a declared fixed score with no
+  caliper or common-support selection and no expanded cross-arm or same-arm boundary
+  ties. The default remains `inference="none"`.
+- A provenance string is audit metadata, not proof that a score is fixed. Estimated and
+  cross-fitted scores continue to refuse analytical inference until a supported
+  first-step-specific variance contract is implemented.
+- Ordinary bootstrap and generic clustered covariance remain prohibited for fixed-
+  neighbor matching.
+
+### Known limitations
+
+- Estimated-propensity adjustment, matching after target-changing support/caliper rules,
+  bias correction, and clustered/paired/survey uncertainty are not implemented.
+- The Stata harness requires a manual run because Stata is not installed in the
+  development environment; its observed version/output must be pinned before matching
+  receives a three-ecosystem parity pass.
+
 ## [0.6.0a2] - Unreleased
 
 ### Added

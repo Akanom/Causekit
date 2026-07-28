@@ -46,12 +46,20 @@ future task can resume without reconstructing intent from chat history.
    event-study bands. Exact recovery, multi-moment, robust/cluster band, singular-refusal,
    and seeded coverage-smoke tests are maintained.
 
+8. `0.6.0a3` matching known-score inference promotion: the Abadie-Imbens path now
+   estimates same-arm conditional variances and applies exact ATT/ATC/ATE comparison-
+   reuse formulas for a declared fixed scalar score. It reports normal inference and full
+   variance audit fields, refuses estimated/cross-fitted scores and target-changing
+   support/caliper selection, exports OutputHub design tables, matches pinned CRAN
+   `Matching` 4.10-15, and has a manually runnable Stata parity script. The 100,000-row
+   inference scenario completes in linear memory without a distance matrix.
+
 ## Open promotion gates
 
-- Matching still defaults to `inference="none"`. Abadie–Imbens reuse-aware variance, the
-  estimated-propensity first-step adjustment, external Stata/R parity, OutputHub
-  adaptation, and the remaining promotion matrix are open. Do not substitute a generic
-  sandwich, ordinary bootstrap, or cluster wrapper.
+- Matching still defaults to `inference="none"`. Known-score reuse-aware inference and R
+  parity are implemented; the estimated-propensity first-step adjustment and recorded
+  manual Stata result remain open. Do not substitute a generic sandwich, ordinary
+  bootstrap, or cluster wrapper.
 - Efficient DiD owns no nuisance model classes. The implemented covariate path must keep
   consuming public cross-fitting factories; direct density-ratio regression remains a
   possible future stability enhancement over ratios of multiclass probabilities.
@@ -78,10 +86,10 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Finish matching promotion from `docs/MATCHING_CONTRACT.md`: settle
-   score-provenance-specific analytical inference, then add variance identities/coverage,
-   aligned external parity, OutputHub adaptation, and the full benchmark matrix without
-   weakening the current refusal boundaries.
+1. Finish matching promotion from `docs/MATCHING_CONTRACT.md`: add a separately supported
+   estimated-propensity first-step contract if its required model information can be
+   exposed cleanly, record the manual Stata harness result, and extend publication-scale
+   sensitivity/coverage evidence without weakening the fixed-score refusal boundaries.
 2. Return to DiD for pre-trend/Hausman diagnostics, repeated cross-sections,
    publication-scale coverage, direct-ratio nuisance support if justified, and broader
    reference evidence.

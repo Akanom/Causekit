@@ -1,11 +1,11 @@
 # causalkit
 
 `causalkit` is an identification-aware Python package for causal inference and
-instrumental-variable workflows. The `0.6.0a2` surface provides linear two-stage least
+instrumental-variable workflows. The `0.6.0a3` surface provides linear two-stage least
 squares, randomized-experiment effects, reusable nuisance cross-fitting, IPW/AIPW ATE,
-ATT, and ATC, a point-estimation alpha for scalar propensity-score matching, conventional
-staggered DiD, and cross-fitted covariate-adjusted Chen-Sant'Anna-Xie efficient DiD for
-short panels.
+ATT, and ATC, scalar propensity-score matching with a maintained fixed-score analytical
+inference path, conventional staggered DiD, and cross-fitted covariate-adjusted
+Chen-Sant'Anna-Xie efficient DiD for short panels.
 
 This is alpha research software. A successful fit is not evidence that an instrument is
 valid, and an IV coefficient is not automatically an average treatment effect. State the
@@ -92,7 +92,7 @@ changes and conditional second moments without owning or copying model implement
 Every task receives a fresh model per fold. A separate `second_moment_factory=` is
 optional; when omitted, the outcome factory is reused.
 
-### Nearest-neighbor matching point alpha
+### Nearest-neighbor matching
 
 `NearestNeighborMatch` consumes a supplied propensity rather than copying a binary model
 from `limiteddepkit`. The implemented slice supports ATT, ATC, and bidirectional-imputation
@@ -119,11 +119,35 @@ print(matched.balance)
 print(matched.match_table)
 ```
 
-This alpha returns a point estimate and deliberately leaves standard errors, statistics,
-and p-values undefined. Ordinary bootstrap, matching without replacement, arbitrary tie
-selection, clustered uncertainty, and unimplemented bias correction refuse explicitly.
-The reserved `inference="abadie_imbens"` path also refuses: valid uncertainty must account
-for comparison reuse and distinguish a fixed score from an estimated propensity. See the
+`inference="none"` remains the default and is required for supplied estimated or
+cross-fitted propensities. When the score is genuinely known/fixed by design, the
+maintained Abadie-Imbens path is explicit:
+
+```python
+fixed_score_match = NearestNeighborMatch(
+    estimand="att",
+    caliper=None,
+    common_support=None,
+    inference="abadie_imbens",
+    variance_neighbors=1,
+).fit(
+    outcome,
+    treatment=treated,
+    propensity=known_propensity,
+    propensity_score_status="known",
+    propensity_provenance="fixed_by_declared_design",
+)
+
+print(fixed_score_match.summary_frame())
+print(fixed_score_match.conditional_variances)
+```
+
+This path uses same-arm nearest neighbors to estimate conditional outcome variances and
+accounts for comparison reuse for ATT, ATC, and ATE. It refuses caliper/support selection,
+expanded cross-arm or same-arm boundary ties, estimated scores, and inadequate same-arm
+samples. A descriptive provenance string does not activate inference; the machine-readable
+score status is separate. Ordinary bootstrap, matching without replacement, arbitrary tie
+selection, clustered uncertainty, and unimplemented bias correction also refuse. See the
 [matching contract](docs/MATCHING_CONTRACT.md) before publication-facing use.
 
 ### Conventional and efficient difference-in-differences
@@ -432,15 +456,15 @@ out-of-sample predictions participate while keeping causal identification inside
 
 ## Roadmap
 
-The point-estimation matching alpha follows the
-[nearest-neighbor matching contract](docs/MATCHING_CONTRACT.md). Analytical uncertainty,
-external parity, OutputHub adaptation, and the remaining promotion evidence are still
-required before it can be described as a completed matching release. DiD promotion now
-includes cross-fitted covariate nuisances and simultaneous event-study bands; pre-trend/
-Hausman diagnostics, repeated cross-sections, and broader parity remain. Later releases
-may add regression discontinuity and panel IV. Each family must define its estimand,
-assumptions, failure behavior, diagnostics, and independent validation evidence before
-promotion.
+The matching alpha follows the
+[nearest-neighbor matching contract](docs/MATCHING_CONTRACT.md). Known-score analytical
+inference, R reference parity, OutputHub adaptation, and a 100,000-row inference smoke are
+implemented. Estimated-propensity adjustment and a recorded manual Stata result remain
+promotion gates. DiD promotion includes cross-fitted covariate nuisances and simultaneous
+event-study bands; pre-trend/Hausman diagnostics, repeated cross-sections, and broader
+parity remain. Later releases may add regression discontinuity and panel IV. Each family
+must define its estimand, assumptions, failure behavior, diagnostics, and independent
+validation evidence before promotion.
 
 DADPLM and BDCPM are outside the current package scope. The roadmap is directional, not a
 promise of API shape or release timing. See [Package scope](docs/PACKAGE_SCOPE.md).

@@ -8,6 +8,7 @@ import pandas as pd
 
 from ..did import DiDResult
 from ..iv import IV2SLSResult
+from ..matching import NearestNeighborMatchResult
 from ..observational import ObservationalATEResult
 from ..randomized import RandomizedATEResult
 
@@ -30,20 +31,78 @@ def _first_stage_table(result: IV2SLSResult) -> pd.DataFrame:
 
 
 def to_outputhub_model(
-    result: IV2SLSResult | RandomizedATEResult | ObservationalATEResult | DiDResult,
+    result: (
+        IV2SLSResult
+        | RandomizedATEResult
+        | ObservationalATEResult
+        | DiDResult
+        | NearestNeighborMatchResult
+    ),
     *,
     name: str | None = None,
 ) -> Any:
     """Convert a fitted causal result into Output Hub's canonical regression model."""
 
     if not isinstance(
-        result, (IV2SLSResult, RandomizedATEResult, ObservationalATEResult, DiDResult)
+        result,
+        (
+            IV2SLSResult,
+            RandomizedATEResult,
+            ObservationalATEResult,
+            DiDResult,
+            NearestNeighborMatchResult,
+        ),
     ):
         raise TypeError(
             "result must be an IV2SLSResult, RandomizedATEResult, "
-            "ObservationalATEResult, or DiDResult."
+            "ObservationalATEResult, DiDResult, or NearestNeighborMatchResult."
         )
     RegressionModel = _regression_model_class()
+    if isinstance(result, NearestNeighborMatchResult):
+        return RegressionModel(
+            name=name or "Nearest-neighbor matching",
+            depvar="outcome",
+            params=result.params.rename("coef"),
+            std_errors=result.standard_errors.rename("se"),
+            pvalues=result.pvalues.rename("pvalue"),
+            statistics={
+                "N": result.nobs,
+                "Treated": result.n_treated,
+                "Control": result.n_control,
+                "Matched focal observations": result.n_matched_focal,
+                "Converged": result.converged,
+            },
+            diagnostics={
+                "Matched focal fraction": result.matched_focal_fraction,
+                "Maximum comparison reuse": result.maximum_reuse_count,
+                "Boundary tie events": result.boundary_tie_events,
+                **{
+                    f"{name.replace('_', ' ').title()}": value
+                    for name, value in result.balance_summary.items()
+                },
+            },
+            metadata={
+                "estimator": "nearest_neighbor_match",
+                "backend": result.backend,
+                "requested_estimand": result.requested_estimand,
+                "realized_estimand": result.realized_estimand,
+                "target_population": result.target_population,
+                "metric": result.metric,
+                "neighbors": result.neighbors,
+                "replacement": result.replacement,
+                "ties": result.ties,
+                "caliper": result.requested_caliper,
+                "common_support": result.common_support,
+                "propensity_provenance": result.propensity_provenance,
+                "propensity_score_status": result.propensity_score_status,
+                "inference": result.inference,
+                "variance_neighbors": result.variance_neighbors,
+                "inference_distribution": result.inference_distribution,
+                "causal_interpretation_requires_assumptions": True,
+                "assumptions": list(result.assumptions),
+            },
+            source="causalkit",
+        )
     if isinstance(result, DiDResult):
         negative_weights = (
             int((result.efficiency_weights["weight"] < 0).sum())
@@ -198,7 +257,13 @@ def to_outputhub_model(
 
 def add_to_outputhub(
     hub: Any,
-    result: IV2SLSResult | RandomizedATEResult | ObservationalATEResult | DiDResult,
+    result: (
+        IV2SLSResult
+        | RandomizedATEResult
+        | ObservationalATEResult
+        | DiDResult
+        | NearestNeighborMatchResult
+    ),
     *,
     name: str | None = None,
 ) -> Any:
@@ -209,6 +274,8 @@ def add_to_outputhub(
     model_name = name or (
         result.estimator.upper()
         if isinstance(result, ObservationalATEResult)
+        else "Nearest-neighbor matching"
+        if isinstance(result, NearestNeighborMatchResult)
         else "Efficient DiD"
         if isinstance(result, DiDResult) and result.method.startswith("chen_santanna_xie_efficient")
         else "Difference-in-Differences"
@@ -230,6 +297,24 @@ def add_to_outputhub(
             ),
             metadata={"source": "causalkit", "estimator": "iv_2sls"},
         )
+    elif isinstance(result, NearestNeighborMatchResult) and hasattr(hub, "add_table"):
+        table_metadata = {"source": "causalkit", "estimator": "nearest_neighbor_match"}
+        hub.add_table(
+            f"{model_name} matches",
+            result.match_table.copy(),
+            caption=(
+                "Focal-to-comparison design with distance, rank, tie group, and fractional "
+                "match weight; outcome values are intentionally excluded."
+            ),
+            metadata=table_metadata,
+        )
+        if not result.balance.empty:
+            hub.add_table(
+                f"{model_name} balance",
+                result.balance.reset_index(),
+                caption="Pre-treatment covariate balance before and after matching.",
+                metadata=table_metadata,
+            )
     elif isinstance(result, RandomizedATEResult) and result.balance and hasattr(hub, "add_table"):
         hub.add_table(
             f"{model_name} covariate balance",

@@ -8,15 +8,17 @@ from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
+from scipy.stats import norm
 
 from ._data import _validate_pandas_indices
 
 MatchingEstimand = Literal["ate", "att", "atc"]
+PropensityScoreStatus = Literal["estimated", "known"]
 
 
 @dataclass(frozen=True)
 class NearestNeighborMatchResult:
-    """Auditable point estimate from scalar nearest-neighbor matching."""
+    """Auditable scalar nearest-neighbor matching estimate and inference."""
 
     estimate: float
     standard_error: float
@@ -65,8 +67,15 @@ class NearestNeighborMatchResult:
     caliper_scale: str
     caliper_standard_deviation_ddof: int | None
     propensity_provenance: str
+    propensity_score_status: PropensityScoreStatus
     bias_correction: str
     inference: str
+    variance: float
+    normalized_variance: float
+    conditional_variances: pd.Series
+    conditional_variance_component: float
+    effect_variance_component: float
+    variance_neighbors: int
     inference_distribution: str | None
     inference_df: float | None
     notes: tuple[str, ...]
@@ -113,18 +122,78 @@ class NearestNeighborMatchResult:
             raise ValueError("level must be strictly between zero and one.")
         if not np.isfinite(self.standard_error):
             raise ValueError("No confidence interval is available when inference='none'.")
-        raise NotImplementedError("Analytical matching confidence intervals are not implemented.")
+        critical = float(norm.ppf(0.5 + level / 2.0))
+        return pd.Series(
+            {
+                "lower": self.estimate - critical * self.standard_error,
+                "upper": self.estimate + critical * self.standard_error,
+            },
+            name=self.realized_estimand,
+        )
 
-    def summary_frame(self) -> pd.DataFrame:
+    def summary_frame(self, level: float = 0.95) -> pd.DataFrame:
+        if not 0.0 < level < 1.0:
+            raise ValueError("level must be strictly between zero and one.")
+        if np.isfinite(self.standard_error):
+            interval = self.conf_int(level)
+            lower, upper = interval["lower"], interval["upper"]
+        else:
+            lower = upper = float("nan")
         return pd.DataFrame(
             {
                 "coef": [self.estimate],
                 "std_err": [self.standard_error],
                 "stat": [self.statistic],
                 "p_value": [self.pvalue],
+                "ci_lower": [lower],
+                "ci_upper": [upper],
             },
             index=pd.Index([self.realized_estimand], dtype="object"),
         )
+
+    def to_markdown(self, digits: int = 4) -> str:
+        """Render a dependency-free audit summary without exposing outcomes."""
+
+        if digits < 0:
+            raise ValueError("digits must be non-negative.")
+        standard_error = (
+            f"{self.standard_error:.{digits}f}"
+            if np.isfinite(self.standard_error)
+            else "not estimated"
+        )
+        inference = (
+            "Abadie-Imbens known-score analytical variance"
+            if self.inference == "abadie_imbens"
+            else "none"
+        )
+        requested_focal_count = (
+            self.n_treated
+            if self.requested_estimand == "att"
+            else self.n_control
+            if self.requested_estimand == "atc"
+            else self.nobs
+        )
+        lines = [
+            "# Nearest-neighbor matching result",
+            "",
+            f"- Requested estimand: `{self.requested_estimand.upper()}`",
+            f"- Realized estimand: `{self.realized_estimand.upper()}`",
+            f"- Target: {self.target_population}",
+            f"- Matched focal observations: `{self.n_matched_focal}` of "
+            f"`{requested_focal_count}` supplied focal observations",
+            f"- Score status: `{self.propensity_score_status}`",
+            f"- Score provenance: `{self.propensity_provenance}`",
+            f"- Inference: `{inference}`",
+            "",
+            "| estimand | estimate | std_err |",
+            "|---|---:|---:|",
+            f"| {self.realized_estimand.upper()} | {self.estimate:.{digits}f} | {standard_error} |",
+            "",
+            f"> {self.causal_interpretation}",
+        ]
+        if self.notes:
+            lines.extend(["", "## Notes", "", *(f"- {note}" for note in self.notes)])
+        return "\n".join(lines)
 
 
 def _series(value: Any, *, name: str) -> tuple[pd.Series, bool]:
@@ -229,6 +298,7 @@ def _neighbor_group(
     *,
     neighbors: int,
     caliper: float | None,
+    exclude_position: int | None = None,
 ) -> tuple[list[tuple[int, float, int, int, float]], bool] | None:
     """Return local neighbors without constructing an arm-by-arm distance matrix."""
 
@@ -246,13 +316,17 @@ def _neighbor_group(
             break
         group: list[tuple[int, float]] = []
         while left >= 0 and abs((focal - sorted_metric[left]) - boundary) <= tolerance:
-            group.append((int(sorted_positions[left]), boundary))
+            candidate = int(sorted_positions[left])
+            if candidate != exclude_position:
+                group.append((candidate, boundary))
             left -= 1
         while (
             right < len(sorted_metric)
             and abs((sorted_metric[right] - focal) - boundary) <= tolerance
         ):
-            group.append((int(sorted_positions[right]), boundary))
+            candidate = int(sorted_positions[right])
+            if candidate != exclude_position:
+                group.append((candidate, boundary))
             right += 1
         remaining = neighbors - len(selected)
         if len(group) >= remaining:
@@ -265,6 +339,127 @@ def _neighbor_group(
     if sum(item[4] for item in selected) < 1.0 - 1e-12:
         return None
     return selected, expanded_tie
+
+
+def _conditional_variances(
+    outcome: np.ndarray,
+    treatment: np.ndarray,
+    metric: np.ndarray,
+    *,
+    variance_neighbors: int,
+) -> np.ndarray:
+    """Equation (14) in Abadie and Imbens (2006), using same-arm matches."""
+
+    estimates = np.empty(len(outcome), dtype=float)
+    for arm in (0, 1):
+        arm_positions = np.flatnonzero(treatment == arm)
+        if len(arm_positions) <= variance_neighbors:
+            raise ValueError(
+                "variance_neighbors requires more same-arm observations than the requested "
+                "conditional-variance neighbor count in both treatment arms."
+            )
+        order = np.argsort(metric[arm_positions], kind="stable")
+        sorted_positions = arm_positions[order]
+        sorted_metric = metric[sorted_positions]
+        for focal_position in arm_positions:
+            found = _neighbor_group(
+                metric[focal_position],
+                sorted_metric,
+                sorted_positions,
+                neighbors=variance_neighbors,
+                caliper=None,
+                exclude_position=int(focal_position),
+            )
+            if found is None:  # pragma: no cover - guarded by the same-arm size check
+                raise RuntimeError("Conditional-variance neighbor search failed unexpectedly.")
+            matches, expanded = found
+            if expanded:
+                raise ValueError(
+                    "Abadie-Imbens conditional-variance matching encountered expanded "
+                    "boundary ties; use inference='none'."
+                )
+            matched_mean = sum(
+                outcome[comparison] * weight for comparison, _, _, _, weight in matches
+            )
+            residual = outcome[focal_position] - matched_mean
+            estimates[focal_position] = (
+                variance_neighbors / (variance_neighbors + 1.0) * residual**2
+            )
+    return estimates
+
+
+def _abadie_imbens_variance(
+    *,
+    estimand: MatchingEstimand,
+    estimate: float,
+    unit_effects: np.ndarray,
+    outcome: np.ndarray,
+    treatment: np.ndarray,
+    metric: np.ndarray,
+    reuse_counts: np.ndarray,
+    neighbors: int,
+    variance_neighbors: int,
+) -> tuple[float, float, np.ndarray, float, float]:
+    """Return sampling and normalized variances under a known scalar score."""
+
+    conditional_variances = _conditional_variances(
+        outcome,
+        treatment,
+        metric,
+        variance_neighbors=variance_neighbors,
+    )
+    match_ratio = reuse_counts / neighbors
+    centered_effects = (unit_effects - estimate) ** 2
+    if estimand == "ate":
+        target_size = len(outcome)
+        normalized_variance = float(
+            np.mean(centered_effects)
+            + np.mean(
+                reuse_counts
+                * (reuse_counts + 2 * neighbors - 1)
+                / neighbors**2
+                * conditional_variances
+            )
+        )
+        conditional_component = float(np.mean((1.0 + match_ratio) ** 2 * conditional_variances))
+    elif estimand == "att":
+        target_size = int(treatment.sum())
+        normalized_variance = float(
+            np.mean(centered_effects)
+            + np.sum(
+                (1 - treatment)
+                * reuse_counts
+                * (reuse_counts - 1)
+                / neighbors**2
+                * conditional_variances
+            )
+            / target_size
+        )
+        conditional_component = float(
+            np.sum((treatment - (1 - treatment) * match_ratio) ** 2 * conditional_variances)
+            / target_size
+        )
+    else:
+        target_size = int((1 - treatment).sum())
+        normalized_variance = float(
+            np.mean(centered_effects)
+            + np.sum(
+                treatment * reuse_counts * (reuse_counts - 1) / neighbors**2 * conditional_variances
+            )
+            / target_size
+        )
+        conditional_component = float(
+            np.sum(((1 - treatment) - treatment * match_ratio) ** 2 * conditional_variances)
+            / target_size
+        )
+    variance = normalized_variance / target_size
+    return (
+        variance,
+        normalized_variance,
+        conditional_variances,
+        conditional_component,
+        normalized_variance - conditional_component,
+    )
 
 
 def _weighted_mean(values: np.ndarray, weights: np.ndarray) -> float:
@@ -373,6 +568,7 @@ class NearestNeighborMatch:
         ties: str = "all",
         bias_correction: str = "none",
         inference: str = "none",
+        variance_neighbors: int = 1,
     ) -> None:
         if estimand not in {"ate", "att", "atc"}:
             raise ValueError("estimand must be 'ate', 'att', or 'atc'.")
@@ -392,6 +588,12 @@ class NearestNeighborMatch:
             raise NotImplementedError("bias_correction other than 'none' is not implemented.")
         if inference not in {"abadie_imbens", "none"}:
             raise ValueError("inference must be 'abadie_imbens' or 'none'.")
+        if (
+            isinstance(variance_neighbors, bool)
+            or not isinstance(variance_neighbors, (int, np.integer))
+            or variance_neighbors < 1
+        ):
+            raise ValueError("variance_neighbors must be a positive integer.")
         if common_support not in {"intersection", None}:
             raise ValueError("common_support must be 'intersection' or None.")
         if isinstance(caliper, str) and caliper != "auto":
@@ -420,6 +622,7 @@ class NearestNeighborMatch:
         self.ties = ties
         self.bias_correction = bias_correction
         self.inference = inference
+        self.variance_neighbors = int(variance_neighbors)
 
     def fit(
         self,
@@ -429,12 +632,15 @@ class NearestNeighborMatch:
         propensity: Any,
         covariates: Any | None = None,
         propensity_provenance: str = "supplied_unspecified",
+        propensity_score_status: PropensityScoreStatus = "estimated",
         clusters: Any | None = None,
     ) -> NearestNeighborMatchResult:
         if clusters is not None:
             raise NotImplementedError("clustered matching inference is not implemented.")
         if not isinstance(propensity_provenance, str) or not propensity_provenance.strip():
             raise ValueError("propensity_provenance must be a nonempty string.")
+        if propensity_score_status not in {"estimated", "known"}:
+            raise ValueError("propensity_score_status must be 'estimated' or 'known'.")
         outcome, assigned, propensity_values, covariate_frame = _prepare(
             y, treatment, propensity, covariates
         )
@@ -564,17 +770,56 @@ class NearestNeighborMatch:
         comparison_reuse = pd.Series(0, index=index, dtype=int, name="reuse_count")
         for position, count in reuse_counts.items():
             comparison_reuse.iloc[int(position)] = int(count)
+        variance = normalized_variance = float("nan")
+        conditional_variance_component = effect_variance_component = float("nan")
+        conditional_variance_values = np.full(nobs, np.nan)
+        standard_error = statistic = pvalue = float("nan")
+        inference_distribution = None
         if self.inference == "abadie_imbens":
             if boundary_tie_events:
                 raise ValueError(
                     "Abadie-Imbens analytical inference is unavailable when boundary ties "
                     "expand the realized neighbor count; use inference='none'."
                 )
-            raise NotImplementedError(
-                "Abadie-Imbens analytical variance and the adjustment for supplied "
-                "propensity-score estimation are not implemented; use inference='none' "
-                "for the audited point-estimation slice."
+            if propensity_score_status != "known":
+                raise NotImplementedError(
+                    "Abadie-Imbens inference currently requires a declared known/fixed "
+                    "propensity score. Estimated or cross-fitted scores require a "
+                    "first-step-specific variance adjustment; use inference='none'."
+                )
+            if self.caliper is not None or self.common_support is not None:
+                raise NotImplementedError(
+                    "Maintained Abadie-Imbens inference currently requires caliper=None "
+                    "and common_support=None so data-dependent selection does not change "
+                    "the target or variance contract."
+                )
+            (
+                variance,
+                normalized_variance,
+                conditional_variance_values,
+                conditional_variance_component,
+                effect_variance_component,
+            ) = _abadie_imbens_variance(
+                estimand=self.estimand,
+                estimate=estimate,
+                unit_effects=np.asarray(unit_effects),
+                outcome=outcome_values,
+                treatment=treatment_values,
+                metric=metric_values,
+                reuse_counts=comparison_reuse.to_numpy(dtype=float),
+                neighbors=self.neighbors,
+                variance_neighbors=self.variance_neighbors,
             )
+            standard_error = float(np.sqrt(variance))
+            if standard_error > 0.0:
+                statistic = estimate / standard_error
+                pvalue = float(2.0 * norm.sf(abs(statistic)))
+            elif estimate == 0.0:
+                statistic = pvalue = float("nan")
+            else:
+                statistic = float(np.sign(estimate) * np.inf)
+                pvalue = 0.0
+            inference_distribution = "normal"
 
         focal_target = np.isin(treatment_values, focal_arms)
         changed_target = bool(
@@ -599,15 +844,34 @@ class NearestNeighborMatch:
             notes.append("No common-support restriction was imposed.")
         if changed_target:
             notes.append("Support or caliper exclusions changed the realized target population.")
+        if self.inference == "abadie_imbens":
+            notes.append(
+                "Analytical variance conditions on the supplied score as known/fixed and "
+                "assumes independent sampling units."
+            )
+        assumptions = [
+            "Treatment consistency",
+            "No interference",
+            "Conditional exchangeability given measured pre-treatment covariates",
+            "Positivity in the realized target population",
+            "The supplied propensity score is suitable for the declared design",
+        ]
+        if self.inference == "abadie_imbens":
+            assumptions.extend(
+                [
+                    "The supplied scalar score is known/fixed rather than estimated in this sample",
+                    "Independent sampling units and fixed-neighbor replacement asymptotics",
+                ]
+            )
         match_table = match_table_internal.copy()
         matched_focal_mask = np.isin(np.arange(nobs), matched_focal_positions)
         caliper_unmatched_mask = np.isin(np.arange(nobs), caliper_unmatched_positions)
         original_focal_count = int(focal_target.sum())
         return NearestNeighborMatchResult(
             estimate=estimate,
-            standard_error=float("nan"),
-            statistic=float("nan"),
-            pvalue=float("nan"),
+            standard_error=standard_error,
+            statistic=statistic,
+            pvalue=pvalue,
             requested_estimand=self.estimand,
             realized_estimand=realized_estimand,
             target_population=target_population,
@@ -655,19 +919,29 @@ class NearestNeighborMatch:
             caliper_scale=self.metric,
             caliper_standard_deviation_ddof=1 if self.caliper == "auto" else None,
             propensity_provenance=propensity_provenance.strip(),
+            propensity_score_status=propensity_score_status,
             bias_correction=self.bias_correction,
             inference=self.inference,
-            inference_distribution=None,
+            variance=variance,
+            normalized_variance=normalized_variance,
+            conditional_variances=pd.Series(
+                conditional_variance_values,
+                index=index,
+                name="conditional_variance",
+            ),
+            conditional_variance_component=conditional_variance_component,
+            effect_variance_component=effect_variance_component,
+            variance_neighbors=self.variance_neighbors,
+            inference_distribution=inference_distribution,
             inference_df=None,
             notes=tuple(notes),
-            assumptions=(
-                "Treatment consistency",
-                "No interference",
-                "Conditional exchangeability given measured pre-treatment covariates",
-                "Positivity in the realized target population",
-                "The supplied propensity score is suitable for the declared design",
-            ),
+            assumptions=tuple(assumptions),
         )
 
 
-__all__ = ["MatchingEstimand", "NearestNeighborMatch", "NearestNeighborMatchResult"]
+__all__ = [
+    "MatchingEstimand",
+    "NearestNeighborMatch",
+    "NearestNeighborMatchResult",
+    "PropensityScoreStatus",
+]

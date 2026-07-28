@@ -23,13 +23,17 @@ effect-weight identities, comparison reuse, inclusive caliper and support bounda
 target-population relabeling, weighted balance, row-permutation invariance, and exact
 paired heterogeneous-effect recovery. Refusal tests cover invalid scores, alignment,
 empty matches, unsupported replacement/metrics/ties/bias correction, ordinary bootstrap,
-clustered inference, and the not-yet-certified analytical variance path. Changing outcomes
-while holding the design inputs fixed must not change selected matches.
+clustered inference, and unsupported analytical-variance paths. Changing outcomes while
+holding the design inputs fixed must not change selected matches.
 
-The point tests are necessary but not sufficient for inferential promotion. The reserved
-Abadie–Imbens path still requires hand-reconstructed reuse-aware variance, conditional-
-variance matching, score-provenance-specific first-step adjustment, coverage simulations,
-and aligned Stata/R evidence. Until those pass, matching results use `inference="none"`.
+The known-score Abadie-Imbens path has hand-reconstructed reuse-aware ATT, ATC, and ATE
+variance identities; exact same-arm conditional-variance values; a seeded ATE coverage
+smoke; and estimate/standard-error parity against CRAN `Matching` 4.10-15 commit
+`1208eaa7bfa888b1fc903481dddfb8c0dffa40d5`. It refuses estimated/cross-fitted scores,
+support/caliper selection, expanded design or variance ties, inadequate same-arm samples,
+and clustered inference. The estimated-propensity first-step adjustment remains open, so
+such scores must continue to use `inference="none"`. The Stata `teffects nnmatch` script
+is maintained but its manual output is not yet recorded.
 
 For DiD, maintained evidence must keep the conventional and efficient estimators
 separate. Conventional tests hand-compute every `ATT(g,t)`, event-time, calendar-time, and
@@ -250,6 +254,7 @@ Run marked evidence subsets explicitly when reviewing them:
 python -m pytest -m validation
 python -m pytest -m simulation
 python benchmarks/benchmark_matching.py --scenario balanced_ate --n 100000 --measure-memory
+python benchmarks/benchmark_matching.py --scenario known_score_ate_inference --n 100000 --measure-memory
 python benchmarks/benchmark_did.py --scenario all --n-entities 20000
 ```
 
@@ -258,6 +263,15 @@ Run pinned R `edid` parity from a checkout at the recorded commit:
 ```bash
 CAUSALKIT_EDID_REFERENCE=/path/to/edid python -m pytest tests/validation/test_edid_parity.py
 Rscript benchmarks/validate_edid_reference.R /path/to/edid
+```
+
+Run pinned R `Matching` parity from the CRAN mirror checkout at tag 4.10-15, then
+run the Stata script manually when Stata is available:
+
+```bash
+CAUSALKIT_MATCHING_REFERENCE=/path/to/Matching python -m pytest tests/validation/test_matching_parity.py
+Rscript benchmarks/validate_matching_reference.R /path/to/Matching
+stata -b do benchmarks/validate_matching_stata.do
 ```
 
 Run the README example in a clean installation and inspect both wheel and source

@@ -5,7 +5,7 @@ identification. Inclusion requires more than a method being common in applied ec
 the package must be able to state the estimand, identifying assumptions, supported data
 structure, inference target, diagnostics, and validation boundary.
 
-## Public `0.6.0a2` alpha surface
+## Public `0.6.0a3` alpha surface
 
 The surface is estimator-specific. Cross-sectional linear instrumental variables retain
 the following contract:
@@ -30,12 +30,13 @@ The stable label describes the intended API surface within this alpha, not a cla
 instrument validity or causal identification can be automated.
 
 The observational surface includes supplied-nuisance `IPWATE` and `AIPWATE`, reusable
-`CrossFitter` orchestration, and ATT/ATC/ATE target choices. The matching point alpha adds
+`CrossFitter` orchestration, and ATT/ATC/ATE target choices. The matching alpha adds
 `NearestNeighborMatch` for supplied logit-propensity distance with replacement, explicit
 support/caliper/tie rules, bidirectional ATE imputation, audit weights, reuse counts, and
-balance diagnostics. It does not yet supply sampling uncertainty: `inference="none"` is
-the default, while analytical, bootstrap, and clustered alternatives refuse rather than
-returning a methodologically incomplete standard error.
+balance diagnostics. `inference="none"` remains the default. A maintained Abadie-Imbens
+analytical path is available for a declared fixed score without support/caliper selection
+or expanded ties; estimated scores, bootstrap, and clustered alternatives refuse rather
+than returning a methodologically incomplete standard error.
 
 The DiD surface adds `DifferenceInDifferences` and `EfficientDiD` for balanced short
 panels. The conventional class retains never-treated/not-yet-treated comparison choices;
@@ -131,7 +132,7 @@ and validation gates:
 
 | Family | Required design questions before promotion |
 | --- | --- |
-| Matching promotion | Reuse-aware analytical variance, estimated-propensity adjustment, external parity, OutputHub adaptation, and complete performance evidence |
+| Matching promotion | Estimated-propensity adjustment, recorded Stata parity, and remaining publication-scale sensitivity/coverage evidence |
 | DiD promotion | Pre-trend/Hausman diagnostics, repeated cross-sections, publication-scale coverage, covariate performance, and broader parity |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
 | Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |
@@ -140,10 +141,10 @@ Roadmap status is not an implementation promise. A family remains experimental o
 until its public contract, failure behavior, tests, independent reference evidence, and
 documentation are complete.
 
-The normative matching decisions and point-alpha boundary are recorded in
-[Nearest-neighbor matching contract](MATCHING_CONTRACT.md). The exported estimator is
-implemented for audited point estimation only and is not a claim that the full matching
-promotion gates have passed.
+The normative matching decisions and fixed-score inferential boundary are recorded in
+[Nearest-neighbor matching contract](MATCHING_CONTRACT.md). The exported estimator has an
+audited point path and a narrower known-score analytical path; this is not a claim that the
+full estimated-score matching promotion gates have passed.
 
 The conventional/efficient distinction, timing rules, formulas, covariate nuisance path,
 and inference boundaries are recorded in [Difference-in-differences contract](DID_CONTRACT.md).
