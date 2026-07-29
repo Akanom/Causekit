@@ -35,6 +35,8 @@ PUBLIC_EXPORTS = {
     "DifferenceInDifferences",
     "EfficientDiD",
     "DiDResult",
+    "PartiallyLinearDML",
+    "PartiallyLinearDMLResult",
     "confint",
     "fitted_values",
     "predict",
@@ -78,6 +80,8 @@ def test_distribution_and_import_namespace_are_causekit_only() -> None:
     metadata = (repository_root / "pyproject.toml").read_text(encoding="utf-8")
 
     assert 'name = "causekit"' in metadata
+    assert 'version = "0.7.0a1"' in metadata
+    assert causekit.__version__ == "0.7.0a1"
     assert (repository_root / "src" / "causekit" / "__init__.py").is_file()
     assert not (repository_root / "src" / "causalkit").exists()
 
@@ -133,6 +137,12 @@ def test_estimator_signatures_keep_identification_inputs_explicit() -> None:
     assert efficient_did.parameters["covariance"].default == "robust"
     assert efficient_did.parameters["inference"].default == "analytic"
     assert efficient_did.parameters["nuisance_probability_floor"].default == 1e-6
+
+    partially_linear_dml = inspect.signature(causekit.PartiallyLinearDML)
+    assert partially_linear_dml.parameters["outcome_factory"].default is None
+    assert partially_linear_dml.parameters["treatment_factory"].default is None
+    assert partially_linear_dml.parameters["n_splits"].default == 5
+    assert partially_linear_dml.parameters["covariance"].default == "robust"
 
 
 def test_fit_returns_the_public_result_type() -> None:

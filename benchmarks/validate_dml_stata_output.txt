@@ -1,0 +1,14 @@
+artifact=causekit_partially_linear_dml_stata_parity
+causekit_version=0.7.0a1
+contract=fixed_oof_nuisance_residual_regression_hc1
+stata_version=17
+stata_flavor=IC
+nobs=                    8
+tolerance= 1.00000000000000e-10
+estimate=   1.7500000000000002
+expected_estimate=                 1.75
+estimate_status=pass
+standard_error=  .074101032131563133
+expected_standard_error=  .074101032131563188
+standard_error_status=pass
+parity_status=pass

@@ -1,9 +1,9 @@
 """Run CauseKit's model families on four pinned, real datasets.
 
-The workflow covers real-data IV, randomized, observational, matching, conventional
-DiD, and efficient-DiD paths. Network access is opt-in, HTTPS-only, and followed by an
-exact SHA-256 check. Source files are cached outside the repository and are not
-redistributed by CauseKit.
+The workflow covers real-data IV, randomized, observational, matching, native causal ML,
+conventional DiD, and efficient-DiD paths. Network access is opt-in, HTTPS-only, and
+followed by an exact SHA-256 check. Source files are cached outside the repository and are
+not redistributed by CauseKit.
 
 Install the validation extra before running because the nuisance examples use
 ``statsmodels``::
@@ -29,6 +29,7 @@ from causekit import (
     DifferenceInDifferences,
     EfficientDiD,
     NearestNeighborMatch,
+    PartiallyLinearDML,
     RandomizedATE,
 )
 from causekit.datasets import REAL_DATASETS, load_real_dataset
@@ -151,9 +152,18 @@ def _observational_workflow(data: pd.DataFrame) -> None:
         propensity_score_status="estimated",
         propensity_provenance="five_fold_statsmodels_logit",
     )
+    dml = PartiallyLinearDML(n_splits=5, random_state=20_260_729).fit(
+        outcome,
+        treatment=treatment,
+        covariates=covariates,
+    )
     print("\nObservational effects — maternal smoking and birthweight")
     print(pd.concat([ipw.summary_frame(), aipw.summary_frame()], keys=["IPW", "AIPW"]))
     print(matched.summary_frame().rename(index={"att": "matching_att"}).to_string())
+    print("\nCauseKit-native partially linear DML")
+    print(dml.summary_frame().to_string())
+    print("The DML coefficient is an ATE only under a constant-effect partially linear")
+    print("model and the documented exchangeability, variation, and nuisance conditions.")
     print("Matching uncertainty is intentionally absent: cross-fitted scores do not satisfy")
     print("CauseKit's narrow full-sample Logit-MLE analytical-inference contract.")
 

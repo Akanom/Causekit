@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "causekit"
-version = "0.6.0a4"
+version = "0.7.0a1"
 description = "Identification-aware causal inference and instrumental-variable workflows for Python."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,6 +14,8 @@ authors = [{ name = "Oluwajuwon Mayomi Akanbi" }]
 maintainers = [{ name = "Oluwajuwon Mayomi Akanbi" }]
 keywords = [
   "causal inference",
+  "causal machine learning",
+  "double machine learning",
   "econometrics",
   "instrumental variables",
   "randomized experiments",

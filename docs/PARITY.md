@@ -37,6 +37,16 @@ uses different estimands or moments. Neither counts as a pass.
 | Conventional staggered DiD | hand/influence identities pass | real hospital group-time/influence contract passes | Stata/IC 17 same group-time/influence contract passes; `didregress` common-effect aggregation is non-comparable | pass for aligned contract |
 | Efficient DiD, no covariates | native result checked on fixture and real data | pinned public `edid` commit passes fixture and real hospital data | unavailable: Stata heterogeneous DiD does not implement PT-All optimal weighting | pass for available aligned comparator |
 | Efficient DiD, covariate adjusted | deterministic equation, refusal, and simulation evidence pass | unavailable: pinned public `edid` explicitly excludes covariates | unavailable: no identified Chen–Sant'Anna–Xie PT-All implementation | internal validation; external unavailable |
+| `PartiallyLinearDML` residual stage | hand score plus independent Statsmodels HC1 pass | base R 4.5.1 matrix/HC1 contract passes | reviewed Stata/IC 17 no-intercept HC1 contract passes | pass |
+
+The DML parity fixture fixes already out-of-fold nuisance predictions and compares the
+aligned residual-on-residual coefficient and HC1 standard error. It validates the public
+orthogonal-score second stage, not another ecosystem's sample splitting or native
+nuisance learner. `benchmarks/validate_dml_reference.R` passes under R 4.5.1. The manual
+Stata harness is `benchmarks/validate_dml_stata.do`; its reviewed Stata/IC 17 output is
+`benchmarks/validate_dml_stata_output.txt`. The estimate difference is
+`2.220446049250313e-16` and the standard-error difference is
+`5.551115123125783e-17`, both below the declared `1e-10` tolerance.
 
 The no-covariate efficient-DiD R harness is
 `benchmarks/validate_edid_reference.R`; its maintained fixture compares every candidate

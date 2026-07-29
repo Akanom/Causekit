@@ -5,7 +5,7 @@ identification. Inclusion requires more than a method being common in applied ec
 the package must be able to state the estimand, identifying assumptions, supported data
 structure, inference target, diagnostics, and validation boundary.
 
-## Public `0.6.0a4` alpha surface
+## Public `0.7.0a1` alpha surface
 
 The surface is estimator-specific. Cross-sectional linear instrumental variables retain
 the following contract:
@@ -49,6 +49,14 @@ clustered pointwise inference, optional multiplier-bootstrap simultaneous event-
 bands, and OutputHub tables. Efficient DiD is an opt-in stronger-assumption estimator,
 not a replacement default.
 
+The causal-ML surface adds `PartiallyLinearDML` for the scalar DML2 coefficient in a
+declared constant-effect partially linear model. CauseKit owns its default standardized
+ridge-GCV nuisance learner, performs selection independently inside each outer training
+fold, and exposes aligned predictions, residuals, fold assignments, orthogonal scores,
+influence functions, HC1/CR1 inference, residual-treatment diagnostics, and OutputHub
+metadata. Optional public nuisance factories remain available only when a design needs a
+different learner; they do not create a runtime dependency.
+
 ## Deliberate boundaries in this release
 
 The current alpha does not provide:
@@ -62,8 +70,12 @@ The current alpha does not provide:
 - weak-IV-robust confidence sets or a complete identification-robust testing suite;
 - heteroskedasticity-robust overidentification tests;
 - multiway clustering, general-purpose bootstrap inference, sampling weights, or survey design;
-- nonlinear IV, GMM beyond linear 2SLS, or control-function estimators; or
-- automatic discovery, selection, or validation of instruments.
+- nonlinear IV, GMM beyond linear 2SLS, or control-function estimators;
+- automatic discovery, selection, or validation of instruments;
+- heterogeneous treatment-effect learners, native causal forests, dose-response curves,
+  or policy learning; or
+- repeated cross-fitting, multiway clustered DML, survey weights, or DML bootstrap
+  inference.
 
 These exclusions protect a clear claim boundary. A feature is not silently approximated by
 a different statistic merely to fill a result field.
@@ -95,9 +107,10 @@ remain the responsibility of `causekit`.
 The first observational slice therefore consumes supplied propensity and potential-
 outcome predictions. `IPWATE` uses the Horvitz-Thompson ATE score; `AIPWATE` uses the
 augmented influence-function score. Both enforce exact row alignment and strict propensity
-support and expose weight effective sample sizes. Built-in nuisance fitting is deferred
-until a cross-fitting protocol can reuse transferred/public model infrastructure without
-duplicate estimators.
+support and expose weight effective sample sizes. Built-in propensity and arm-specific
+outcome fitting for IPW/AIPW remains separate from the specialized DML default; the latter
+owns only the native regression nuisance path required by its declared partially linear
+score.
 
 `CrossFitter` now provides that protocol boundary. It generates out-of-fold propensity and
 arm-specific outcome predictions from fresh model factories and supports fitted results
@@ -105,6 +118,11 @@ that either expose the default prediction methods or use explicit adapters. IPW/
 support the analysis-population ATE, treated-population ATT, and control-population ATC.
 This is orchestration, not ownership transfer: nuisance estimators remain in their proper
 packages.
+
+`PartiallyLinearDML` is the deliberate exception for a complete native causal-ML path. Its
+small ridge-GCV learner is implemented in CauseKit, selected within each outer fold, and
+subordinate to the DML score. This does not move sibling-package likelihood models into
+CauseKit or turn the package into a general-purpose prediction library.
 
 Matching inference uses a second, deliberately narrower protocol because the
 Abadie–Imbens first-step formula requires a regular full-sample parametric MLE rather than
@@ -141,6 +159,7 @@ and validation gates:
 | --- | --- |
 | Matching promotion | Remaining publication-scale sensitivity/coverage evidence; fixed-score and supported estimated-Logit Python/R/Stata evidence is recorded where estimand-aligned comparators exist |
 | DiD promotion | Pre-trend/Hausman diagnostics, repeated cross-sections, publication-scale coverage, covariate performance, and broader parity |
+| Causal ML promotion | Repeated-splitting sensitivity, broader real-data evidence, then separate R/DR-learner and heterogeneous-effect graphing contracts; aligned Python/R/Stata residual-stage parity is recorded |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
 | Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |
 
@@ -167,7 +186,8 @@ Generic prediction models, neural networks, unrestricted finite mixtures, Markov
 models, and limited-outcome likelihoods are also not added merely because they can appear
 inside a causal workflow. Nuisance models may eventually support an in-scope causal
 estimand, but their contract must be subordinate to that estimand and validated as part of
-the complete procedure.
+the complete procedure. The native ridge-GCV implementation is therefore an internal
+component of `PartiallyLinearDML`, not a general regression API.
 
 ## Promotion criteria
 

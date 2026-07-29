@@ -9,6 +9,7 @@ import pandas as pd
 from ..did import DiDResult
 from ..iv import IV2SLSResult
 from ..matching import NearestNeighborMatchResult
+from ..ml import PartiallyLinearDMLResult
 from ..observational import ObservationalATEResult
 from ..randomized import RandomizedATEResult
 
@@ -37,6 +38,7 @@ def to_outputhub_model(
         | ObservationalATEResult
         | DiDResult
         | NearestNeighborMatchResult
+        | PartiallyLinearDMLResult
     ),
     *,
     name: str | None = None,
@@ -51,11 +53,13 @@ def to_outputhub_model(
             ObservationalATEResult,
             DiDResult,
             NearestNeighborMatchResult,
+            PartiallyLinearDMLResult,
         ),
     ):
         raise TypeError(
             "result must be an IV2SLSResult, RandomizedATEResult, "
-            "ObservationalATEResult, DiDResult, or NearestNeighborMatchResult."
+            "ObservationalATEResult, DiDResult, NearestNeighborMatchResult, or "
+            "PartiallyLinearDMLResult."
         )
     RegressionModel = _regression_model_class()
     if isinstance(result, NearestNeighborMatchResult):
@@ -192,6 +196,42 @@ def to_outputhub_model(
             },
             source="causekit",
         )
+    if isinstance(result, PartiallyLinearDMLResult):
+        return RegressionModel(
+            name=name or "Partially linear DML",
+            depvar="outcome",
+            params=result.params.rename("coef"),
+            std_errors=result.standard_errors.rename("se"),
+            pvalues=result.pvalues.rename("pvalue"),
+            statistics={
+                "N": result.nobs,
+                "Outer folds": result.n_splits,
+                "Converged": result.converged,
+            },
+            diagnostics={
+                "Residual treatment second moment": (result.residual_treatment_second_moment),
+                "Residual treatment tolerance": result.residual_treatment_tolerance,
+                "Orthogonal score mean": result.orthogonal_score_mean,
+            },
+            metadata={
+                "estimator": result.estimator,
+                "estimand": result.estimand,
+                "backend": result.backend,
+                "covariance_type": result.covariance_type,
+                "inference_distribution": result.inference_distribution,
+                "n_clusters": result.n_clusters,
+                "n_splits": result.n_splits,
+                "random_state": result.random_state,
+                "treatment_kind": result.treatment_kind,
+                "native_nuisance": result.native_nuisance,
+                "outcome_model": result.outcome_model_name,
+                "treatment_model": result.treatment_model_name,
+                "nuisance_cross_fitted": True,
+                "causal_interpretation_requires_assumptions": True,
+                "assumptions": list(result.assumptions),
+            },
+            source="causekit",
+        )
     if isinstance(result, RandomizedATEResult):
         return RegressionModel(
             name=name or "Randomized ATE",
@@ -271,17 +311,20 @@ def add_to_outputhub(
         | ObservationalATEResult
         | DiDResult
         | NearestNeighborMatchResult
+        | PartiallyLinearDMLResult
     ),
     *,
     name: str | None = None,
 ) -> Any:
-    """Add an IV model and its first-stage diagnostics to an OutputHub."""
+    """Add a fitted causal model and any supported diagnostic tables to OutputHub."""
 
     if not hasattr(hub, "add_model"):
         raise TypeError("hub must provide an OutputHub-compatible add_model method.")
     model_name = name or (
         result.estimator.upper()
         if isinstance(result, ObservationalATEResult)
+        else "Partially linear DML"
+        if isinstance(result, PartiallyLinearDMLResult)
         else "Nearest-neighbor matching"
         if isinstance(result, NearestNeighborMatchResult)
         else "Efficient DiD"

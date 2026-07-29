@@ -53,6 +53,12 @@ must use HTTPS, follow only HTTPS redirects, write through a temporary file, mat
 release-pinned SHA-256 digest exactly, and fail closed on any mismatch. Verified files are
 cached outside the repository by default; they are never imported as package data.
 
+The native causal-ML default is implemented with NumPy inside CauseKit and does not load
+serialized estimators, execute provider code, or contact an external service. Supplying a
+custom nuisance factory executes user-provided Python by design; callers must treat that
+factory and any model artifacts it loads as trusted code. Optional benchmark comparators
+are development-only and are not imported by the installed native execution path.
+
 ## Dependency and release policy
 
 Runtime and optional dependencies use bounded compatibility ranges. Confirmed critical

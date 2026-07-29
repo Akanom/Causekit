@@ -46,6 +46,16 @@ passes the ATT/ATC/ATE point, known-variance, first-step, and final-standard-err
 components at `1e-8`; R `Matching` is non-comparable because it treats the supplied score
 as fixed.
 
+For partially linear DML, maintained tests reconstruct the DML2 coefficient, orthogonal
+score, influence function, residual-treatment Jacobian, HC1 covariance, cluster-summed CR1
+covariance, and reference distribution. They also verify shared binary-stratified folds,
+native fold-local ridge-GCV defaults, deterministic continuous-treatment recovery,
+alignment/factory/fold/cluster refusals, and numerical residual-treatment identification.
+Statsmodels and base R independently reproduce the fixed residual-stage coefficient and
+HC1 standard error. The manually executed Stata/IC 17 harness writes its result before
+asserting; the reviewed saved output passes both estimate and standard-error assertions at
+the declared `1e-10` tolerance.
+
 For DiD, maintained evidence must keep the conventional and efficient estimators
 separate. Conventional tests hand-compute every `ATT(g,t)`, event-time, calendar-time, and
 ESavg aggregation for both never-treated and not-yet-treated comparisons. Efficient tests
@@ -205,6 +215,8 @@ passing only after its tests have executed successfully in the recorded environm
 | Efficient DiD | Multiple pre-periods and auxiliary cohorts under PT-All | Candidate effects, inverse-covariance weights, efficient influence, singular refusal, R parity |
 | Covariate-efficient DiD | Multiple moments, valid/invalid overlap and covariance systems | OOF alignment, equation (4.4) scores, equation (3.12) weights, exact refusal boundaries |
 | DiD inference | Entity and higher-level clustered sampling | HC1/cluster score identities, pointwise metadata, robust/cluster max-t band identities |
+| Partially linear DML | Binary/continuous treatment, native/custom nuisance, robust/clustered inference | DML2 score, OOF fold alignment, native ridge-GCV, influence/Jacobian identities, strict weak-signal refusal |
+| Causal-ML performance | One hash-verified real dataset, one identically folded run per model | Estimate, standard error, OOF outcome/treatment RMSE, elapsed time, Python peak memory, versions, no runtime comparator dependency |
 
 ## Cross-software parity matrix
 
@@ -269,7 +281,13 @@ python benchmarks/benchmark_matching.py --scenario balanced_ate --n 100000 --mea
 python benchmarks/benchmark_matching.py --scenario known_score_ate_inference --n 100000 --measure-memory
 python benchmarks/benchmark_matching.py --scenario estimated_score_ate_inference --n 100000 --measure-memory
 python benchmarks/benchmark_did.py --scenario all --n-entities 20000
+python benchmarks/benchmark_ml.py --models all
+Rscript benchmarks/validate_dml_reference.R
 ```
+
+Stata is manual: from the repository root run
+`do "benchmarks/validate_dml_stata.do"`. The harness persists
+`benchmarks/validate_dml_stata_output.txt` before any parity assertion.
 
 Prepare and run the pinned real-data certificate against the exact R reference checkouts:
 

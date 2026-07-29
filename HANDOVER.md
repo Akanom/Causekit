@@ -18,7 +18,7 @@ future task can resume without reconstructing intent from chat history.
    fractional ties, effect/reuse weights, balance, strict refusals, deterministic recovery
    tests, and a reproducible benchmark harness.
 
-## Active milestone
+## Continued completed milestones
 
 6. `0.6.0a1` DiD alpha: conventional DiD remains a separate first-class estimator with
    never-treated or not-yet-treated comparisons. The Chen–Sant'Anna–Xie efficient
@@ -74,6 +74,15 @@ future task can resume without reconstructing intent from chat history.
     comparisons. The reviewed Stata/IC 17 saved-output certificate also passes every
     comparable family; efficient PT-All DiD remains explicitly unavailable in Stata.
 
+11. `0.7.0a1` native causal-ML alpha: `PartiallyLinearDML` implements the pooled DML2
+    score with shared `CrossFitter` folds, a CauseKit-owned standardized ridge-GCV default
+    fitted separately inside every outer training fold, HC1/one-way CR1 inference, strict
+    residual-treatment identification, full OOF audit records, OutputHub adaptation, and
+    a hash-verified Cattaneo real-data workflow. Hand, refusal, simulation, Statsmodels,
+    base-R 4.5.1, and manually executed Stata/IC 17 contracts pass. A one-run real-data
+    performance comparison records native and optional external learner results without
+    adding an ML dependency.
+
 ## Open promotion gates
 
 - Matching still defaults to `inference="none"`. Known-score reuse-aware inference and a
@@ -89,6 +98,9 @@ future task can resume without reconstructing intent from chat history.
   and a larger covariate benchmark remain open. Covariate-efficient external parity was
   audited: the pinned public R implementation has no covariate path and reviewed Stata
   estimators target different moments, so those cells remain explicitly unavailable.
+- R/DR learners, heterogeneous-effect diagnostics, and their materially useful graphing
+  contracts are not yet implemented. The partially linear DML residual-stage parity row
+  passes in Python, base R 4.5.1, and a reviewed manual Stata/IC 17 run.
 
 ## Required implementation patterns
 
@@ -100,8 +112,11 @@ future task can resume without reconstructing intent from chat history.
   receive fresh nuisance estimators from factories, and every reported nuisance prediction
   must be out of fold.
 - Do not copy binary, count, censoring, duration, or ordinal estimators into CauseKit.
-  Nuisance integration stays provider-neutral through protocols or explicit prediction
-  adapters; CauseKit has no LimitedDepKit runtime or validation dependency.
+  General nuisance integration stays provider-neutral through protocols or explicit
+  prediction adapters. The small native ridge-GCV learner is owned only as the default
+  component of `PartiallyLinearDML`, not as a general regression surface.
+- LimitedDepKit is owned by a separate agent/location. Do not inspect, edit, test, build,
+  commit, clean, or release that repository from this CauseKit worktree.
 - Do not claim that overlap diagnostics prove exchangeability, that AIPW repairs unmeasured
   confounding, or that clipping is an innocuous numerical operation.
 - Every model addition requires analytical identities, deterministic recovery,
@@ -110,14 +125,18 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Continue matching promotion from `docs/MATCHING_CONTRACT.md`: extend publication-scale
+1. Design the native heterogeneous-effect R-learner contract, including honest evaluation
+   and the CATE/calibration graphing surface, before implementation.
+2. Add the doubly robust learner only after its propensity, pseudo-outcome, honest second-
+   stage, and uncertainty contracts are settled.
+3. Continue matching promotion from `docs/MATCHING_CONTRACT.md`: extend publication-scale
    sensitivity/coverage evidence without weakening either analytical refusal boundary.
-2. Return to DiD for pre-trend/Hausman diagnostics, repeated cross-sections,
+4. Return to DiD for pre-trend/Hausman diagnostics, repeated cross-sections,
    publication-scale coverage, direct-ratio nuisance support if justified, and broader
    reference evidence.
-3. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
+5. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
    manipulation checks, bias correction, and local estimand.
-4. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
+6. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
    effects, and clustered covariance contracts.
 
 Continue to preserve the matching tie/inference, target-population, and no-quadratic-

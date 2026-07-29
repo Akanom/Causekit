@@ -20,6 +20,7 @@ from .matching import (
     NearestNeighborMatchResult,
     PropensityScoreStatus,
 )
+from .ml import PartiallyLinearDML, PartiallyLinearDMLResult
 from .observational import AIPWATE, IPWATE, ObservationalATEResult, OverlapDiagnostic
 from .postestimation import (
     confint,
@@ -55,6 +56,8 @@ __all__ = [
     "NearestNeighborMatch",
     "NearestNeighborMatchResult",
     "OutcomeResultProtocol",
+    "PartiallyLinearDML",
+    "PartiallyLinearDMLResult",
     "PropensityResultProtocol",
     "PropensityScoreStatus",
     "SarganTest",
@@ -72,4 +75,4 @@ __all__ = [
     "wald_test",
 ]
 
-__version__ = "0.6.0a4"
+__version__ = "0.7.0a1"

@@ -9,7 +9,7 @@ preparation use the same registry in `causekit.datasets`.
 | --- | --- | --- | --- |
 | `hsng` | 1980 U.S. Census state housing IV example | `https://www.stata-press.com/data/r19/hsng.dta` | `d19cd25299af57569d93d8f16b4f72d5ffc7f897c9247d8a8e5fddddef43ad11` |
 | `nsw_mixtape` | National Supported Work randomized job-training experiment | `https://raw.githubusercontent.com/scunning1975/mixtape/master/nsw_mixtape.dta` | `fc424cfc9d7861f4b95a6612f27c7e842671fea5a8612edcfe0273ee62e6f0a4` |
-| `cattaneo2` | Maternal smoking, birthweight, supplied-nuisance effects, and matching | `https://www.stata-press.com/data/r19/cattaneo2.dta` | `631e926eb9981828ba2e542b32c16ae08f336b9efa10621651a8a185405e0577` |
+| `cattaneo2` | Maternal smoking, birthweight, supplied-nuisance effects, matching, and native partially linear DML | `https://www.stata-press.com/data/r19/cattaneo2.dta` | `631e926eb9981828ba2e542b32c16ae08f336b9efa10621651a8a185405e0577` |
 | `hospdd` | Hospital procedure-adoption conventional and efficient DiD | `https://www.stata-press.com/data/r19/hospdd.dta` | `e3ae6451e89cb915c546ab772410046726f280ad7d117611376beb4f46a521bb` |
 
 Stata Press lists `hsng` for `ivregress`, `cattaneo2` for the `teffects` family, and
@@ -31,7 +31,8 @@ The workflow fits:
 
 - robust `IV2SLS` on the housing data;
 - unadjusted and Lin-adjusted `RandomizedATE` on NSW;
-- five-fold supplied-nuisance IPW/AIPW and point matching on `cattaneo2`; and
+- five-fold supplied-nuisance IPW/AIPW, point matching, and CauseKit-native partially
+  linear DML on `cattaneo2`; and
 - conventional and PT-All efficient DiD on an equal-hospital-weight panel constructed
   from `hospdd`.
 
@@ -39,6 +40,12 @@ It prints explicit interpretation boundaries. In particular, instrument diagnost
 not establish exclusion; the smoking analysis remains observational; cross-fitted
 matching is not given an unsupported analytical standard error; and PT-All efficient DiD
 is displayed beside the conventional estimator rather than replacing it.
+
+The real-data causal-ML workflow returned `theta=-225.350625` with robust standard error
+`22.439969` under the documented five-fold native ridge-GCV specification. This is a
+deterministic software smoke, not evidence that smoking is conditionally exchangeable or
+that a constant treatment effect is scientifically credible. The separate one-run
+performance record is [Causal-ML real-data performance](ML_BENCHMARK.md).
 
 ## Cross-language preparation
 

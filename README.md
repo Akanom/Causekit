@@ -1,11 +1,12 @@
 # CauseKit
 
 CauseKit (installed and imported as `causekit`) is an identification-aware Python package for causal inference and
-instrumental-variable workflows. The `0.6.0a4` surface provides linear two-stage least
+instrumental-variable workflows. The `0.7.0a1` surface provides linear two-stage least
 squares, randomized-experiment effects, reusable nuisance cross-fitting, IPW/AIPW ATE,
 ATT, and ATC, scalar propensity-score matching with separate fixed- and estimated-score
 analytical inference paths, conventional staggered DiD, and cross-fitted covariate-adjusted
-Chen-Sant'Anna-Xie efficient DiD for short panels.
+Chen-Sant'Anna-Xie efficient DiD for short panels, and CauseKit-native partially linear
+double machine learning.
 
 This is alpha research software. A successful fit is not evidence that an instrument is
 valid, and an IV coefficient is not automatically an average treatment effect. State the
@@ -94,6 +95,38 @@ regression tasks. Those operations let panel estimators request cohort-specific 
 changes and conditional second moments without owning or copying model implementations.
 Every task receives a fresh model per fold. A separate `second_moment_factory=` is
 optional; when omitted, the outcome factory is reused.
+
+### Native causal machine learning
+
+`PartiallyLinearDML` estimates the DML2 orthogonal-score coefficient for a binary or
+continuous scalar treatment. Its default nuisance path is CauseKit's own dependency-free,
+standardized ridge learner with generalized-cross-validation selection nested separately
+inside each outer training fold.
+
+```python
+from causekit import PartiallyLinearDML
+
+dml = PartiallyLinearDML(
+    n_splits=5,
+    random_state=2026,
+    covariance="robust",
+).fit(
+    outcome,
+    treatment=treatment,
+    covariates=baseline_covariates,
+)
+
+print(dml.summary_frame())
+print(dml.nuisance_predictions)
+print(dml.residual_treatment_second_moment)
+```
+
+CauseKit imports no third-party ML implementation for this path. Optional outcome and
+treatment factories can replace either native nuisance learner when substantively
+necessary, while `CrossFitter` retains the shared out-of-fold plan. The reported `theta`
+is an ATE only under a credible constant-effect partially linear model, consistency, no
+interference, conditional exchangeability, residual treatment variation, and the DML
+nuisance-rate/regularity conditions. See the [causal-ML contract](docs/ML_CONTRACT.md).
 
 ### Nearest-neighbor matching
 
@@ -291,7 +324,7 @@ attrition correction, or multi-arm experiments.
 From PyPI after publication:
 
 ```bash
-python -m pip install causekit==0.6.0a4
+python -m pip install causekit==0.7.0a1
 ```
 
 From a source checkout:
@@ -311,9 +344,10 @@ Python 3.10 through 3.13 is supported by the package metadata.
 ## Real-world workflow
 
 The runnable workflow covers IV, randomized effects, cross-fitted IPW/AIPW, matching,
-conventional DiD, and efficient DiD on four pinned real datasets. The project does not
-redistribute the source files: downloads are opt-in, HTTPS-only, cached outside the
-repository, and checked against release-pinned SHA-256 digests.
+native partially linear DML, conventional DiD, and efficient DiD on four pinned real
+datasets. The project does not redistribute the source files: downloads are opt-in,
+HTTPS-only, cached outside the repository, and checked against release-pinned SHA-256
+digests.
 
 ```bash
 python -m pip install -e ".[validation]"
@@ -519,6 +553,9 @@ score inference smokes are implemented, with fixed-score parity against pinned R
 checked against `statsmodels` and a reviewed Stata/IC 17 `teffects psmatch` fixture. DiD
 promotion includes cross-fitted covariate nuisances and simultaneous
 event-study bands; pre-trend/Hausman diagnostics and repeated cross-sections remain.
+The causal-ML alpha starts with native partially linear DML; R- and DR-learner contracts,
+heterogeneous-effect diagnostics, and graphing are next-stage candidates rather than
+placeholder APIs.
 Available aligned Python/R/Stata parity rows are recorded, while unavailable comparator
 cells remain explicit. Later releases may add regression discontinuity and panel IV. Each family
 must define its estimand, assumptions, failure behavior, diagnostics, and independent

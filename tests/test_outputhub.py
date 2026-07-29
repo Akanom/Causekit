@@ -11,6 +11,7 @@ from causekit import (
     IV2SLS,
     DifferenceInDifferences,
     NearestNeighborMatch,
+    PartiallyLinearDML,
     RandomizedATE,
     add_to_outputhub,
     to_outputhub_model,
@@ -106,6 +107,26 @@ def test_observational_ate_converts_without_reestimating_nuisance_models() -> No
     assert model.metadata["estimand"] == "ate"
     assert model.metadata["nuisance_predictions_supplied"] is True
     assert model.params.index.tolist() == ["ate"]
+
+
+def test_partially_linear_dml_converts_without_reestimating_nuisance_models() -> None:
+    rng = np.random.default_rng(104)
+    covariates = pd.DataFrame(rng.normal(size=(180, 3)), columns=["a", "b", "c"])
+    treatment = 0.4 * covariates["a"] + rng.normal(size=len(covariates))
+    outcome = 1.6 * treatment + 0.5 * covariates["b"] + rng.normal(size=len(covariates))
+    result = PartiallyLinearDML(n_splits=3, random_state=17).fit(
+        outcome, treatment=treatment, covariates=covariates
+    )
+
+    model = to_outputhub_model(result)
+
+    assert model.metadata["estimator"] == "partially_linear_dml2"
+    assert model.metadata["native_nuisance"] is True
+    assert model.metadata["nuisance_cross_fitted"] is True
+    assert model.params.index.tolist() == ["theta"]
+    hub = outputhub.OutputHub("Causal ML")
+    add_to_outputhub(hub, result)
+    assert len(hub.models) == 1
 
 
 def test_did_converts_and_adds_auditable_effect_tables() -> None:

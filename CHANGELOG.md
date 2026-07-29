@@ -4,6 +4,44 @@ All notable changes to CauseKit are recorded here. The project follows
 [Semantic Versioning](https://semver.org/) once a public contract is released. Alpha
 versions may refine APIs, but breaking changes must still be documented explicitly.
 
+## [0.7.0a1] - Unreleased
+
+### Added
+
+- `PartiallyLinearDML` and `PartiallyLinearDMLResult` for DML2 estimation of the scalar
+  treatment coefficient in a declared partially linear structural model.
+- A CauseKit-owned, dependency-free standardized ridge nuisance learner with
+  generalized-cross-validation penalty selection performed separately inside every
+  outer training fold.
+- Shared-fold outcome/treatment nuisance tasks through `CrossFitter`, exact binary-arm
+  stratification, aligned prediction/residual/fold audit records, HC1 and one-way CR1
+  influence inference, and scale-aware residual-treatment identification refusal.
+- Hand-reconstructed score/influence/variance contracts, deterministic simulation,
+  strict refusal tests, Statsmodels, base-R 4.5.1, and reviewed Stata/IC 17
+  residual-stage parity, OutputHub adaptation, and a pinned real-data workflow smoke.
+- A one-run hash-verified Cattaneo real-data benchmark comparing the native learner with
+  scikit-learn RidgeCV, histogram gradient boosting, and random forest without adding a
+  runtime dependency.
+
+### Architecture
+
+- The native causal-ML path owns its default nuisance learner and does not depend on a
+  third-party ML package. Existing public nuisance factories remain optional escape
+  hatches for designs that need another learner.
+- The scalar coefficient is labelled `theta`, not automatically `ATE`; its causal
+  interpretation requires the constant-effect partially linear model plus the documented
+  exchangeability, variation, and nuisance-rate assumptions.
+- Heterogeneous-effect R/DR learners and graphing remain later contract-first milestones.
+
+### Known limitations
+
+- The alpha does not provide heterogeneous treatment effects, dose-response curves,
+  endogenous-treatment DML, repeated cross-fitting, multiway clustering, sample weights,
+  bootstrap inference, or native causal forests.
+- The deterministic Python, base-R, and manually executed Stata parity rows pass for the
+  aligned fixed-OOF residual stage; they do not compare nuisance-learning algorithms.
+- A single comparator benchmark is descriptive, not a model ranking or coverage study.
+
 ## [0.6.0a4] - Unreleased
 
 ### Breaking change
