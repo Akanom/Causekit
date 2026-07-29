@@ -166,6 +166,22 @@ future task can resume without reconstructing intent from chat history.
     10 controls and the narrow caliper removes three more control focal units. Settled
     R/Stata parity and 100,000-row performance artifacts were not rerun.
 
+19. `0.7.0a5` DiD diagnostic contract: no-covariate panel results now expose adjacent
+    uncontaminated cohort-period pre-trend placebos, complete entity influence/covariance
+    records, and robust chi-square or cluster-summed finite-cluster F joint tests. No-lead
+    and singular cases are explicit and receive no numerical repair. The public Hausman
+    diagnostic compares the common post-treatment event-study vector under aligned
+    never-treated PT-Post and no-covariate PT-All fits, using the covariance of the
+    difference influence function and strict design fingerprints. A separate repeated-
+    cross-section contract freezes observation/PSU scores, stationary-composition
+    semantics, refusals, phased CrossFitter integration, parity targets, coverage, and
+    performance gates without exporting a placeholder estimator. A nonlinear-only
+    Hillstrom real-data smoke was rerun without the settled linear row: the adaptive spline
+    stage reproduced the frozen honest metrics and explicitly selected the zero-knot
+    linear submodel. A new conversion-outcome comparison selected one knot but had 0.0019%
+    higher honest R-loss than linear ridge; neither stage beat the construction-fitted
+    constant, so no nonlinear performance gain is claimed.
+
 ## Open promotion gates
 
 - Matching still defaults to `inference="none"`. Known-score reuse-aware inference and a
@@ -178,14 +194,17 @@ future task can resume without reconstructing intent from chat history.
 - Efficient DiD owns no nuisance model classes. The implemented covariate path must keep
   consuming public cross-fitting factories; direct density-ratio regression remains a
   possible future stability enhancement over ratios of multiclass probabilities.
-- Pre-trend/Hausman diagnostics, repeated-cross-section DiD, publication-scale coverage,
-  and a larger covariate benchmark remain open. Covariate-efficient external parity was
+- Repeated-cross-section DiD implementation, publication-scale coverage, and a larger
+  covariate benchmark remain open. The covariate-adjusted path still needs an aligned
+  conditional pre-trend diagnostic. Covariate-efficient external parity was
   audited: the pinned public R implementation has no covariate path and reviewed Stata
   estimators target different moments, so those cells remain explicitly unavailable.
 - The R-learner alpha is public with honest evaluation, calibration, groups, bands, graph
   data, simulations, base-R/Stata parity, performance, native nonlinear support, and two
-  real-data CATE records. Repeated splits, unit-level intervals, RATE, policy evaluation,
-  and deployment refitting remain separate future contracts. The partially linear
+  real-data CATE records. The next native nonlinear stage is frozen as a separate
+  construction-cross-fitted orthogonal-stack contract; no placeholder is exported and the
+  current linear default is unchanged. Repeated splits, unit-level intervals, RATE, policy
+  evaluation, and deployment refitting remain separate future contracts. The partially linear
   DML residual-stage parity row passes in Python, base R 4.5.1, and reviewed Stata/IC 17.
 - The DR-learner alpha is a separate public estimator, not an R-learner alias. Its Python
   hand/simulation gates and base-R fixed-evaluation parity pass. One-run NSW evidence is
@@ -217,9 +236,9 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Return to DiD for pre-trend/Hausman diagnostics, repeated cross-sections,
-   publication-scale coverage, direct-ratio nuisance support if justified, and broader
-   reference evidence.
+1. Implement repeated-cross-section DiD from its frozen contract, then return to
+   publication-scale DiD coverage, direct-ratio nuisance support if justified, the
+   conditional covariate pre-trend score, and broader reference evidence.
 2. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
    manipulation checks, bias correction, and local estimand.
 3. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed

@@ -278,9 +278,20 @@ Analytic intervals are pointwise. Robust inference treats the panel entity as th
 sampling unit; higher-level clustered inference assumes independent clusters and many
 clusters. The optional multiplier max-t path supplies a simultaneous band across the
 reported event-study coordinates, with multipliers drawn at the declared sampling level.
-It does not validate PT-All or turn a pre-trend plot into an identification test. The
-current alpha has no pre-trend test, Hausman test, or repeated-cross-section
-interpretation, and refuses those unsupported paths.
+
+The no-covariate panel results expose adjacent, uncontaminated cohort-period pre-trend
+placebos and a joint test. A two-period design can have no testable placebo, and a singular
+joint covariance is reported as unavailable without repairing or dropping moments.
+Failure to reject is not evidence that parallel trends holds. The separate
+`did_hausman_test` compares aligned no-covariate PT-All and PT-Post post-treatment
+event-study vectors using the influence function of their difference. Rejection weighs
+against the additional PT-All restrictions; non-rejection does not prove them or justify
+mechanical estimator selection.
+
+Neither panel class has a repeated-cross-section interpretation. That design requires
+observation-level influence functions and an explicit stationarity or composition-change
+contract; the frozen implementation plan is documented separately and no estimator
+placeholder is exported.
 
 ## Honest heterogeneous effects
 

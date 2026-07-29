@@ -8,7 +8,13 @@ Example:
 
     python benchmarks/benchmark_rlearner_hillstrom.py \
         --data path/to/Kevin_Hillstrom_...csv \
-        --output causekit-rlearner-hillstrom-v1.json
+        --model spline \
+        --output causekit-rlearner-hillstrom-spline-smoke.json
+
+Omit ``--model`` for the original two-row linear/nonlinear certificate. Use
+``--model spline`` for a native nonlinear-only smoke without rerunning the settled linear
+row. ``--outcome conversion`` exercises a real binary outcome for which the maintained
+construction split selects a nonzero spline knot count.
 """
 
 from __future__ import annotations
@@ -38,6 +44,7 @@ MODEL_NAMES = (
     "causekit_native_weighted_ridge_gcv",
     "causekit_native_spline_ridge_gcv",
 )
+OUTCOME_NAMES = ("visit", "conversion", "spend")
 REQUIRED_COLUMNS = (
     "recency",
     "history",
@@ -47,7 +54,6 @@ REQUIRED_COLUMNS = (
     "newbie",
     "channel",
     "segment",
-    "visit",
 )
 
 
@@ -59,11 +65,14 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _prepare_hillstrom(data: pd.DataFrame) -> dict[str, Any]:
-    missing = [name for name in REQUIRED_COLUMNS if name not in data.columns]
+def _prepare_hillstrom(data: pd.DataFrame, *, outcome: str = "visit") -> dict[str, Any]:
+    if outcome not in OUTCOME_NAMES:
+        raise ValueError(f"outcome must be one of {OUTCOME_NAMES}.")
+    required_columns = (*REQUIRED_COLUMNS, outcome)
+    missing = [name for name in required_columns if name not in data.columns]
     if missing:
         raise ValueError(f"Hillstrom source is missing required columns: {missing}.")
-    if data.loc[:, list(REQUIRED_COLUMNS)].isna().any().any():
+    if data.loc[:, list(required_columns)].isna().any().any():
         raise ValueError("Hillstrom design columns must not contain missing values.")
     observed_segments = set(data["segment"].astype(str))
     required_segments = {"Mens E-Mail", "Womens E-Mail", "No E-Mail"}
@@ -82,48 +91,65 @@ def _prepare_hillstrom(data: pd.DataFrame) -> dict[str, Any]:
     return {
         "covariates": covariates,
         "treatment": selected["segment"].eq("Mens E-Mail").astype(float),
-        "outcome": selected["visit"].astype(float),
+        "outcome": selected[outcome].astype(float),
     }
 
 
-def _design(path: Path) -> dict[str, Any]:
+def _design(path: Path, *, outcome: str = "visit") -> dict[str, Any]:
     observed_hash = _sha256(path)
     if observed_hash != SOURCE_SHA256:
         raise ValueError(
             "Hillstrom source SHA-256 mismatch: "
             f"expected {SOURCE_SHA256}, observed {observed_hash}."
         )
-    return _prepare_hillstrom(pd.read_csv(path))
+    return _prepare_hillstrom(pd.read_csv(path), outcome=outcome)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, required=True)
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--model",
+        choices=("linear", "spline", "both"),
+        default="both",
+        help="Run only the requested native final stage; 'both' preserves the certificate workflow.",
+    )
+    parser.add_argument(
+        "--outcome",
+        choices=OUTCOME_NAMES,
+        default="visit",
+        help="Hillstrom post-assignment outcome; conversion selects nonlinear complexity on the maintained split.",
+    )
     args = parser.parse_args()
-    design = _design(args.data)
+    design = _design(args.data, outcome=args.outcome)
+    selected_models = {
+        "linear": MODEL_NAMES[:1],
+        "spline": MODEL_NAMES[1:],
+        "both": MODEL_NAMES,
+    }[args.model]
     report = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "design": DESIGN_ID,
         "dataset": "hillstrom_email_rct",
         "dataset_source": f"kaggle:{SOURCE_REF}",
         "dataset_source_sha256": SOURCE_SHA256,
-        "outcome": "visit",
+        "outcome": args.outcome,
         "treatment": "Mens E-Mail versus No E-Mail",
         "excluded_arm": "Womens E-Mail",
         "covariates": list(design["covariates"].columns),
         "nobs": len(design["outcome"]),
         "benchmark_repetitions": 1,
         "comparison_policy": (
-            "one identical honest split per model; native nuisances fixed in specification; "
-            "only the native weighted CATE learner changes"
+            "one identical honest split per selected model; native nuisances fixed in "
+            "specification; only the native weighted CATE learner changes"
         ),
         "python": platform.python_version(),
         "platform": platform.platform(),
         "causekit": causekit.__version__,
         "numpy": np.__version__,
         "pandas": pd.__version__,
-        "results": [_run_once(name, design) for name in MODEL_NAMES],
+        "results": [_run_once(name, design) for name in selected_models],
     }
     rendered = json.dumps(report, indent=2)
     print(rendered)

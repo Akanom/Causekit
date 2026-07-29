@@ -82,6 +82,14 @@ singular systems without hidden regularization. Anticipation, control contaminat
 balanced-panel validation, entity-level HC scaling, cluster-summed covariance, and random
 cohort-share influence terms require direct tests.
 
+Panel diagnostic tests hand-compute adjacent uncontaminated pre-period placebos, verify
+that anticipation-window leads are excluded, reconstruct the full robust and cluster-
+summed joint covariance, and retain individual placebos when a singular joint test is
+unavailable. The PT-All/PT-Post Hausman contract reconstructs the common post-treatment
+event-study difference influence function and covariance, hashes the complete estimation
+design, and refuses not-yet-treated, covariate-adjusted, mismatched, reduced-moment, and
+singular comparisons without pseudoinverse rank selection.
+
 The covariate path additionally requires exact shared-fold alignment across multiclass
 cohort probabilities, masked outcome-change tasks, and residual-product second-moment
 tasks; a multi-moment fixture must exercise observation-specific conditional covariance
@@ -232,6 +240,7 @@ passing only after its tests have executed successfully in the recorded environm
 | Efficient DiD | Multiple pre-periods and auxiliary cohorts under PT-All | Candidate effects, inverse-covariance weights, efficient influence, singular refusal, R parity |
 | Covariate-efficient DiD | Multiple moments, valid/invalid overlap and covariance systems | OOF alignment, equation (4.4) scores, equation (3.12) weights, exact refusal boundaries |
 | DiD inference | Entity and higher-level clustered sampling | HC1/cluster score identities, pointwise metadata, robust/cluster max-t band identities |
+| DiD diagnostics | Clean/no-clean/singular pre-period paths; aligned/misaligned PT-All and PT-Post | Placebo influence/covariance identities, anticipation exclusion, strict Hausman difference-IF/refusal contract |
 | Partially linear DML | Binary/continuous treatment, native/custom nuisance, robust/clustered inference | DML2 score, OOF fold alignment, native ridge-GCV, fold tuning audit, direct GCV identity, influence/Jacobian identities, strict weak-signal refusal |
 | Honest R-learner | Binary treatment, row/cluster honesty, native/custom learners, overlap, robust/clustered calibration | Leakage/refusals, exact R-objective, held-out loss/constant gain, HC1/CR1 differential calibration, tie-preserving group moments/influence/max-t bands, simulations, R/Stata fixed-evaluation parity, real-data comparator record |
 | Causal-ML performance | One hash-verified real dataset, one identically folded run per model | Estimate, standard error, OOF outcome/treatment RMSE, elapsed time, Python peak memory, versions, no runtime comparator dependency |

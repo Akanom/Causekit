@@ -1,7 +1,7 @@
 # CauseKit
 
 CauseKit (installed and imported as `causekit`) is an identification-aware Python package for causal inference and
-instrumental-variable workflows. The `0.7.0a4` surface provides linear two-stage least
+instrumental-variable workflows. The `0.7.0a5` surface provides linear two-stage least
 squares, randomized-experiment effects, reusable nuisance cross-fitting, IPW/AIPW ATE,
 ATT, and ATC, scalar propensity-score matching with separate fixed- and estimated-score
 analytical inference paths, conventional staggered DiD, and cross-fitted covariate-adjusted
@@ -188,9 +188,16 @@ print(nonlinear.cate_diagnostics)  # selected knots, basis size, alpha, weighted
 It selects zero-, one-, or three-knot additive linear-spline bases and the ridge penalty
 using construction-only weighted GCV, then evaluates once on the honest role. Linear
 ridge-GCV remains the default: the nonlinear learner recovers a known piecewise effect in
-simulation, safely matches linear performance on the Hillstrom randomized-email data, and
-is worse on the separate NSW split. Pairwise interactions are explicit opt-in and a strict
+simulation, matches linear performance on the Hillstrom visit outcome through its zero-
+knot fallback, is slightly worse after selecting one knot for Hillstrom conversion, and is
+worse on the separate NSW split. Pairwise interactions are explicit opt-in and a strict
 basis-size ceiling prevents accidental feature explosion.
+
+The next nonlinear stage is design-only: a construction-cross-fitted orthogonal stack of
+constant, linear, feature-adaptive additive, and strong-heredity interaction candidates.
+It will not replace the default until it passes the frozen correctness, leakage,
+semisynthetic known-truth, real randomized-outcome, comparator, and performance gates in
+the [native nonlinear CATE promotion contract](docs/NONLINEAR_CATE_PROMOTION_CONTRACT.md).
 
 `DRLearner` is a separately contracted heterogeneous-effect estimator. It cross-fits the
 propensity and both treatment-arm outcome regressions inside construction, forms the
@@ -331,7 +338,7 @@ inverse-covariance weights. It is not a silent default because PT-All is stronge
 conventional post-treatment parallel-trends contract.
 
 ```python
-from causekit import DifferenceInDifferences, EfficientDiD
+from causekit import DifferenceInDifferences, EfficientDiD, did_hausman_test
 
 conventional = DifferenceInDifferences(
     control_group="never_treated",
@@ -343,6 +350,15 @@ conventional = DifferenceInDifferences(
     time="period",
     treatment_time="first_treated",
 )
+
+pt_all_no_covariates = EfficientDiD(pre_periods="all").fit(
+    panel,
+    outcome="outcome",
+    entity="unit",
+    time="period",
+    treatment_time="first_treated",
+)
+hausman = did_hausman_test(conventional, pt_all_no_covariates)
 
 cross_fitter = CrossFitter(
     propensity_factory=make_multiclass_cohort_model,
@@ -369,6 +385,10 @@ efficient = EfficientDiD(
 
 print(conventional.group_time)
 print(conventional.event_study)
+print(conventional.pretrend.placebo_effects)
+print(conventional.pretrend.pvalue)
+print(hausman.event_study)
+print(hausman.pvalue)
 print(efficient.efficiency_weights)
 print(efficient.simultaneous_event_study)
 ```
@@ -378,6 +398,13 @@ treatment time, and an explicit never-treated sentinel (positive infinity by def
 `anticipation=` moves the effective treatment boundary back by an integer number of
 periods. Robust inference treats the panel entity as the sampling unit; higher-level
 one-way clustering is available through `covariance="clustered"` and `cluster=`.
+
+The pre-trend diagnostic uses only adjacent changes ending before the declared treatment
+or anticipation boundary and jointly tests the retained cohort-period placebos. Failure
+to reject does not validate parallel trends. `did_hausman_test` compares the common
+post-treatment event-study path under aligned no-covariate PT-Post and PT-All results;
+it refuses mismatched samples and singular difference covariance rather than changing
+rank or applying a pseudoinverse.
 
 The covariate-efficient path forms cohort-density ratios from cross-fitted multiclass
 probabilities, estimates group-specific conditional outcome changes and residual-product
@@ -430,7 +457,7 @@ attrition correction, or multi-arm experiments.
 From PyPI after publication:
 
 ```bash
-python -m pip install causekit==0.7.0a4
+python -m pip install causekit==0.7.0a5
 ```
 
 From a source checkout:
@@ -659,8 +686,10 @@ score inference smokes are implemented, with fixed-score parity against pinned R
 checked against `statsmodels` and a reviewed Stata/IC 17 `teffects psmatch` fixture. The
 publication-scale ATT/ATC/ATE coverage and real-data sensitivity certificate passes
 without widening either analytical boundary. DiD
-promotion includes cross-fitted covariate nuisances and simultaneous
-event-study bands; pre-trend/Hausman diagnostics and repeated cross-sections remain.
+promotion includes cross-fitted covariate nuisances, simultaneous event-study bands,
+uncontaminated pre-trend placebos, and a PT-All/PT-Post Hausman diagnostic. The separate
+[repeated-cross-section design contract](docs/DID_REPEATED_CROSS_SECTION_CONTRACT.md) is
+frozen; its estimator, coverage, and external parity gates remain open.
 The causal-ML alpha includes native partially linear DML and separately contracted public
 [honest R-learner](docs/R_LEARNER_CONTRACT.md) and
 [honest DR-learner](docs/DR_LEARNER_CONTRACT.md) paths, with immutable

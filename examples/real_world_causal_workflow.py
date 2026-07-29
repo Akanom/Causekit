@@ -33,6 +33,7 @@ from causekit import (
     PartiallyLinearDML,
     RandomizedATE,
     RLearner,
+    did_hausman_test,
 )
 from causekit.datasets import REAL_DATASETS, load_real_dataset
 
@@ -246,6 +247,11 @@ def _did_workflow(data: pd.DataFrame) -> None:
     }
     conventional = DifferenceInDifferences().fit(panel, **fit_arguments)
     efficient = EfficientDiD(pre_periods="all").fit(panel, **fit_arguments)
+    try:
+        hausman = did_hausman_test(conventional, efficient)
+        hausman_message = f"PT-All versus PT-Post Hausman p-value: {hausman.pvalue}"
+    except ValueError as error:
+        hausman_message = f"PT-All versus PT-Post Hausman unavailable: {error}"
     results = pd.DataFrame(
         {
             "estimate": [conventional.estimate, efficient.estimate],
@@ -255,8 +261,14 @@ def _did_workflow(data: pd.DataFrame) -> None:
     )
     print("\nDifference-in-differences — hospital procedure adoption")
     print(results.to_string())
+    if conventional.pretrend.available:
+        print("Pre-trend joint p-value:", conventional.pretrend.pvalue)
+    else:
+        print("Pre-trend joint test unavailable:", conventional.pretrend.reason)
+    print(hausman_message)
     print("The efficient estimate is opt-in: it requires the stronger PT-All restriction;")
     print("it does not replace the conventional post-treatment parallel-trends analysis.")
+    print("Neither failure to reject is proof of parallel trends or a model-selection rule.")
 
 
 def main() -> None:

@@ -4,6 +4,46 @@ All notable changes to CauseKit are recorded here. The project follows
 [Semantic Versioning](https://semver.org/) once a public contract is released. Alpha
 versions may refine APIs, but breaking changes must still be documented explicitly.
 
+## [0.7.0a5] - Unreleased
+
+### Added
+
+- Public `DiDPretrendDiagnostic` results with adjacent uncontaminated cohort-period
+  placebos, full entity influence and covariance records, HC1 or cluster-summed joint
+  inference, explicit no-lead/singular availability status, and OutputHub reporting.
+- Public `did_hausman_test` and `DiDHausmanDiagnostic` for the common post-treatment
+  event-study vector under aligned no-covariate PT-Post and PT-All results. The test uses
+  the covariance of the difference influence function and refuses mismatched samples or
+  singular systems without rank changes or numerical repair.
+- A separately reasoned repeated-cross-section DiD contract covering the estimand,
+  stationary-composition declaration, observation/PSU sampling unit, planned CrossFitter
+  boundary, refusals, parity targets, performance, and promotion tests. No estimator
+  placeholder is exported.
+- A backward-compatible Hillstrom benchmark selector can run only the native spline stage,
+  avoiding unnecessary repetition of the settled linear row. The `0.7.0a5` nonlinear-only
+  visit smoke reproduced the frozen metrics and selected the zero-knot linear submodel;
+  the new conversion-outcome comparison selected one knot but did not improve honest
+  R-loss over linear ridge or the construction-fitted constant.
+- A design-only `NativeOrthogonalStackedCATE` promotion contract freezes direct R-loss,
+  construction-side cross-fitted simplex stacking, constant/linear/additive/interaction
+  candidates, hard complexity limits, known-truth semisynthetic gates, external comparator
+  evidence, and strict honest-evaluation non-leakage. No placeholder is exported.
+
+### Changed
+
+- DiD results now retain a deterministic design fingerprint and aligned inference-cluster
+  labels so cross-estimator diagnostics cannot silently compare different samples.
+- The package version and public documentation now identify `0.7.0a5`; conventional and
+  efficient DiD point estimators and matching inference remain unchanged.
+
+### Known limitations
+
+- The covariate-adjusted PT-All path does not yet expose a conditional pre-trend score,
+  and the maintained Hausman diagnostic is limited to the aligned no-covariate,
+  never-treated PT-Post comparison.
+- Repeated-cross-section DiD remains design-complete but unimplemented. Publication-scale
+  DiD coverage, larger covariate performance, and broader covariate parity remain open.
+
 ## [0.7.0a4] - Unreleased
 
 ### Added

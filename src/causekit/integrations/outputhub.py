@@ -146,6 +146,15 @@ def to_outputhub_model(
                 "Group-time effects": len(result.group_time),
                 "Event-time effects": len(result.event_study),
                 "Negative efficiency weights": negative_weights,
+                "Pre-trend restrictions": result.pretrend.n_restrictions,
+                **(
+                    {
+                        "Pre-trend joint statistic": result.pretrend.statistic,
+                        "Pre-trend joint p-value": result.pretrend.pvalue,
+                    }
+                    if result.pretrend.available
+                    else {}
+                ),
             },
             metadata={
                 "estimator": result.method,
@@ -162,6 +171,8 @@ def to_outputhub_model(
                 "n_clusters": result.n_clusters,
                 "covariates": list(result.covariates),
                 "nuisance_cross_fitted": result.cross_fitted,
+                "pretrend_available": result.pretrend.available,
+                "pretrend_unavailable_reason": result.pretrend.reason,
                 "causal_interpretation_requires_assumptions": True,
                 "assumptions": list(result.assumptions),
             },
@@ -605,6 +616,21 @@ def add_to_outputhub(
         )
     elif isinstance(result, DiDResult) and hasattr(hub, "add_table"):
         table_metadata = {"source": "causekit", "estimator": result.method}
+        if not result.pretrend.placebo_effects.empty:
+            hub.add_table(
+                f"{model_name} pre-trend placebos",
+                result.pretrend.placebo_effects.reset_index(),
+                caption=(
+                    "Uncontaminated adjacent pre-period placebo effects. The joint test "
+                    "does not prove parallel trends when it fails to reject."
+                ),
+                metadata={
+                    **table_metadata,
+                    "joint_test_available": result.pretrend.available,
+                    "joint_test_statistic": result.pretrend.statistic,
+                    "joint_test_pvalue": result.pretrend.pvalue,
+                },
+            )
         hub.add_table(
             f"{model_name} group-time effects",
             result.group_time.reset_index(),

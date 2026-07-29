@@ -2,7 +2,7 @@
 
 ## Status and decision
 
-The `0.6.0a2` milestone keeps two separate estimators. The efficient estimator is an
+The maintained panel milestone keeps two separate estimators. The efficient estimator is an
 addition, not a replacement for conventional difference-in-differences (DiD).
 
 | Public estimator | Identifying restriction | Comparison observations | Weighting |
@@ -171,9 +171,60 @@ The paper's semiparametric efficiency-bound claim is retained only for independe
 entities; requesting higher-level clustered uncertainty does not establish efficiency
 under a cluster-dependent model.
 
+## Pre-trend diagnostics
+
+Every no-covariate panel result exposes `result.pretrend`. For cohort `g`, the diagnostic
+uses adjacent changes ending strictly before the effective treatment boundary. With
+anticipation `A`, every retained placebo therefore has event time at most `-A-1`; the
+declared anticipation window is never tested as though it were untreated.
+
+Each placebo compares the treated cohort with the estimator's declared never-treated or
+not-yet-treated comparison population and reports its entity influence function. The
+joint null sets every retained cohort-period placebo to zero. Robust covariance is the
+full HC1-style cross-product of the influence matrix and uses a chi-square reference;
+clustered covariance sums the entire vector once per declared cluster and uses the
+package's finite-cluster F reference. Singular joint covariance leaves the individual
+placebos visible but marks the joint test unavailable. No restriction is dropped and no
+ridge or pseudoinverse is applied.
+
+Two-period designs can have no uncontaminated placebo change; this is recorded as
+unavailable rather than as a passing test. The current covariate-adjusted efficient path
+also records the diagnostic as unavailable because an unadjusted placebo would not test
+its conditional PT-All restriction. Failure to reject any pre-trend diagnostic is not
+evidence that parallel trends holds.
+
+## PT-All versus PT-Post Hausman diagnostic
+
+`did_hausman_test(pt_post, pt_all)` implements the event-study comparison in Theorem A.1
+of Chen, Sant'Anna, and Xie for the maintained no-covariate specialization. It requires a
+conventional never-treated PT-Post result and a no-covariate PT-All result using every
+admissible pre-period moment, fitted to exactly the same outcome/timing sample and
+covariance design.
+
+The tested vector is the common post-treatment event-study path, not only `ESavg`. The
+finite-sample covariance is computed directly from the difference between the aligned
+PT-All and PT-Post influence functions. This positive-semidefinite construction avoids
+subtracting two estimated covariance matrices. A singular difference covariance is
+refused without a pseudoinverse or effective-rank change. Rejection is evidence against
+the extra PT-All restrictions; failure to reject does not prove PT-All and is not an
+automatic estimator-selection rule.
+
+The maintained Hausman slice refuses not-yet-treated PT-Post comparisons, covariate-
+adjusted results, reduced `pre_periods`, different samples, roles, timing, covariance, or
+clusters. Those comparisons require separately aligned efficient influence functions.
+
+## Repeated-cross-section boundary
+
+Repeated cross sections require observation-level rather than entity-level influence
+functions and an explicit composition restriction. They are therefore not a mode switch
+on either panel estimator. The public implementation contract, phased nuisance design,
+strict refusals, parity targets, and promotion gates are frozen in
+[`DID_REPEATED_CROSS_SECTION_CONTRACT.md`](DID_REPEATED_CROSS_SECTION_CONTRACT.md). No
+placeholder estimator is exported yet.
+
 ## Refusals
 
-The public estimators refuse duplicate entity-time rows, unbalanced panels, non-finite
+The public panel estimators refuse duplicate entity-time rows, unbalanced panels, non-finite
 outcomes or time values, varying treatment time, covariates, or cluster within entity, an unobserved
 finite adoption time, missing never-treated observations, cohorts without a clean
 baseline, undersized cohorts, unsupported repeated cross-sections, sampling weights,
@@ -191,9 +242,11 @@ part of this contract.
 
 The maintained promotion evidence now covers covariate nuisance integration, shared-fold
 cross-fitting, conditional covariance inversion and refusal, robust/clustered multiplier
-band identities, and a seeded coverage smoke. Remaining gates include pre-trend/Hausman
-diagnostics, repeated cross-sections, publication-scale Monte Carlo studies, larger
-covariate-performance fixtures, and aligned external parity for the covariate path.
+band identities, a seeded coverage smoke, hand-computed uncontaminated pre-trend placebos,
+clustered joint tests, and the influence-difference PT-All/PT-Post Hausman diagnostic.
+Remaining gates include repeated-cross-section implementation, publication-scale Monte
+Carlo studies, larger covariate-performance fixtures, and aligned external parity for the
+covariate path.
 
 Primary methodology:
 

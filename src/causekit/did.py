@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass
 from numbers import Integral
@@ -9,7 +10,7 @@ from typing import Any, Literal, cast
 
 import numpy as np
 import pandas as pd
-from scipy.stats import norm
+from scipy.stats import chi2, f, norm
 from scipy.stats import t as student_t
 
 from .crossfit import CrossFitTask, CrossFitter
@@ -18,6 +19,52 @@ ControlGroup = Literal["never_treated", "not_yet_treated"]
 DiDCovariance = Literal["robust", "clustered"]
 DiDInference = Literal["analytic", "multiplier_bootstrap"]
 PrePeriods = Literal["all"] | int
+
+
+@dataclass(frozen=True)
+class DiDPretrendDiagnostic:
+    """Uncontaminated cohort-period placebo effects and their joint test."""
+
+    available: bool
+    reason: str | None
+    placebo_effects: pd.DataFrame
+    influence: pd.DataFrame
+    covariance: pd.DataFrame
+    statistic: float | None
+    pvalue: float | None
+    n_restrictions: int
+    df_num: int
+    df_denom: float | None
+    distribution: str | None
+    covariance_type: DiDCovariance
+    n_clusters: int | None
+    null_hypothesis: str
+    notes: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class DiDHausmanDiagnostic:
+    """PT-All versus PT-Post event-study Hausman diagnostic."""
+
+    statistic: float
+    pvalue: float
+    reject: bool
+    level: float
+    recommendation: str
+    event_study: pd.DataFrame
+    influence: pd.DataFrame
+    covariance: pd.DataFrame
+    pt_post_covariance: pd.DataFrame
+    pt_all_covariance: pd.DataFrame
+    cross_covariance: pd.DataFrame
+    n_restrictions: int
+    df_num: int
+    df_denom: float | None
+    distribution: str
+    covariance_type: DiDCovariance
+    n_clusters: int | None
+    null_hypothesis: str
+    notes: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -35,6 +82,7 @@ class DiDResult:
     event_study_influence: pd.DataFrame
     calendar_time_influence: pd.DataFrame
     overall_influence: pd.Series
+    pretrend: DiDPretrendDiagnostic
     efficiency_weights: pd.DataFrame
     conditional_efficiency_weights: pd.DataFrame
     candidate_influence_functions: pd.DataFrame
@@ -65,7 +113,9 @@ class DiDResult:
     covariates: tuple[str, ...]
     cross_fitted: bool
     estimation_entities: pd.Index
+    inference_clusters: pd.Series
     times: tuple[float, ...]
+    design_fingerprint: str
     assumptions: tuple[str, ...]
     notes: tuple[str, ...]
     converged: bool = True
@@ -159,6 +209,7 @@ class _Panel:
     entity_effective_positions: np.ndarray
     never_mask: np.ndarray
     clusters: np.ndarray | None
+    design_fingerprint: str
 
 
 @dataclass(frozen=True)
@@ -375,6 +426,21 @@ def _prepare_panel(
     elif cluster is not None:
         raise ValueError("cluster is only allowed when covariance='clustered'.")
 
+    fingerprint = hashlib.sha256()
+    fingerprint.update(
+        pd.util.hash_pandas_object(pd.Series(entities, dtype="object"), index=False)
+        .to_numpy(dtype=np.uint64)
+        .tobytes()
+    )
+    for values in (times, entity_cohorts, outcome_wide.to_numpy(dtype=float)):
+        fingerprint.update(np.ascontiguousarray(values, dtype=float).tobytes())
+    if cluster_values is not None:
+        fingerprint.update(
+            pd.util.hash_pandas_object(pd.Series(cluster_values, dtype="object"), index=False)
+            .to_numpy(dtype=np.uint64)
+            .tobytes()
+        )
+
     return _Panel(
         outcomes=outcome_wide.to_numpy(dtype=float),
         entities=entities,
@@ -386,6 +452,7 @@ def _prepare_panel(
         entity_effective_positions=entity_effective,
         never_mask=never_mask,
         clusters=cluster_values,
+        design_fingerprint=fingerprint.hexdigest(),
     )
 
 
@@ -586,6 +653,258 @@ def _summary_row(
     }
 
 
+def _score_cross_covariance(
+    left: np.ndarray,
+    right: np.ndarray,
+    *,
+    covariance: DiDCovariance,
+    clusters: np.ndarray | None,
+) -> tuple[np.ndarray, int | None]:
+    if left.ndim != 2 or right.ndim != 2 or left.shape[0] != right.shape[0]:
+        raise ValueError("Influence matrices must be two-dimensional and row aligned.")
+    n = left.shape[0]
+    if covariance == "robust":
+        return left.T @ right / (n * (n - 1)), None
+    if clusters is None:
+        raise ValueError("cluster labels are required for clustered joint inference.")
+    codes, labels = pd.factorize(clusters, sort=False)
+    cluster_left = np.zeros((len(labels), left.shape[1]))
+    cluster_right = np.zeros((len(labels), right.shape[1]))
+    np.add.at(cluster_left, codes, left)
+    np.add.at(cluster_right, codes, right)
+    scale = len(labels) / (len(labels) - 1) / n**2
+    return scale * cluster_left.T @ cluster_right, len(labels)
+
+
+def _joint_wald(
+    estimates: np.ndarray,
+    covariance_matrix: np.ndarray,
+    *,
+    covariance: DiDCovariance,
+    n_clusters: int | None,
+    singularity_tolerance: float = 1e-12,
+) -> tuple[float, float, str, float | None]:
+    covariance_matrix = 0.5 * (covariance_matrix + covariance_matrix.T)
+    eigenvalues = np.linalg.eigvalsh(covariance_matrix)
+    largest = float(eigenvalues[-1]) if eigenvalues.size else 0.0
+    smallest = float(eigenvalues[0]) if eigenvalues.size else 0.0
+    if (
+        not np.isfinite(eigenvalues).all()
+        or largest <= 0.0
+        or smallest <= singularity_tolerance * largest
+    ):
+        raise ValueError(
+            "The joint diagnostic covariance is singular or numerically unidentified; "
+            "no ridge or pseudoinverse was applied."
+        )
+    wald = float(estimates @ np.linalg.solve(covariance_matrix, estimates))
+    restrictions = len(estimates)
+    if covariance == "robust":
+        return wald, float(chi2.sf(wald, restrictions)), "chi2", None
+    if n_clusters is None:
+        raise ValueError("The cluster count is required for clustered joint inference.")
+    statistic = wald / restrictions
+    denominator_df = float(n_clusters - 1)
+    return (
+        statistic,
+        float(f.sf(statistic, restrictions, denominator_df)),
+        "f",
+        denominator_df,
+    )
+
+
+def _empty_pretrend(
+    panel: _Panel,
+    *,
+    covariance: DiDCovariance,
+    reason: str,
+) -> DiDPretrendDiagnostic:
+    columns = pd.MultiIndex.from_arrays([[], []], names=["cohort", "time"])
+    placebo_effects = pd.DataFrame(
+        columns=[
+            "event_time",
+            "base_period",
+            "att",
+            "std_err",
+            "stat",
+            "p_value",
+            "n_treated",
+            "n_comparison",
+        ],
+        index=columns,
+    )
+    influence = pd.DataFrame(index=panel.entities.copy(), columns=columns, dtype=float)
+    covariance_frame = pd.DataFrame(index=columns, columns=columns, dtype=float)
+    n_clusters = None if panel.clusters is None else len(pd.unique(panel.clusters))
+    return DiDPretrendDiagnostic(
+        available=False,
+        reason=reason,
+        placebo_effects=placebo_effects,
+        influence=influence,
+        covariance=covariance_frame,
+        statistic=None,
+        pvalue=None,
+        n_restrictions=0,
+        df_num=0,
+        df_denom=None,
+        distribution=None,
+        covariance_type=covariance,
+        n_clusters=n_clusters,
+        null_hypothesis=("Every retained uncontaminated cohort-period placebo effect equals zero."),
+        notes=(
+            "Failure to reject is not evidence that parallel trends is true.",
+            "Post-estimation choices should not be selected mechanically from this diagnostic.",
+        ),
+    )
+
+
+def _pretrend_diagnostic(
+    panel: _Panel,
+    *,
+    covariance: DiDCovariance,
+    control_group: ControlGroup | None,
+    unavailable_reason: str | None,
+) -> DiDPretrendDiagnostic:
+    if control_group is None:
+        return _empty_pretrend(
+            panel,
+            covariance=covariance,
+            reason=unavailable_reason
+            or "The declared estimator does not expose an aligned pre-trend diagnostic.",
+        )
+    n = len(panel.entities)
+    rows: list[dict[str, Any]] = []
+    keys: list[tuple[float, float]] = []
+    influences: list[np.ndarray] = []
+    for cohort in panel.treated_cohorts:
+        treated_mask = panel.original_cohorts == cohort
+        n_treated = int(treated_mask.sum())
+        pi_treated = n_treated / n
+        effective_position = panel.effective_positions[cohort]
+        for target_position in range(1, effective_position):
+            base_position = target_position - 1
+            if control_group == "never_treated":
+                comparison_mask = panel.never_mask.copy()
+            else:
+                comparison_mask = panel.never_mask | (
+                    panel.entity_effective_positions > target_position
+                )
+            comparison_mask &= ~treated_mask
+            n_comparison = int(comparison_mask.sum())
+            if n_comparison < 2:
+                raise ValueError(
+                    "each pre-trend placebo requires at least two eligible comparison entities."
+                )
+            changes = panel.outcomes[:, target_position] - panel.outcomes[:, base_position]
+            treated_mean = float(changes[treated_mask].mean())
+            comparison_mean = float(changes[comparison_mask].mean())
+            placebo = treated_mean - comparison_mean
+            pi_comparison = n_comparison / n
+            influence = treated_mask.astype(float) / pi_treated * (
+                changes - treated_mean
+            ) - comparison_mask.astype(float) / pi_comparison * (changes - comparison_mean)
+            public_time = float(panel.times[target_position])
+            keys.append((cohort, public_time))
+            influences.append(influence)
+            rows.append(
+                {
+                    "cohort": cohort,
+                    "time": public_time,
+                    "event_time": target_position - panel.original_positions[cohort],
+                    "base_period": float(panel.times[base_position]),
+                    **_summary_row(
+                        placebo,
+                        influence,
+                        covariance=covariance,
+                        clusters=panel.clusters,
+                    ),
+                    "n_treated": n_treated,
+                    "n_comparison": n_comparison,
+                }
+            )
+    if not rows:
+        return _empty_pretrend(
+            panel,
+            covariance=covariance,
+            reason=(
+                "No uncontaminated adjacent pre-period changes remain before the declared "
+                "treatment or anticipation boundary."
+            ),
+        )
+
+    columns = pd.MultiIndex.from_tuples(keys, names=["cohort", "time"])
+    influence_matrix = np.column_stack(influences)
+    influence_frame = pd.DataFrame(
+        influence_matrix,
+        index=panel.entities.copy(),
+        columns=columns,
+    )
+    covariance_matrix, n_clusters = _score_cross_covariance(
+        influence_matrix,
+        influence_matrix,
+        covariance=covariance,
+        clusters=panel.clusters,
+    )
+    covariance_frame = pd.DataFrame(
+        covariance_matrix,
+        index=columns.copy(),
+        columns=columns.copy(),
+    )
+    placebo_effects = pd.DataFrame(rows).set_index(["cohort", "time"])
+    estimates = placebo_effects["att"].to_numpy(dtype=float)
+    try:
+        statistic, pvalue, distribution, denominator_df = _joint_wald(
+            estimates,
+            covariance_matrix,
+            covariance=covariance,
+            n_clusters=n_clusters,
+        )
+    except ValueError as error:
+        return DiDPretrendDiagnostic(
+            available=False,
+            reason=str(error),
+            placebo_effects=placebo_effects,
+            influence=influence_frame,
+            covariance=covariance_frame,
+            statistic=None,
+            pvalue=None,
+            n_restrictions=len(keys),
+            df_num=len(keys),
+            df_denom=None,
+            distribution=None,
+            covariance_type=covariance,
+            n_clusters=n_clusters,
+            null_hypothesis=(
+                "Every retained uncontaminated cohort-period placebo effect equals zero."
+            ),
+            notes=(
+                "The placebo effects remain available, but their joint covariance was not invertible.",
+                "No ridge, dimension dropping, or pseudoinverse was applied.",
+            ),
+        )
+    return DiDPretrendDiagnostic(
+        available=True,
+        reason=None,
+        placebo_effects=placebo_effects,
+        influence=influence_frame,
+        covariance=covariance_frame,
+        statistic=statistic,
+        pvalue=pvalue,
+        n_restrictions=len(keys),
+        df_num=len(keys),
+        df_denom=denominator_df,
+        distribution=distribution,
+        covariance_type=covariance,
+        n_clusters=n_clusters,
+        null_hypothesis=("Every retained uncontaminated cohort-period placebo effect equals zero."),
+        notes=(
+            "Placebos use adjacent changes ending strictly before the anticipation boundary.",
+            "Failure to reject is not evidence that parallel trends is true.",
+            "Post-estimation choices should not be selected mechanically from this diagnostic.",
+        ),
+    )
+
+
 def _assemble_result(
     cells: list[_EffectCell],
     panel: _Panel,
@@ -611,6 +930,8 @@ def _assemble_result(
     cohort_probabilities: pd.DataFrame,
     covariates: tuple[str, ...],
     cross_fitted: bool,
+    pretrend_control_group: ControlGroup | None,
+    pretrend_unavailable_reason: str | None,
     notes: tuple[str, ...],
 ) -> DiDResult:
     group_rows: list[dict[str, Any]] = []
@@ -714,6 +1035,18 @@ def _assemble_result(
             level=simultaneous_level,
         )
 
+    pretrend = _pretrend_diagnostic(
+        panel,
+        covariance=covariance,
+        control_group=pretrend_control_group,
+        unavailable_reason=pretrend_unavailable_reason,
+    )
+    inference_clusters = (
+        pd.Series(dtype="object", name="cluster")
+        if panel.clusters is None
+        else pd.Series(panel.clusters.copy(), index=panel.entities.copy(), name="cluster")
+    )
+
     return DiDResult(
         estimate=estimate,
         standard_error=standard_error,
@@ -726,6 +1059,7 @@ def _assemble_result(
         event_study_influence=event_study_influence,
         calendar_time_influence=calendar_time_influence,
         overall_influence=overall_influence,
+        pretrend=pretrend,
         efficiency_weights=efficiency_weights,
         conditional_efficiency_weights=conditional_efficiency_weights,
         candidate_influence_functions=candidate_influence,
@@ -760,7 +1094,9 @@ def _assemble_result(
         covariates=covariates,
         cross_fitted=cross_fitted,
         estimation_entities=panel.entities.copy(),
+        inference_clusters=inference_clusters,
         times=tuple(float(value) for value in panel.times),
+        design_fingerprint=panel.design_fingerprint,
         assumptions=(
             "Balanced short panel with entities sampled independently unless higher-level clusters are declared",
             "Absorbing treatment at the declared first-treatment time",
@@ -926,6 +1262,8 @@ class DifferenceInDifferences:
             cohort_probabilities=pd.DataFrame(index=panel.entities.copy()),
             covariates=(),
             cross_fitted=False,
+            pretrend_control_group=self.control_group,
+            pretrend_unavailable_reason=None,
             notes=(
                 "Group-time effects use the period immediately before the effective treatment boundary as baseline.",
                 (
@@ -935,6 +1273,154 @@ class DifferenceInDifferences:
                 ),
             ),
         )
+
+
+def did_hausman_test(
+    pt_post: DiDResult,
+    pt_all: DiDResult,
+    *,
+    level: float = 0.95,
+) -> DiDHausmanDiagnostic:
+    """Compare common post-treatment event-study paths under PT-Post and PT-All.
+
+    The finite-sample covariance uses the difference of the two aligned influence
+    functions. This is the positive-semidefinite construction discussed after
+    Theorem A.1 of Chen, Sant'Anna, and Xie (2025); no variance subtraction,
+    dimension dropping, ridge, or pseudoinverse is used.
+    """
+
+    if not isinstance(pt_post, DiDResult) or not isinstance(pt_all, DiDResult):
+        raise TypeError("pt_post and pt_all must both be fitted DiDResult objects.")
+    if pt_post.method != "conventional_group_time":
+        raise ValueError("The first argument must be a conventional PT-Post DiD result.")
+    if pt_all.method != "chen_santanna_xie_efficient":
+        raise ValueError(
+            "The second argument must be the no-covariate Chen-Sant'Anna-Xie PT-All result."
+        )
+    if pt_post.control_group != "never_treated":
+        raise ValueError(
+            "The maintained Hausman contract requires the PT-Post never-treated comparison."
+        )
+    if pt_post.covariates or pt_all.covariates or pt_post.cross_fitted or pt_all.cross_fitted:
+        raise ValueError(
+            "The maintained Hausman contract is currently limited to the aligned "
+            "no-covariate PT-Post and PT-All paths."
+        )
+    if pt_all.pre_periods != "all":
+        raise ValueError("The PT-All result must retain all admissible pre-period moments.")
+    if not np.isfinite(level) or not 0.0 < level < 1.0:
+        raise ValueError("level must be strictly between zero and one.")
+    if pt_post.design_fingerprint != pt_all.design_fingerprint:
+        raise ValueError(
+            "The Hausman diagnostic requires both results to use the same estimation sample, "
+            "outcomes, timing, and cluster design."
+        )
+    if not pt_post.estimation_entities.equals(pt_all.estimation_entities):
+        raise ValueError("The Hausman diagnostic requires identically ordered entities.")
+    if (
+        pt_post.times != pt_all.times
+        or pt_post.anticipation != pt_all.anticipation
+        or pt_post.entity_name != pt_all.entity_name
+        or pt_post.time_name != pt_all.time_name
+        or pt_post.outcome_name != pt_all.outcome_name
+        or pt_post.treatment_time_name != pt_all.treatment_time_name
+    ):
+        raise ValueError("The Hausman diagnostic requires identical DiD role and timing contracts.")
+    if pt_post.covariance_type != pt_all.covariance_type:
+        raise ValueError("The Hausman diagnostic requires the same covariance declaration.")
+    if not pt_post.inference_clusters.equals(pt_all.inference_clusters):
+        raise ValueError("The Hausman diagnostic requires identical inference clusters.")
+
+    post_events = [int(value) for value in pt_post.event_study.index if int(value) >= 0]
+    all_events = [int(value) for value in pt_all.event_study.index if int(value) >= 0]
+    if post_events != all_events or not post_events:
+        raise ValueError(
+            "The PT-Post and PT-All results must expose the same non-empty post-treatment "
+            "event-study support."
+        )
+    pt_post_estimates = pt_post.event_study.loc[post_events, "att"].to_numpy(dtype=float)
+    pt_all_estimates = pt_all.event_study.loc[post_events, "att"].to_numpy(dtype=float)
+    difference = pt_all_estimates - pt_post_estimates
+    post_influence = pt_post.event_study_influence.loc[:, post_events].to_numpy(dtype=float)
+    all_influence = pt_all.event_study_influence.loc[:, post_events].to_numpy(dtype=float)
+    difference_influence = all_influence - post_influence
+    clusters = (
+        None if pt_post.covariance_type == "robust" else pt_post.inference_clusters.to_numpy()
+    )
+    post_covariance, n_clusters = _score_cross_covariance(
+        post_influence,
+        post_influence,
+        covariance=pt_post.covariance_type,
+        clusters=clusters,
+    )
+    all_covariance, _ = _score_cross_covariance(
+        all_influence,
+        all_influence,
+        covariance=pt_post.covariance_type,
+        clusters=clusters,
+    )
+    cross_covariance, _ = _score_cross_covariance(
+        post_influence,
+        all_influence,
+        covariance=pt_post.covariance_type,
+        clusters=clusters,
+    )
+    difference_covariance, _ = _score_cross_covariance(
+        difference_influence,
+        difference_influence,
+        covariance=pt_post.covariance_type,
+        clusters=clusters,
+    )
+    statistic, pvalue, distribution, denominator_df = _joint_wald(
+        difference,
+        difference_covariance,
+        covariance=pt_post.covariance_type,
+        n_clusters=n_clusters,
+    )
+    event_index = pd.Index(post_events, name="event_time")
+
+    def covariance_frame(values: np.ndarray) -> pd.DataFrame:
+        return pd.DataFrame(values, index=event_index.copy(), columns=event_index.copy())
+
+    reject = pvalue < 1.0 - float(level)
+    return DiDHausmanDiagnostic(
+        statistic=statistic,
+        pvalue=pvalue,
+        reject=reject,
+        level=float(level),
+        recommendation="pt_post" if reject else "pt_all_not_rejected",
+        event_study=pd.DataFrame(
+            {
+                "pt_post": pt_post_estimates,
+                "pt_all": pt_all_estimates,
+                "difference": difference,
+            },
+            index=event_index,
+        ),
+        influence=pd.DataFrame(
+            difference_influence,
+            index=pt_post.estimation_entities.copy(),
+            columns=event_index.copy(),
+        ),
+        covariance=covariance_frame(difference_covariance),
+        pt_post_covariance=covariance_frame(post_covariance),
+        pt_all_covariance=covariance_frame(all_covariance),
+        cross_covariance=covariance_frame(cross_covariance),
+        n_restrictions=len(post_events),
+        df_num=len(post_events),
+        df_denom=denominator_df,
+        distribution=distribution,
+        covariance_type=pt_post.covariance_type,
+        n_clusters=n_clusters,
+        null_hypothesis=(
+            "The common post-treatment event-study path is equal under PT-All and PT-Post."
+        ),
+        notes=(
+            "Rejection is evidence against the extra PT-All restrictions, not against every possible parallel-trends restriction.",
+            "Failure to reject does not prove PT-All and should not be used as an automatic estimator-selection rule.",
+            "The covariance is computed from the difference influence function and is refused when singular.",
+        ),
+    )
 
 
 def _change_values(panel: _Panel, change: _Change) -> np.ndarray:
@@ -1293,6 +1779,12 @@ def _fit_covariate_efficient(
         cohort_probabilities=probabilities,
         covariates=covariate_names,
         cross_fitted=True,
+        pretrend_control_group=None,
+        pretrend_unavailable_reason=(
+            "The covariate-adjusted PT-All path requires a separately cross-fitted "
+            "conditional pre-trend score; an unadjusted placebo test would target a "
+            "different restriction."
+        ),
         notes=(
             "All reported outcome, cohort-probability, and conditional-covariance nuisance predictions are out of fold.",
             "Cohort density ratios are formed from cross-fitted multiclass probabilities and are refused below the declared floor rather than clipped.",
@@ -1603,6 +2095,8 @@ class EfficientDiD:
             cohort_probabilities=pd.DataFrame(index=panel.entities.copy()),
             covariates=(),
             cross_fitted=False,
+            pretrend_control_group="never_treated",
+            pretrend_unavailable_reason=None,
             notes=(
                 "Efficiency is claimed only for the no-covariate PT-All short-panel model implemented here.",
                 "Efficiency weights may be negative because they combine homogeneous identifying moments.",
@@ -1614,3 +2108,13 @@ class EfficientDiD:
                 ),
             ),
         )
+
+
+__all__ = [
+    "DiDHausmanDiagnostic",
+    "DiDPretrendDiagnostic",
+    "DiDResult",
+    "DifferenceInDifferences",
+    "EfficientDiD",
+    "did_hausman_test",
+]

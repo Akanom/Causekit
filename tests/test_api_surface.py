@@ -40,7 +40,10 @@ PUBLIC_EXPORTS = {
     "DRLearner",
     "DRLearnerResult",
     "EfficientDiD",
+    "DiDHausmanDiagnostic",
+    "DiDPretrendDiagnostic",
     "DiDResult",
+    "did_hausman_test",
     "PartiallyLinearDML",
     "PartiallyLinearDMLResult",
     "NativeSplineRidgeCATE",
@@ -61,6 +64,8 @@ def test_initial_stable_namespace_exports_iv_and_postestimation_contract() -> No
     assert all(hasattr(causekit, name) for name in PUBLIC_EXPORTS)
     assert "TreatmentEffect" not in causekit.__all__
     assert not hasattr(causekit, "TreatmentEffect")
+    assert not hasattr(causekit, "RepeatedCrossSectionDiD")
+    assert not hasattr(causekit, "NativeOrthogonalStackedCATE")
 
 
 def test_causekit_has_no_limiteddepkit_dependency_or_import() -> None:
@@ -90,8 +95,8 @@ def test_distribution_and_import_namespace_are_causekit_only() -> None:
     metadata = (repository_root / "pyproject.toml").read_text(encoding="utf-8")
 
     assert 'name = "causekit"' in metadata
-    assert 'version = "0.7.0a4"' in metadata
-    assert causekit.__version__ == "0.7.0a4"
+    assert 'version = "0.7.0a5"' in metadata
+    assert causekit.__version__ == "0.7.0a5"
     assert (repository_root / "src" / "causekit" / "__init__.py").is_file()
     assert not (repository_root / "src" / "causalkit").exists()
 

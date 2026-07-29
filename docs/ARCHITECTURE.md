@@ -1,6 +1,6 @@
 # Architecture
 
-`causekit` is organized around small, auditable estimation paths. The `0.7.0a4`
+`causekit` is organized around small, auditable estimation paths. The `0.7.0a5`
 architecture keeps causal assumptions visible, separates numerical estimation from
 inference and diagnostics, and returns frozen labelled result containers suitable for
 reporting. The pandas objects stored inside a result should be treated as read-only; helper
@@ -226,6 +226,18 @@ pre-treatment baseline with never-treated or not-yet-treated comparisons, while 
 efficient class constructs the PT-All generated outcomes and solves their covariance
 system. Fixed-T cohort/period loops are permitted; all entity-level arithmetic is
 vectorized and cluster scores are aggregated after one factorization of the labels.
+
+Panel pre-trend diagnostics reuse the validated wide outcome bundle but build a separate
+matrix of adjacent changes that end before the anticipation boundary. Joint covariance is
+formed from the complete influence matrix, with cluster vector sums performed once.
+`did_hausman_test` aligns common post-treatment event-study coordinates and tests the
+PT-All minus PT-Post influence vector; a result fingerprint prevents comparisons across
+different outcomes, samples, timing, or cluster designs.
+
+Repeated cross sections will not enter this panel bundle. Their separate contract uses
+observation- or PSU-level scores, unequal cell sizes, and an explicit composition
+restriction. No panel entity is synthesized and no current panel helper is exposed as a
+repeated-cross-section estimator.
 
 No nuisance learner lives in `did.py`. The covariate-adjusted efficient path expresses
 cohort classification, group-specific outcome changes, and conditional residual products

@@ -31,6 +31,8 @@ def _source() -> pd.DataFrame:
                 "Womens E-Mail",
             ],
             "visit": [1, 0, 1, 0, 1, 0],
+            "conversion": [0, 1, 0, 1, 0, 1],
+            "spend": [0.0, 12.0, 4.0, 0.0, 7.0, 2.0],
         }
     )
 
@@ -51,6 +53,17 @@ def test_hillstrom_design_keeps_randomized_binary_contrast_and_pretreatment_cova
         "zip_Urban",
         "channel_Web",
     }
+
+    conversion = benchmark_rlearner_hillstrom._prepare_hillstrom(
+        _source(),
+        outcome="conversion",
+    )
+    assert conversion["outcome"].tolist() == [0.0, 1.0, 1.0, 0.0]
+
+
+def test_hillstrom_design_refuses_an_undeclared_outcome() -> None:
+    with pytest.raises(ValueError, match="outcome must be one of"):
+        benchmark_rlearner_hillstrom._prepare_hillstrom(_source(), outcome="future_outcome")
 
 
 def test_hillstrom_design_refuses_missing_columns_and_arm_drift() -> None:
@@ -75,3 +88,5 @@ def test_hillstrom_benchmark_documented_direct_script_path_loads() -> None:
 
     assert completed.returncode == 0, completed.stderr
     assert "--data" in completed.stdout
+    assert "--model {linear,spline,both}" in completed.stdout
+    assert "--outcome {visit,conversion,spend}" in completed.stdout

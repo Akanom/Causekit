@@ -15,7 +15,14 @@ from .crossfit import (
     WeightedCATEEstimatorProtocol,
 )
 from .diagnostics import FirstStageDiagnostic, SarganTest
-from .did import DiDResult, DifferenceInDifferences, EfficientDiD
+from .did import (
+    DiDHausmanDiagnostic,
+    DiDPretrendDiagnostic,
+    DiDResult,
+    DifferenceInDifferences,
+    EfficientDiD,
+    did_hausman_test,
+)
 from .integrations import add_to_outputhub, to_outputhub_model
 from .iv import IV2SLS, IV2SLSResult
 from .matching import (
@@ -57,6 +64,8 @@ __all__ = [
     "CrossFitTask",
     "CrossFitTaskResult",
     "CrossFitter",
+    "DiDHausmanDiagnostic",
+    "DiDPretrendDiagnostic",
     "DiDResult",
     "DifferenceInDifferences",
     "DRLearner",
@@ -96,6 +105,7 @@ __all__ = [
     "to_outputhub_model",
     "vcov",
     "wald_test",
+    "did_hausman_test",
 ]
 
-__version__ = "0.7.0a4"
+__version__ = "0.7.0a5"

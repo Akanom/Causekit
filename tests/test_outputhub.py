@@ -242,6 +242,8 @@ def test_did_converts_and_adds_auditable_effect_tables() -> None:
     assert model.metadata["parallel_trends"] == "post"
     assert model.metadata["inference_method"] == "analytic"
     assert model.metadata["nuisance_cross_fitted"] is False
+    assert model.metadata["pretrend_available"] is False
+    assert model.diagnostics["Pre-trend restrictions"] == 0
     assert model.params.index.tolist() == ["esavg"]
     hub = outputhub.OutputHub("DiD analysis")
     add_to_outputhub(hub, result)
@@ -251,6 +253,49 @@ def test_did_converts_and_adds_auditable_effect_tables() -> None:
         "Difference-in-Differences event study",
         "Difference-in-Differences calendar-time effects",
     ]
+
+
+def test_did_adds_pretrend_table_when_clean_placebos_exist() -> None:
+    rows = []
+    treated_paths = (
+        (0.0, 1.0, 1.0, 4.0),
+        (0.0, -1.0, -1.0, 2.0),
+        (0.0, 0.0, 1.0, 4.0),
+        (0.0, 0.0, -1.0, 2.0),
+    )
+    for position, path in enumerate(treated_paths):
+        for period, outcome in enumerate(path, start=1):
+            rows.append(
+                {
+                    "entity": f"treated_{position}",
+                    "time": period,
+                    "treatment_time": 4.0,
+                    "outcome": outcome,
+                }
+            )
+    for position in range(4):
+        for period in range(1, 5):
+            rows.append(
+                {
+                    "entity": f"never_{position}",
+                    "time": period,
+                    "treatment_time": np.inf,
+                    "outcome": 0.0,
+                }
+            )
+    result = DifferenceInDifferences().fit(
+        pd.DataFrame(rows),
+        outcome="outcome",
+        entity="entity",
+        time="time",
+        treatment_time="treatment_time",
+    )
+    hub = outputhub.OutputHub("DiD pre-trend analysis")
+    add_to_outputhub(hub, result)
+
+    assert result.pretrend.available
+    assert hub.tables[0].name == "Difference-in-Differences pre-trend placebos"
+    assert hub.tables[0].metadata["joint_test_available"] is True
 
 
 def test_matching_converts_and_adds_design_tables_without_reestimating() -> None:

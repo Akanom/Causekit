@@ -43,6 +43,32 @@ construction, this is consistent with safe fallback to the linear candidate. The
 benchmark did not retain the selected-knot scalar, so that statement is an inference from
 the aligned output, not a fabricated diagnostic.
 
+A `0.7.0a5` nonlinear-only smoke on 2026-07-30 retained the same source hash, roles,
+evaluation-index hash, honest R-loss `0.1182661234006891`, and gain
+`0.0003339839622894525`. The public tuning record confirmed that the adaptive spline stage
+selected zero knots, ridge penalty `100`, and a nine-column additive basis. Runtime was
+5.498 seconds with a 135.805 MiB Python-managed peak. This confirms deterministic fallback
+to the linear submodel on Hillstrom; it is not evidence that nonlinear complexity improved
+the real-data objective.
+
+## Nonlinear-selected real outcome
+
+The same randomized contrast was also evaluated with Hillstrom's binary conversion
+outcome. This is a new outcome-specific comparison, not a rerun of the visit certificate.
+Construction-only GCV selected one spline knot, penalty `10000`, and an 11-column basis,
+so the nonlinear candidate was genuinely exercised.
+
+| Native weighted CATE stage | Honest R-loss | Constant R-loss | R-loss gain | Selected knots | p-value vs 0 | Seconds |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Linear ridge-GCV | 0.0090008582 | 0.0089996206 | -0.0138% | — | 0.7600 | 3.365 |
+| Adaptive spline-ridge GCV | 0.0090010296 | 0.0089996206 | -0.0157% | 1 | 0.9026 | 4.032 |
+
+The spline R-loss was 0.0019% higher than the linear stage, and both were worse than the
+construction-fitted constant on the untouched evaluation role. Thus, the real outcome
+activated nonlinear complexity but did not validate a performance gain or detectable
+effect heterogeneity. The separate piecewise simulation remains the recovery test where
+the nonlinear treatment-effect function is known by construction.
+
 The positive differential-calibration test supplies split-conditional evidence that the
 learned ranking contains some heterogeneity signal on this contrast. The slope is not
 statistically distinguishable from one at 5%, and group effects range from 0.0628 to 0.0893.
@@ -65,3 +91,12 @@ python benchmarks/benchmark_rlearner_hillstrom.py \
 
 The script refuses any source hash other than the reviewed CSV. It does not download data,
 read credentials, or add Kaggle to CauseKit's dependency graph.
+
+To exercise only the native nonlinear candidate without rerunning the settled linear row:
+
+```bash
+python benchmarks/benchmark_rlearner_hillstrom.py \
+  --data path/to/Kevin_Hillstrom_MineThatData_E-MailAnalytics_DataMiningChallenge_2008.03.20.csv \
+  --model spline \
+  --outcome conversion
+```
