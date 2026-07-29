@@ -131,15 +131,17 @@ Credible alternatives were assessed before implementation:
 | --- | --- | --- |
 | S/T/X meta-learners | Simple CATE baselines and broad learner compatibility | Plug-in heterogeneity estimates do not provide this scalar orthogonal-inference contract |
 | R-learner | Orthogonal residual objective for CATE estimation | Implemented after its weighted final-stage and honest CATE evaluation/inference contracts were complete |
-| DR-learner | Doubly robust pseudo-outcome for CATE estimation | Requires propensity overlap rules plus an honest second-stage and CATE-specific uncertainty contract |
+| DR-learner | Doubly robust pseudo-outcome for CATE estimation | Implemented only after propensity, honest second-stage, evaluation, and uncertainty contracts were frozen |
 | Native honest causal forest | Strong adaptive heterogeneity workflow | Requires a separate splitting, honesty, treatment-overlap, prediction, and inference contract; it will not be delegated to another runtime package |
 | Partially linear DML | Orthogonal scalar target, cross-fitting, auditable influence inference | Selected as the smallest complete specialized causal-ML model |
 
-The implemented heterogeneous-effect path is governed by the separate
-[honest R-learner contract](R_LEARNER_CONTRACT.md), based on the residual objective of
-[Nie and Wager](https://arxiv.org/abs/1712.04912). A doubly robust learner whose two-stage
-contract follows [Kennedy](https://arxiv.org/abs/2004.14497) comes later and is not a
-placeholder public import.
+The heterogeneous-effect paths are governed by separate contracts. The
+[honest R-learner contract](R_LEARNER_CONTRACT.md) uses the residual objective of
+[Nie and Wager](https://arxiv.org/abs/1712.04912). The
+[honest DR-learner contract](DR_LEARNER_CONTRACT.md) follows the two-stage augmented
+inverse-probability construction analyzed by
+[Kennedy](https://arxiv.org/abs/2004.14497). They share role/fold and uncertainty
+infrastructure but do not share or relabel their final-stage objectives.
 
 CauseKit implements the R-learner's native prerequisites: stratified
 training-only-CV ridge Logit for binary probabilities and weighted ridge-GCV for the exact
@@ -164,6 +166,23 @@ separate result surfaces. `RLearnerResult` retains held-out R-loss, a constructi
 constant comparator, differential calibration, tie-preserving group effects, HC1/CR1
 inference, seeded simultaneous bands, prediction and graph data, and every audit record.
 It does not expose unit-level CATE intervals or policy claims.
+
+`DRLearner` cross-fits a propensity and two arm-specific conditional means on that same
+construction boundary. It refuses overlap violations rather than clipping, forms the
+canonical augmented inverse-probability score, and fits a separate unweighted
+`CATEEstimatorProtocol`. Fresh full-construction nuisance refits predict evaluation rows;
+evaluation outcomes and treatment enter only the fixed DR score used for loss,
+intercept/heterogeneity calibration, and tie-preserving mean-score groups. HC1/CR1 and
+seeded max-t bands reuse the covariance/influence kernels, but their estimands are ordinary
+DR-score group means rather than R-learner overlap-weighted residual moments.
+
+The package-owned DR final stage reuses native standardized ridge-GCV. On the one-run NSW
+comparison it exactly matched the optional scikit-learn RidgeCV loss and prediction path,
+used lower Python-managed peak memory, and was slightly slower; both tree comparators were
+worse than the construction constant. This is evidence for the dependency-free default,
+not a uniqueness claim. The DR score's double robustness requires a correct propensity or
+both correct arm outcome regressions plus the documented rates and identification—not one
+arbitrary outcome regression and not protection against unmeasured confounding.
 
 ## Validation and promotion gates
 

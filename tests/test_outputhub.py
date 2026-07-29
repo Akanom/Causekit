@@ -10,6 +10,7 @@ from causekit import (
     AIPWATE,
     IV2SLS,
     DifferenceInDifferences,
+    DRLearner,
     NearestNeighborMatch,
     PartiallyLinearDML,
     RandomizedATE,
@@ -166,6 +167,42 @@ def test_honest_rlearner_exports_loss_calibration_groups_and_tuning_without_refi
         "Honest R-learner calibration groups",
         "Honest R-learner nuisance tuning",
         "Honest R-learner CATE tuning",
+    ]
+
+
+def test_honest_drlearner_exports_score_loss_groups_and_tuning_without_refit() -> None:
+    rng = np.random.default_rng(873)
+    nobs = 360
+    covariates = pd.DataFrame(rng.normal(size=(nobs, 3)), columns=list("abc"))
+    propensity = 1.0 / (1.0 + np.exp(-(0.2 * covariates["a"] - 0.1 * covariates["b"])))
+    treatment = pd.Series(rng.binomial(1, propensity), index=covariates.index)
+    cate = 0.7 + 0.45 * covariates["a"]
+    outcome = 0.3 * covariates["b"] + cate * treatment + rng.normal(scale=0.6, size=nobs)
+    result = DRLearner(
+        n_splits=3,
+        evaluation_fraction=0.4,
+        random_state=39,
+        calibration_groups=3,
+        bootstrap_iterations=99,
+        propensity_tuning_splits=2,
+    ).fit(outcome, treatment=treatment, covariates=covariates)
+
+    model = to_outputhub_model(result)
+
+    assert model.metadata["estimator"] == "honest_dr_learner"
+    assert model.metadata["evaluation_used_for_fitting"] is False
+    assert model.metadata["unit_level_intervals"] is False
+    assert model.metadata["split_conditional"] is True
+    assert model.params.index.tolist() == ["level", "heterogeneity"]
+    hub = outputhub.OutputHub("Honest doubly robust effects")
+    add_to_outputhub(hub, result)
+    assert len(hub.models) == 1
+    assert [table.name for table in hub.tables] == [
+        "Honest DR learner honest loss",
+        "Honest DR learner calibration tests",
+        "Honest DR learner calibration groups",
+        "Honest DR learner nuisance tuning",
+        "Honest DR learner CATE tuning",
     ]
 
 

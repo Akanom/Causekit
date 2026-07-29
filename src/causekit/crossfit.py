@@ -40,6 +40,13 @@ class WeightedCATEEstimatorProtocol(Protocol):
 
 
 @runtime_checkable
+class CATEEstimatorProtocol(Protocol):
+    """Unweighted fit contract for a DR pseudo-outcome CATE learner."""
+
+    def fit(self, X: Any, y: Any) -> Any: ...
+
+
+@runtime_checkable
 class CATEResultProtocol(Protocol):
     """Prediction contract for a fitted conditional-effect learner."""
 
@@ -54,6 +61,7 @@ class NuisanceDiagnosticsProtocol(Protocol):
 
 
 NuisanceFactory = Callable[[], NuisanceEstimatorProtocol]
+CATEFactory = Callable[[], CATEEstimatorProtocol]
 WeightedCATEFactory = Callable[[], WeightedCATEEstimatorProtocol]
 PredictionAdapter = Callable[[Any, Any], Any]
 
@@ -763,6 +771,8 @@ class CrossFitter:
 
 
 __all__ = [
+    "CATEEstimatorProtocol",
+    "CATEFactory",
     "CATEResultProtocol",
     "ClassProbabilityCrossFitResult",
     "CrossFitResult",

@@ -141,6 +141,19 @@ future task can resume without reconstructing intent from chat history.
     reviewed Stata/IC 17 fixed-evaluation artifact passes at `1e-8` with maximum absolute
     difference `1.55e-15`. Linear ridge remains the default.
 
+17. `0.7.0a3` separately contracted honest DR learner: `DRLearner` cross-fits propensity
+    and both arm-specific outcome regressions inside immutable construction roles, forms
+    the canonical augmented inverse-probability score without clipping, and fits a
+    separate unweighted `CATEEstimatorProtocol`. Fresh full-construction nuisances and the
+    construction CATE model predict the untouched evaluation role. HC1/CR1 differential
+    calibration, tie-preserving mean-score groups, seeded max-t bands, graph data,
+    OutputHub, future-data prediction, score/loss/influence audit records, exact hand and
+    double-robustness simulations, base-R parity, and a hash-verified NSW comparison are
+    implemented. Native ridge-GCV exactly matched optional scikit-learn RidgeCV on that
+    split while using less Python-managed peak memory; boosting and forest were worse.
+    The reviewed Stata/IC 17 fixed-evaluation artifact passes every field at `1e-8`; the
+    maximum absolute difference is `4.44e-16`.
+
 ## Open promotion gates
 
 - Matching still defaults to `inference="none"`. Known-score reuse-aware inference and a
@@ -158,9 +171,15 @@ future task can resume without reconstructing intent from chat history.
   estimators target different moments, so those cells remain explicitly unavailable.
 - The R-learner alpha is public with honest evaluation, calibration, groups, bands, graph
   data, simulations, base-R/Stata parity, performance, native nonlinear support, and two
-  real-data CATE records. Repeated splits, unit-level intervals, RATE, policy evaluation, deployment
-  refitting, and the DR learner remain separate future contracts. The partially linear
+  real-data CATE records. Repeated splits, unit-level intervals, RATE, policy evaluation,
+  and deployment refitting remain separate future contracts. The partially linear
   DML residual-stage parity row passes in Python, base R 4.5.1, and reviewed Stata/IC 17.
+- The DR-learner alpha is a separate public estimator, not an R-learner alias. Its Python
+  hand/simulation gates and base-R fixed-evaluation parity pass. One-run NSW evidence is
+  recorded without rerunning settled R-learner comparators. Repeated splits, unit-level
+  intervals, RATE, policy evaluation, deployment refitting, and publication-scale coverage
+  remain separate gates. The Python/base-R/reviewed-Stata fixed-evaluation parity row
+  passes.
 
 ## Required implementation patterns
 
@@ -185,16 +204,14 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Add the doubly robust learner only after its propensity, pseudo-outcome, honest second-
-   stage, and uncertainty contracts are settled.
-2. Continue matching promotion from `docs/MATCHING_CONTRACT.md`: extend publication-scale
+1. Continue matching promotion from `docs/MATCHING_CONTRACT.md`: extend publication-scale
    sensitivity/coverage evidence without weakening either analytical refusal boundary.
-3. Return to DiD for pre-trend/Hausman diagnostics, repeated cross-sections,
+2. Return to DiD for pre-trend/Hausman diagnostics, repeated cross-sections,
    publication-scale coverage, direct-ratio nuisance support if justified, and broader
    reference evidence.
-4. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
+3. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
    manipulation checks, bias correction, and local estimand.
-5. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
+4. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
    effects, and clustered covariance contracts.
 
 Continue to preserve the matching tie/inference, target-population, and no-quadratic-

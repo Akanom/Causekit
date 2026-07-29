@@ -9,7 +9,7 @@ import pandas as pd
 from ..did import DiDResult
 from ..iv import IV2SLSResult
 from ..matching import NearestNeighborMatchResult
-from ..ml import PartiallyLinearDMLResult, RLearnerResult
+from ..ml import DRLearnerResult, PartiallyLinearDMLResult, RLearnerResult
 from ..observational import ObservationalATEResult
 from ..randomized import RandomizedATEResult
 
@@ -39,6 +39,7 @@ def to_outputhub_model(
         | DiDResult
         | NearestNeighborMatchResult
         | PartiallyLinearDMLResult
+        | DRLearnerResult
         | RLearnerResult
     ),
     *,
@@ -55,13 +56,14 @@ def to_outputhub_model(
             DiDResult,
             NearestNeighborMatchResult,
             PartiallyLinearDMLResult,
+            DRLearnerResult,
             RLearnerResult,
         ),
     ):
         raise TypeError(
             "result must be an IV2SLSResult, RandomizedATEResult, "
             "ObservationalATEResult, DiDResult, NearestNeighborMatchResult, or "
-            "PartiallyLinearDMLResult, or RLearnerResult."
+            "PartiallyLinearDMLResult, DRLearnerResult, or RLearnerResult."
         )
     RegressionModel = _regression_model_class()
     if isinstance(result, NearestNeighborMatchResult):
@@ -294,6 +296,62 @@ def to_outputhub_model(
             },
             source="causekit",
         )
+    if isinstance(result, DRLearnerResult):
+        return RegressionModel(
+            name=name or "Honest DR learner",
+            depvar="outcome",
+            params=result.params.rename("coef"),
+            std_errors=result.standard_errors.rename("se"),
+            pvalues=result.pvalues.rename("pvalue"),
+            statistics={
+                "N": result.nobs,
+                "Construction N": result.construction_nobs,
+                "Evaluation N": result.evaluation_nobs,
+                "Outer folds": result.n_splits,
+                "Calibration groups": result.calibration_groups,
+                "Converged": result.converged,
+            },
+            diagnostics={
+                "Honest DR loss": result.honest_dr_loss,
+                "Honest constant DR loss": result.honest_constant_dr_loss,
+                "DR loss gain": result.dr_loss_gain,
+                "Construction constant effect": result.construction_constant_effect,
+                "Calibration center": result.calibration_center,
+                "Minimum propensity": result.minimum_propensity,
+                "Maximum propensity": result.maximum_propensity,
+            },
+            metadata={
+                "estimator": result.estimator,
+                "estimand": result.estimand,
+                "backend": result.backend,
+                "covariance_type": result.covariance_type,
+                "inference_distribution": result.inference_distribution,
+                "n_clusters": result.n_clusters,
+                "n_splits": result.n_splits,
+                "split_seed": result.split_seed,
+                "requested_evaluation_fraction": result.requested_evaluation_fraction,
+                "realized_evaluation_fraction": result.realized_evaluation_fraction,
+                "split_conditional": result.split_conditional,
+                "overlap_floor": result.overlap_floor,
+                "simultaneous_level": result.simultaneous_level,
+                "simultaneous_critical_value": result.simultaneous_critical_value,
+                "bootstrap_iterations": result.bootstrap_iterations,
+                "bootstrap_random_state": result.bootstrap_random_state,
+                "native_outcome": result.native_outcome,
+                "native_propensity": result.native_propensity,
+                "native_cate": result.native_cate,
+                "outcome_control_model": result.outcome_control_model_name,
+                "outcome_treated_model": result.outcome_treated_model_name,
+                "propensity_model": result.propensity_model_name,
+                "cate_model": result.cate_model_name,
+                "nuisance_cross_fitted": True,
+                "evaluation_used_for_fitting": False,
+                "unit_level_intervals": False,
+                "causal_interpretation_requires_assumptions": True,
+                "assumptions": list(result.assumptions),
+            },
+            source="causekit",
+        )
     if isinstance(result, RandomizedATEResult):
         return RegressionModel(
             name=name or "Randomized ATE",
@@ -374,6 +432,7 @@ def add_to_outputhub(
         | DiDResult
         | NearestNeighborMatchResult
         | PartiallyLinearDMLResult
+        | DRLearnerResult
         | RLearnerResult
     ),
     *,
@@ -390,6 +449,8 @@ def add_to_outputhub(
         if isinstance(result, PartiallyLinearDMLResult)
         else "Honest R-learner"
         if isinstance(result, RLearnerResult)
+        else "Honest DR learner"
+        if isinstance(result, DRLearnerResult)
         else "Nearest-neighbor matching"
         if isinstance(result, NearestNeighborMatchResult)
         else "Efficient DiD"
@@ -486,6 +547,53 @@ def add_to_outputhub(
             f"{model_name} CATE tuning",
             result.cate_diagnostics.copy(),
             caption="Construction-only weighted CATE learner diagnostics.",
+            metadata=table_metadata,
+        )
+    elif isinstance(result, DRLearnerResult) and hasattr(hub, "add_table"):
+        table_metadata = {"source": "causekit", "estimator": result.estimator}
+        hub.add_table(
+            f"{model_name} honest loss",
+            pd.DataFrame(
+                {
+                    "value": [
+                        result.honest_dr_loss,
+                        result.honest_constant_dr_loss,
+                        result.dr_loss_gain,
+                    ]
+                },
+                index=["dr_loss", "constant_dr_loss", "dr_loss_gain"],
+            ).reset_index(names="metric"),
+            caption=(
+                "Held-out DR-score loss against a constant fitted only on construction; "
+                "the pseudo-outcome is not observed unit-level effect truth."
+            ),
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} calibration tests",
+            result.calibration_tests.reset_index(names="hypothesis"),
+            caption="Split-conditional DR-score calibration tests on honest evaluation data.",
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} calibration groups",
+            result.group_effects.reset_index(),
+            caption=(
+                "Tie-preserving mean DR group scores with pointwise intervals and "
+                "studentized multiplier-bootstrap simultaneous bands."
+            ),
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} nuisance tuning",
+            result.nuisance_diagnostics.copy(),
+            caption="Construction-only arm outcome and propensity nuisance diagnostics.",
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} CATE tuning",
+            result.cate_diagnostics.copy(),
+            caption="Construction-only unweighted DR pseudo-outcome regression diagnostics.",
             metadata=table_metadata,
         )
     elif isinstance(result, RandomizedATEResult) and result.balance and hasattr(hub, "add_table"):

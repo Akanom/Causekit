@@ -1,6 +1,6 @@
 # Architecture
 
-`causekit` is organized around small, auditable estimation paths. The `0.7.0a2`
+`causekit` is organized around small, auditable estimation paths. The `0.7.0a3`
 architecture keeps causal assumptions visible, separates numerical estimation from
 inference and diagnostics, and returns frozen labelled result containers suitable for
 reporting. The pandas objects stored inside a result should be treated as read-only; helper
@@ -275,6 +275,17 @@ or cluster-summed influence matrix. `RLearnerResult` owns OutputHub tables, exac
 data, optional plotting, and future-data prediction through the construction-fitted CATE
 model. Unit-level intervals, repeated-split aggregation, RATE, and policy evaluation stay
 outside this alpha.
+
+The honest DR learner reuses role assignment, shared cluster-preserving outer folds,
+fresh-state auditing, covariance, tie grouping, multiplier bands, and result/reporting
+conventions, while keeping a separate statistical objective. Two masked `CrossFitter`
+tasks fit control and treated outcome regressions only on their arms; a third task fits the
+propensity on the same fold plan. Construction OOF predictions form the augmented
+inverse-probability score. The public `CATEEstimatorProtocol` then fits an unweighted
+construction-only regression, distinct from the R-learner's weighted protocol. Fresh
+full-construction nuisance refits and the construction CATE model predict evaluation rows.
+`DRLearner` consumes evaluation outcomes/treatments once for fixed score loss, calibration,
+and group inference and never feeds them back into selection.
 
 The historical `limiteddepkit.TreatmentEffect` migration is complete. `IV2SLS` owns the
 replacement and a maintained numerical migration contract; the obsolete source snapshot

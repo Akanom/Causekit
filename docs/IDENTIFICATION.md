@@ -304,6 +304,20 @@ the complete reported group path under the declared sampling assumptions. The al
 not provide unit-level CATE intervals, repeated-split aggregation, RATE, targeting curves,
 or policy value.
 
+`DRLearner` targets the same binary-treatment CATE through the augmented
+inverse-probability score. Its conditional score mean identifies `tau(x)` when the
+propensity is correct or both treatment-arm outcome regressions are correct, subject to
+the same consistency, no-interference, conditional-exchangeability, overlap, and
+nuisance-rate conditions. “Doubly robust” does not cover unmeasured confounding, overlap
+failure, a single correct arm regression, or arbitrary final-stage approximation error.
+
+Construction-only cross-fitting and full-construction refits preserve the immutable honest
+boundary. Evaluation DR-score loss is a noisy model-comparison signal, not observed
+unit-level effect error. Calibration regresses the fixed evaluation score on an intercept
+and centered CATE prediction; tie-preserving groups average the DR score and therefore
+target score-defined group ATEs under the declared assumptions. Their HC1/CR1 and max-t
+uncertainty remains split-conditional and does not imply unit-level CATE intervals.
+
 ## Missing values, indices, and sample definition
 
 The default policy is `missing="raise"`. Missing or non-finite numeric values trigger an

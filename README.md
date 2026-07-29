@@ -1,12 +1,13 @@
 # CauseKit
 
 CauseKit (installed and imported as `causekit`) is an identification-aware Python package for causal inference and
-instrumental-variable workflows. The `0.7.0a2` surface provides linear two-stage least
+instrumental-variable workflows. The `0.7.0a3` surface provides linear two-stage least
 squares, randomized-experiment effects, reusable nuisance cross-fitting, IPW/AIPW ATE,
 ATT, and ATC, scalar propensity-score matching with separate fixed- and estimated-score
 analytical inference paths, conventional staggered DiD, and cross-fitted covariate-adjusted
 Chen-Sant'Anna-Xie efficient DiD for short panels, and CauseKit-native partially linear
-double machine learning plus honest heterogeneous-effect R-learning.
+double machine learning plus separately contracted honest heterogeneous-effect R- and
+DR-learning.
 
 This is alpha research software. A successful fit is not evidence that an instrument is
 valid, and an IV coefficient is not automatically an average treatment effect. State the
@@ -190,6 +191,40 @@ ridge-GCV remains the default: the nonlinear learner recovers a known piecewise 
 simulation, safely matches linear performance on the Hillstrom randomized-email data, and
 is worse on the separate NSW split. Pairwise interactions are explicit opt-in and a strict
 basis-size ceiling prevents accidental feature explosion.
+
+`DRLearner` is a separately contracted heterogeneous-effect estimator. It cross-fits the
+propensity and both treatment-arm outcome regressions inside construction, forms the
+augmented inverse-probability pseudo-outcome without clipping, and fits an unweighted CATE
+regression. The evaluation role remains untouched by every fit and tuning operation.
+
+```python
+from causekit import DRLearner
+
+drlearner = DRLearner(
+    n_splits=5,
+    evaluation_fraction=0.5,
+    random_state=2026,
+    calibration_groups=5,
+    bootstrap_iterations=999,
+).fit(outcome, treatment=treated, covariates=X)
+
+print(drlearner.summary_frame())
+print(drlearner.honest_dr_loss, drlearner.honest_constant_dr_loss)
+print(drlearner.calibration_plot_data())
+```
+
+The score is doubly robust only in the precise sense that its conditional mean is correct
+when the propensity is correct or both arm outcome regressions are correct, alongside the
+documented identification and rate conditions. It does not repair unmeasured confounding.
+HC1/CR1 calibration, tie-preserving mean-score groups, and max-t group bands are
+split-conditional; no unit-level interval, RATE, or policy-value claim is exposed. See the
+[honest DR-learner contract](docs/DR_LEARNER_CONTRACT.md).
+
+On one hash-verified NSW split, native ridge-GCV and optional scikit-learn RidgeCV produced
+the same displayed CATE predictions and honest DR loss; the native path used less
+Python-managed peak memory, while RidgeCV was slightly faster. Boosting and random forest
+were worse than the construction-fitted constant. Ridge-GCV is therefore the auditable,
+dependency-free default, not a claimed novel ridge method or universal winner.
 
 ### Nearest-neighbor matching
 
@@ -387,7 +422,7 @@ attrition correction, or multi-arm experiments.
 From PyPI after publication:
 
 ```bash
-python -m pip install causekit==0.7.0a2
+python -m pip install causekit==0.7.0a3
 ```
 
 From a source checkout:
@@ -616,10 +651,10 @@ score inference smokes are implemented, with fixed-score parity against pinned R
 checked against `statsmodels` and a reviewed Stata/IC 17 `teffects psmatch` fixture. DiD
 promotion includes cross-fitted covariate nuisances and simultaneous
 event-study bands; pre-trend/Hausman diagnostics and repeated cross-sections remain.
-The causal-ML alpha includes native partially linear DML and the public
-[honest R-learner](docs/R_LEARNER_CONTRACT.md), with immutable construction/evaluation
-roles, held-out loss/calibration, group inference, and graph data. The DR learner remains
-absent rather than a placeholder API.
+The causal-ML alpha includes native partially linear DML and separately contracted public
+[honest R-learner](docs/R_LEARNER_CONTRACT.md) and
+[honest DR-learner](docs/DR_LEARNER_CONTRACT.md) paths, with immutable
+construction/evaluation roles, held-out loss/calibration, group inference, and graph data.
 Available aligned Python/R/Stata parity rows are recorded, while unavailable comparator
 cells remain explicit. Later releases may add regression discontinuity and panel IV. Each family
 must define its estimand, assumptions, failure behavior, diagnostics, and independent

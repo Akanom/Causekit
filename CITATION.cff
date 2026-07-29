@@ -3,16 +3,16 @@ message: "If you use causekit in research, please cite the software and the exac
 type: software
 title: "CauseKit: Identification-aware causal inference and instrumental variables for Python"
 abstract: >-
-  An identification-aware Python toolkit for causal inference. Version 0.7.0a2
+  An identification-aware Python toolkit for causal inference. Version 0.7.0a3
   provides IV, randomized effects, cross-fitted nuisance orchestration,
   IPW/AIPW ATE, ATT, and ATC, auditable nearest-neighbor matching with fixed- or
   supported estimated-score inference, conventional staggered difference-in-differences, and cross-fitted
   covariate-adjusted efficient PT-All event-study estimation, and native partially linear
-  double machine learning with strict contracts.
+  double machine learning and separately contracted honest R-/DR-learning.
 authors:
   - family-names: Akanbi
     given-names: "Oluwajuwon Mayomi"
-version: 0.7.0a2
+version: 0.7.0a3
 repository-code: "https://github.com/Akanom/causekit"
 url: "https://github.com/Akanom/causekit"
 license: MIT

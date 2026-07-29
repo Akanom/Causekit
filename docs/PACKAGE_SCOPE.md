@@ -5,7 +5,7 @@ identification. Inclusion requires more than a method being common in applied ec
 the package must be able to state the estimand, identifying assumptions, supported data
 structure, inference target, diagnostics, and validation boundary.
 
-## Public `0.7.0a2` alpha surface
+## Public `0.7.0a3` alpha surface
 
 The surface is estimator-specific. Cross-sectional linear instrumental variables retain
 the following contract:
@@ -67,6 +67,13 @@ weighted group effects. Pointwise HC1/CR1 inference and seeded max-t group bands
 split-conditional. The result provides no unit-level CATE intervals, RATE, policy value,
 or repeated-split aggregation.
 
+The separately contracted `DRLearner` cross-fits the propensity and two arm-specific
+outcome regressions in construction, forms the augmented inverse-probability score without
+clipping, and fits an unweighted CATE stage. Evaluation-only DR loss, calibration, mean-
+score groups, HC1/CR1 covariance, and max-t bands preserve the same immutable honest
+boundary without relabelling the R-objective. It exposes the same unit-level, RATE, policy,
+and repeated-split refusals.
+
 ## Deliberate boundaries in this release
 
 The current alpha does not provide:
@@ -83,7 +90,7 @@ The current alpha does not provide:
 - nonlinear IV, GMM beyond linear 2SLS, or control-function estimators;
 - automatic discovery, selection, or validation of instruments;
 - native causal forests, dose-response curves, or policy learning beyond the implemented
-  honest R-learner and opt-in adaptive spline CATE stage; or
+  honest R-/DR-learners and opt-in adaptive spline R-learner CATE stage; or
 - repeated cross-fitting, multiway clustered DML, survey weights, or DML bootstrap
   inference.
 
@@ -140,6 +147,13 @@ and evaluation contract. Custom factories replace only declared learner roles; C
 continues to own splitting, overlap, residualization, evaluation, covariance, and graph
 semantics.
 
+`DRLearner` is a separate heterogeneous-effect exception rather than an alias or wrapper
+around `RLearner`. It owns the augmented inverse-probability score, two arm-specific
+outcome roles, unweighted public CATE protocol, honest loss/calibration/groups, and strict
+no-clipping overlap boundary. It reuses CauseKit's native ridge-GCV only as a subordinate
+default; optional external factories are comparator/provider escape hatches and do not
+become package dependencies.
+
 Matching inference uses a second, deliberately narrower protocol because the
 Abadie–Imbens first-step formula requires a regular full-sample parametric MLE rather than
 an arbitrary prediction learner. CauseKit validates the provider-neutral public fit
@@ -175,7 +189,7 @@ and validation gates:
 | --- | --- |
 | Matching promotion | Remaining publication-scale sensitivity/coverage evidence; fixed-score and supported estimated-Logit Python/R/Stata evidence is recorded where estimand-aligned comparators exist |
 | DiD promotion | Pre-trend/Hausman diagnostics, repeated cross-sections, publication-scale coverage, covariate performance, and broader parity |
-| Causal ML promotion | Harden the implemented honest R-learner with repeated-split and publication-scale evidence; the Stata evaluation and native nonlinear real-data gates pass, while the DR learner requires its own contract |
+| Causal ML promotion | Harden the separately implemented honest R- and DR-learners with repeated-split and publication-scale evidence; unit-level intervals, RATE, and policy evaluation retain separate contracts |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
 | Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |
 

@@ -12,6 +12,7 @@ import causekit
 from causekit import IV2SLS, IV2SLSResult
 
 PUBLIC_EXPORTS = {
+    "CATEEstimatorProtocol",
     "CATEResultProtocol",
     "IV2SLS",
     "IV2SLSResult",
@@ -36,6 +37,8 @@ PUBLIC_EXPORTS = {
     "PropensityScoreStatus",
     "FittedPropensityMLEProtocol",
     "DifferenceInDifferences",
+    "DRLearner",
+    "DRLearnerResult",
     "EfficientDiD",
     "DiDResult",
     "PartiallyLinearDML",
@@ -87,8 +90,8 @@ def test_distribution_and_import_namespace_are_causekit_only() -> None:
     metadata = (repository_root / "pyproject.toml").read_text(encoding="utf-8")
 
     assert 'name = "causekit"' in metadata
-    assert 'version = "0.7.0a2"' in metadata
-    assert causekit.__version__ == "0.7.0a2"
+    assert 'version = "0.7.0a3"' in metadata
+    assert causekit.__version__ == "0.7.0a3"
     assert (repository_root / "src" / "causekit" / "__init__.py").is_file()
     assert not (repository_root / "src" / "causalkit").exists()
 
@@ -161,6 +164,17 @@ def test_estimator_signatures_keep_identification_inputs_explicit() -> None:
     assert rlearner.parameters["covariance"].default == "robust"
     assert rlearner.parameters["calibration_groups"].default == 5
     assert rlearner.parameters["bootstrap_iterations"].default == 999
+
+    drlearner = inspect.signature(causekit.DRLearner)
+    assert drlearner.parameters["outcome_factory"].default is None
+    assert drlearner.parameters["propensity_factory"].default is None
+    assert drlearner.parameters["cate_factory"].default is None
+    assert drlearner.parameters["n_splits"].default == 5
+    assert drlearner.parameters["evaluation_fraction"].default == 0.5
+    assert drlearner.parameters["overlap_floor"].default == 0.01
+    assert drlearner.parameters["covariance"].default == "robust"
+    assert drlearner.parameters["calibration_groups"].default == 5
+    assert drlearner.parameters["bootstrap_iterations"].default == 999
 
     nonlinear_cate = inspect.signature(causekit.NativeSplineRidgeCATE)
     assert nonlinear_cate.parameters["knot_counts"].default == (0, 1, 3)

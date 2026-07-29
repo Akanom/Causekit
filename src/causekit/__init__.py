@@ -1,6 +1,7 @@
 """Identification-aware causal inference and instrumental-variable workflows."""
 
 from .crossfit import (
+    CATEEstimatorProtocol,
     CATEResultProtocol,
     ClassProbabilityCrossFitResult,
     CrossFitResult,
@@ -24,6 +25,8 @@ from .matching import (
     PropensityScoreStatus,
 )
 from .ml import (
+    DRLearner,
+    DRLearnerResult,
     NativeSplineRidgeCATE,
     NativeSplineRidgeCATEResult,
     PartiallyLinearDML,
@@ -45,6 +48,7 @@ from .postestimation import (
 from .randomized import CovariateBalance, RandomizedATE, RandomizedATEResult
 
 __all__ = [
+    "CATEEstimatorProtocol",
     "CATEResultProtocol",
     "FirstStageDiagnostic",
     "CovariateBalance",
@@ -55,6 +59,8 @@ __all__ = [
     "CrossFitter",
     "DiDResult",
     "DifferenceInDifferences",
+    "DRLearner",
+    "DRLearnerResult",
     "EfficientDiD",
     "FittedPropensityMLEProtocol",
     "AIPWATE",
@@ -92,4 +98,4 @@ __all__ = [
     "wald_test",
 ]
 
-__version__ = "0.7.0a2"
+__version__ = "0.7.0a3"

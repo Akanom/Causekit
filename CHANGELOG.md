@@ -4,6 +4,44 @@ All notable changes to CauseKit are recorded here. The project follows
 [Semantic Versioning](https://semver.org/) once a public contract is released. Alpha
 versions may refine APIs, but breaking changes must still be documented explicitly.
 
+## [0.7.0a3] - Unreleased
+
+### Added
+
+- Public `CATEEstimatorProtocol`, `DRLearner`, and `DRLearnerResult` under a contract
+  separate from the R-learner's weighted final stage.
+- Immutable treatment-stratified row or whole-cluster construction/evaluation roles;
+  shared cluster-preserving propensity and arm-outcome folds; strict arm-specific fitting;
+  fresh full-construction evaluation refits; augmented inverse-probability scores without
+  hidden clipping; and a CauseKit-native unweighted ridge-GCV default CATE stage.
+- Honest DR-score and construction-constant loss, intercept/heterogeneity calibration,
+  tie-preserving mean-score groups, HC1/CR1 inference, seeded max-t group bands, influence
+  records, graph data/optional plots, future-data prediction, and OutputHub tables.
+- Observed-failing hand/leakage/refusal contracts, exact score/loss/covariance/max-t
+  identities, both one-nuisance-side-correct simulations, native CATE recovery, base-R
+  4.5.1 parity, a reproducible manual Stata HC1 fixture, a hash-verified NSW test, and a
+  one-run NSW final-learner comparison.
+
+### Changed
+
+- The package version and public documentation now identify `0.7.0a3` and describe R- and
+  DR-learning as separate estimator objectives sharing honest infrastructure.
+- On the one-run NSW DR comparison, native ridge-GCV and optional scikit-learn RidgeCV
+  produced identical displayed predictions, loss, and gain. Native used about 39% less
+  Python-managed peak memory and was about 5.5% slower; boosting and forest were worse
+  than the construction constant. Existing R-learner benchmark artifacts were not rerun.
+
+### Known limitations
+
+- DR inference is conditional on one recorded honest split. Unit-level CATE intervals,
+  repeated-split aggregation, RATE, policy value, deployment refitting, and publication-
+  scale coverage are not implemented.
+- Double robustness requires a correct propensity or both correct arm outcome regressions,
+  plus identification and nuisance-rate conditions; it does not repair unmeasured
+  confounding or arbitrary final-stage misspecification.
+- Repeated-split and publication-scale uncertainty evidence remain open even though the
+  fixed-evaluation Python/base-R/reviewed-Stata parity row passes.
+
 ## [0.7.0a2] - Unreleased
 
 ### Added

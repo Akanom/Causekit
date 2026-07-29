@@ -39,6 +39,7 @@ uses different estimands or moments. Neither counts as a pass.
 | Efficient DiD, covariate adjusted | deterministic equation, refusal, and simulation evidence pass | unavailable: pinned public `edid` explicitly excludes covariates | unavailable: no identified Chen–Sant'Anna–Xie PT-All implementation | internal validation; external unavailable |
 | `PartiallyLinearDML` residual stage | hand score plus independent Statsmodels HC1 pass | base R 4.5.1 matrix/HC1 contract passes | reviewed Stata/IC 17 no-intercept HC1 contract passes | pass |
 | `RLearner` fixed honest evaluation | hand loss/calibration/group/max-t identities pass | base R 4.5.1 loss, HC1 calibration, and group covariance pass | reviewed Stata/IC 17 loss/calibration/group HC1 fixture passes | pass |
+| `DRLearner` fixed honest evaluation | hand pseudo-outcome/loss/calibration/group/max-t identities pass | base R 4.5.1 loss, HC1 calibration, and group covariance pass | reviewed Stata/IC 17 loss/calibration/group HC1 fixture passes | pass |
 
 The DML parity fixture fixes already out-of-fold nuisance predictions and compares the
 aligned residual-on-residual coefficient and HC1 standard error. It validates the public
@@ -69,6 +70,17 @@ The input SHA-256 is
 `946a7a49d8fa5b1926030365ee03b60ff8d857992a1956c09e783e5755b20e2d`; the reviewed
 Stata output SHA-256 is
 `d16bd2b65dfcd69340f9327239f17f3b2f384811aff4bf591884c17e0441504c`.
+
+The DR-learner parity fixture likewise conditions on immutable construction-fitted
+evaluation nuisance and CATE predictions. Python reconstructs the augmented
+inverse-probability score, losses, HC1 calibration, group covariance, influence values,
+and seeded max-t draws. `benchmarks/validate_drlearner_reference.R` passes under base R
+4.5.1. `benchmarks/prepare_drlearner_stata.py` reproduces the fixed input and
+`benchmarks/validate_drlearner_stata.do` writes diagnostic output before assertion. The
+reviewed Stata/IC 17 artifact passes all fields at `1e-8`; the maximum absolute difference
+is `4.440892098500626e-16`. The input SHA-256 is
+`dd903ee5cfd916e0be5fabf234565ad8daae1a957f8c38ccb95e1e07d9c78e78`; the output SHA-256
+is `fd70e45a700c25839602b787967c3b3634b35141942d01a21b7d69fa458598eb`.
 
 The no-covariate efficient-DiD R harness is
 `benchmarks/validate_edid_reference.R`; its maintained fixture compares every candidate

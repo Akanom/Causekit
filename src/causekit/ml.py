@@ -16,6 +16,8 @@ from scipy.stats import norm, t
 
 from ._covariance import CovarianceType, ols_covariance
 from .crossfit import (
+    CATEEstimatorProtocol,
+    CATEFactory,
     CATEResultProtocol,
     CrossFitTask,
     CrossFitter,
@@ -33,6 +35,7 @@ from .crossfit import (
 )
 
 DMLCovariance = Literal["robust", "clustered"]
+DRLearnerCovariance = Literal["robust", "clustered"]
 RLearnerCovariance = Literal["robust", "clustered"]
 TreatmentKind = Literal["binary", "continuous"]
 
@@ -532,6 +535,270 @@ class RLearnerResult:
         ax.set_xlabel("Honest predicted CATE")
         ax.set_ylabel("Evaluation observations")
         ax.set_title("Honest evaluation CATE distribution")
+        return ax
+
+
+@dataclass(frozen=True)
+class DRLearnerResult:
+    """Split-conditional honest evaluation of a construction-fitted DR learner."""
+
+    _estimation_index: pd.Index
+    _construction_index: pd.Index
+    _evaluation_index: pd.Index
+    _sample_role_values: tuple[str, ...]
+    _construction_fold_values: tuple[int, ...]
+    _cluster_labels: pd.Index | None
+    _cluster_role_values: tuple[str, ...] | None
+    _evaluation_group_values: tuple[int, ...]
+    _cate_result: Any
+    _cate_predict: PredictionAdapter | None
+    _feature_names: pd.Index
+    construction_nuisance_predictions: pd.DataFrame
+    evaluation_nuisance_predictions: pd.DataFrame
+    construction_dr_score: pd.Series
+    evaluation_dr_score: pd.Series
+    construction_cate_predictions: pd.Series
+    evaluation_cate_predictions: pd.Series
+    nuisance_diagnostics: pd.DataFrame
+    cate_diagnostics: pd.DataFrame
+    calibration_coefficients: pd.Series
+    calibration_covariance: pd.DataFrame
+    calibration_tests: pd.DataFrame
+    group_effects: pd.DataFrame
+    group_covariance: pd.DataFrame
+    group_influence: pd.DataFrame
+    honest_dr_loss: float
+    honest_constant_dr_loss: float
+    dr_loss_gain: float
+    construction_constant_effect: float
+    calibration_center: float
+    construction_dr_objective: float
+    requested_evaluation_fraction: float
+    realized_evaluation_fraction: float
+    split_seed: int | None
+    n_splits: int
+    overlap_floor: float
+    minimum_propensity: float
+    maximum_propensity: float
+    cluster_split: bool
+    nobs: int
+    construction_nobs: int
+    evaluation_nobs: int
+    calibration_groups: int
+    covariance_type: DRLearnerCovariance
+    inference_distribution: str
+    inference_df: float | None
+    n_clusters: int | None
+    simultaneous_level: float
+    simultaneous_critical_value: float
+    bootstrap_iterations: int
+    bootstrap_random_state: int | None
+    outcome_control_model_name: str
+    outcome_treated_model_name: str
+    propensity_model_name: str
+    cate_model_name: str
+    native_outcome: bool
+    native_propensity: bool
+    native_cate: bool
+    assumptions: tuple[str, ...]
+    notes: tuple[str, ...]
+    estimator: str = "honest_dr_learner"
+    estimand: str = "dr_cate_calibration"
+    converged: bool = True
+    split_conditional: bool = True
+    backend: str = "native-honest-dr-learner"
+
+    @property
+    def estimation_index(self) -> pd.Index:
+        return self._estimation_index.copy()
+
+    @property
+    def construction_index(self) -> pd.Index:
+        return self._construction_index.copy()
+
+    @property
+    def evaluation_index(self) -> pd.Index:
+        return self._evaluation_index.copy()
+
+    @property
+    def sample_role(self) -> pd.Series:
+        return pd.Series(
+            self._sample_role_values,
+            index=self._estimation_index.copy(),
+            name="sample_role",
+            dtype="object",
+        )
+
+    @property
+    def construction_fold(self) -> pd.Series:
+        return pd.Series(
+            self._construction_fold_values,
+            index=self._construction_index.copy(),
+            name="construction_fold",
+            dtype=int,
+        )
+
+    @property
+    def cluster_role(self) -> pd.Series:
+        if self._cluster_labels is None or self._cluster_role_values is None:
+            return pd.Series(name="cluster_role", dtype="object")
+        return pd.Series(
+            self._cluster_role_values,
+            index=self._cluster_labels.copy(),
+            name="cluster_role",
+            dtype="object",
+        )
+
+    @property
+    def evaluation_group(self) -> pd.Series:
+        return pd.Series(
+            self._evaluation_group_values,
+            index=self._evaluation_index.copy(),
+            name="calibration_group",
+            dtype=int,
+        )
+
+    @property
+    def params(self) -> pd.Series:
+        return self.calibration_coefficients.copy().rename("coef")
+
+    @property
+    def standard_errors(self) -> pd.Series:
+        values = np.sqrt(np.maximum(np.diag(self.calibration_covariance), 0.0))
+        return pd.Series(values, index=self.params.index.copy(), name="std_err")
+
+    @property
+    def test_statistics(self) -> pd.Series:
+        return (self.params / self.standard_errors).rename("stat")
+
+    @property
+    def pvalues(self) -> pd.Series:
+        values = _reference_probability(
+            self.test_statistics.to_numpy(dtype=float),
+            distribution=self.inference_distribution,
+            degrees_of_freedom=self.inference_df,
+        )
+        return pd.Series(values, index=self.params.index.copy(), name="p_value")
+
+    @property
+    def causal_interpretation(self) -> str:
+        return (
+            "The CATE ranking and calibration are causal only under consistency, no "
+            "interference, conditional exchangeability, overlap, the stated doubly robust "
+            "nuisance condition and rates, and the recorded honest split."
+        )
+
+    def conf_int(self, level: float = 0.95) -> pd.DataFrame:
+        """Return pointwise calibration-coefficient confidence intervals."""
+
+        if not 0.0 < level < 1.0:
+            raise ValueError("level must be strictly between zero and one.")
+        critical = _reference_critical(
+            level,
+            distribution=self.inference_distribution,
+            degrees_of_freedom=self.inference_df,
+        )
+        return pd.DataFrame(
+            {
+                "lower": self.params - critical * self.standard_errors,
+                "upper": self.params + critical * self.standard_errors,
+            },
+            index=self.params.index.copy(),
+        )
+
+    def summary_frame(self, level: float = 0.95) -> pd.DataFrame:
+        """Return honest DR calibration coefficients and pointwise inference."""
+
+        interval = self.conf_int(level)
+        return pd.DataFrame(
+            {
+                "coef": self.params,
+                "std_err": self.standard_errors,
+                "stat": self.test_statistics,
+                "p_value": self.pvalues,
+                "ci_lower": interval["lower"],
+                "ci_upper": interval["upper"],
+            },
+            index=self.params.index.copy(),
+        )
+
+    def predict(self, X: Any) -> pd.Series:
+        """Predict CATEs using the model fitted only on construction DR scores."""
+
+        frame, index = _frame(X)
+        if not frame.columns.equals(self._feature_names):
+            raise ValueError("Prediction covariate columns must match the fitted schema exactly.")
+        values = _cate_prediction(self._cate_result, frame, adapter=self._cate_predict)
+        return pd.Series(values, index=index, name="cate")
+
+    def calibration_plot_data(self) -> pd.DataFrame:
+        return self.group_effects.copy()
+
+    def cate_distribution_data(self) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "cate": self.evaluation_cate_predictions.copy(),
+                "calibration_group": self.evaluation_group,
+                "sample_role": "evaluation",
+            },
+            index=self._evaluation_index.copy(),
+        )
+
+    def graph_metadata(self) -> dict[str, Any]:
+        return {
+            "construction_nobs": self.construction_nobs,
+            "evaluation_nobs": self.evaluation_nobs,
+            "split_seed": self.split_seed,
+            "n_splits": self.n_splits,
+            "covariance_type": self.covariance_type,
+            "calibration_groups": self.calibration_groups,
+            "simultaneous_level": self.simultaneous_level,
+            "simultaneous_critical_value": self.simultaneous_critical_value,
+            "bootstrap_iterations": self.bootstrap_iterations,
+            "bootstrap_random_state": self.bootstrap_random_state,
+            "split_conditional": self.split_conditional,
+            "score": "augmented_inverse_probability",
+        }
+
+    def plot_calibration(self, *, ax: Any | None = None) -> Any:
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError as error:  # pragma: no cover - optional extra
+            raise ImportError(
+                "Install CauseKit's 'plot' extra to draw DR-learner calibration graphs."
+            ) from error
+        if ax is None:
+            _, ax = plt.subplots()
+        table = self.calibration_plot_data()
+        x = table["predicted_cate_mean"].to_numpy(dtype=float)
+        y = table["effect"].to_numpy(dtype=float)
+        lower = table["simultaneous_lower"].to_numpy(dtype=float)
+        upper = table["simultaneous_upper"].to_numpy(dtype=float)
+        ax.errorbar(x, y, yerr=np.vstack([y - lower, upper - y]), fmt="o", capsize=3)
+        limits = np.array([x.min(), x.max(), y.min(), y.max(), lower.min(), upper.max()])
+        lower_limit = float(limits.min())
+        upper_limit = float(limits.max())
+        ax.plot([lower_limit, upper_limit], [lower_limit, upper_limit], linestyle="--")
+        ax.set_xlabel("Honest mean predicted CATE")
+        ax.set_ylabel("Mean doubly robust group score")
+        ax.set_title("Honest DR-learner calibration")
+        return ax
+
+    def plot_cate_distribution(self, *, ax: Any | None = None, bins: int = 20) -> Any:
+        if isinstance(bins, bool) or not isinstance(bins, Integral) or int(bins) < 1:
+            raise ValueError("bins must be a positive integer.")
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError as error:  # pragma: no cover - optional extra
+            raise ImportError(
+                "Install CauseKit's 'plot' extra to draw DR-learner CATE distributions."
+            ) from error
+        if ax is None:
+            _, ax = plt.subplots()
+        ax.hist(self.evaluation_cate_predictions.to_numpy(dtype=float), bins=int(bins))
+        ax.set_xlabel("Honest predicted CATE")
+        ax.set_ylabel("Evaluation observations")
+        ax.set_title("Honest DR-learner CATE distribution")
         return ax
 
 
@@ -1240,6 +1507,33 @@ def _fit_weighted_cate(
     return fitted
 
 
+def _fit_cate(
+    factory: CATEFactory,
+    X: Any,
+    pseudo_outcome: Any,
+) -> Any:
+    """Create and fit one unweighted DR CATE model under its public protocol."""
+
+    if not callable(factory):
+        raise TypeError("The CATE factory must be callable.")
+    frame, index = _frame(X)
+    target = _series(pseudo_outcome, name="pseudo_outcome", index=index)
+    if len(frame) < 2:
+        raise ValueError("DR CATE fitting requires at least two observations.")
+    estimator = factory()
+    if not isinstance(estimator, CATEEstimatorProtocol):
+        raise TypeError("Each DR CATE factory must return an object with fit(X, pseudo_outcome).")
+    try:
+        signature(estimator.fit).bind(frame, target)
+    except (TypeError, ValueError) as error:
+        raise TypeError("The DR CATE estimator must accept fit(X, pseudo_outcome).") from error
+    result = estimator.fit(frame, target)
+    fitted = estimator if result is None else result
+    if not isinstance(fitted, CATEResultProtocol):
+        raise TypeError("The fitted CATE result must provide predict(X).")
+    return fitted
+
+
 @dataclass(frozen=True)
 class _HonestRConstructionResult:
     """Internal audit result for honest roles and construction-only R fitting."""
@@ -1835,6 +2129,436 @@ class _HonestRConstruction:
         )
 
 
+@dataclass(frozen=True)
+class _HonestDRConstructionResult:
+    """Internal audit result for honest roles and construction-only DR fitting."""
+
+    _estimation_index: pd.Index
+    _construction_index: pd.Index
+    _evaluation_index: pd.Index
+    _sample_role_values: tuple[str, ...]
+    _construction_fold_values: tuple[int, ...]
+    _cluster_labels: pd.Index | None
+    _cluster_role_values: tuple[str, ...] | None
+    _cate_result: Any
+    _cate_predict: PredictionAdapter | None
+    _feature_names: pd.Index
+    construction_nuisance_predictions: pd.DataFrame
+    evaluation_nuisance_predictions: pd.DataFrame
+    construction_dr_score: pd.Series
+    construction_cate_predictions: pd.Series
+    evaluation_cate_predictions: pd.Series
+    nuisance_diagnostics: pd.DataFrame
+    cate_diagnostics: pd.DataFrame
+    construction_dr_objective: float
+    requested_evaluation_fraction: float
+    realized_evaluation_fraction: float
+    split_seed: int | None
+    n_splits: int
+    overlap_floor: float
+    cluster_split: bool
+    outcome_control_model_name: str
+    outcome_treated_model_name: str
+    propensity_model_name: str
+    cate_model_name: str
+    split_conditional: bool = True
+
+    @property
+    def estimation_index(self) -> pd.Index:
+        return self._estimation_index.copy()
+
+    @property
+    def construction_index(self) -> pd.Index:
+        return self._construction_index.copy()
+
+    @property
+    def evaluation_index(self) -> pd.Index:
+        return self._evaluation_index.copy()
+
+    @property
+    def sample_role(self) -> pd.Series:
+        return pd.Series(
+            self._sample_role_values,
+            index=self._estimation_index.copy(),
+            name="sample_role",
+            dtype="object",
+        )
+
+    @property
+    def construction_fold(self) -> pd.Series:
+        return pd.Series(
+            self._construction_fold_values,
+            index=self._construction_index.copy(),
+            name="construction_fold",
+            dtype=int,
+        )
+
+    @property
+    def cluster_role(self) -> pd.Series:
+        if self._cluster_labels is None or self._cluster_role_values is None:
+            return pd.Series(name="cluster_role", dtype="object")
+        return pd.Series(
+            self._cluster_role_values,
+            index=self._cluster_labels.copy(),
+            name="cluster_role",
+            dtype="object",
+        )
+
+
+def _dr_pseudo_outcome(
+    outcome: pd.Series,
+    treatment: pd.Series,
+    outcome_control: pd.Series,
+    outcome_treated: pd.Series,
+    propensity: pd.Series,
+) -> pd.Series:
+    """Return the binary-treatment augmented inverse-probability pseudo-outcome."""
+
+    y = outcome.to_numpy(dtype=float)
+    w = treatment.to_numpy(dtype=float)
+    mu0 = outcome_control.to_numpy(dtype=float)
+    mu1 = outcome_treated.to_numpy(dtype=float)
+    e = propensity.to_numpy(dtype=float)
+    values = mu1 - mu0 + w * (y - mu1) / e - (1.0 - w) * (y - mu0) / (1.0 - e)
+    if not np.isfinite(values).all():
+        raise ValueError("Doubly robust pseudo-outcomes must contain only finite values.")
+    return pd.Series(values, index=outcome.index.copy(), name="dr_score")
+
+
+class _HonestDRConstruction:
+    """Construction-only cross-fitting and second-stage DR pseudo-outcome regression."""
+
+    def __init__(
+        self,
+        *,
+        outcome_factory: NuisanceFactory | None = None,
+        propensity_factory: NuisanceFactory | None = None,
+        cate_factory: CATEFactory | None = None,
+        n_splits: int = 5,
+        evaluation_fraction: float = 0.5,
+        random_state: int | None = None,
+        overlap_floor: float = 0.01,
+        outcome_predict: PredictionAdapter | None = None,
+        propensity_predict: PredictionAdapter | None = None,
+        cate_predict: PredictionAdapter | None = None,
+        outcome_alphas: Sequence[float] = DEFAULT_RIDGE_ALPHAS,
+        propensity_alphas: Sequence[float] = DEFAULT_RIDGE_ALPHAS,
+        cate_alphas: Sequence[float] = DEFAULT_RIDGE_ALPHAS,
+        propensity_tuning_splits: int = 3,
+    ) -> None:
+        if cate_factory is not None and not callable(cate_factory):
+            raise TypeError("cate_factory must be callable or None.")
+        self._shared = _HonestRConstruction(
+            outcome_factory=outcome_factory,
+            propensity_factory=propensity_factory,
+            cate_factory=None,
+            n_splits=n_splits,
+            evaluation_fraction=evaluation_fraction,
+            random_state=random_state,
+            overlap_floor=overlap_floor,
+            outcome_predict=outcome_predict,
+            propensity_predict=propensity_predict,
+            cate_predict=cate_predict,
+            outcome_alphas=outcome_alphas,
+            propensity_alphas=propensity_alphas,
+            cate_alphas=cate_alphas,
+            propensity_tuning_splits=propensity_tuning_splits,
+        )
+        self.dr_cate_factory: CATEFactory | None = cate_factory
+        self.n_splits: int = self._shared.n_splits
+        self.evaluation_fraction: float = self._shared.evaluation_fraction
+        self.random_state: int | None = self._shared.random_state
+        self.overlap_floor: float = self._shared.overlap_floor
+        self.outcome_predict: PredictionAdapter | None = self._shared.outcome_predict
+        self.propensity_predict: PredictionAdapter | None = self._shared.propensity_predict
+        self.cate_predict: PredictionAdapter | None = self._shared.cate_predict
+        self.cate_alphas: tuple[float, ...] = self._shared.cate_alphas
+
+    def _outcome_factory(self) -> NuisanceFactory:
+        return self._shared._outcome_factory()
+
+    def _propensity_factory(self) -> NuisanceFactory:
+        return self._shared._propensity_factory()
+
+    def _validate_role_capacity(
+        self,
+        treatment: pd.Series,
+        roles: np.ndarray,
+        clusters: pd.Series | None,
+    ) -> None:
+        self._shared._validate_role_capacity(treatment, roles, clusters)
+
+    def _dr_cate_factory(self) -> CATEFactory:
+        if self.dr_cate_factory is not None:
+            return self.dr_cate_factory
+        alphas = self.cate_alphas
+        return lambda: _NativeRidgeCV(alphas)
+
+    def fit(
+        self,
+        y: Any,
+        *,
+        treatment: Any,
+        covariates: Any,
+        clusters: Any | None = None,
+    ) -> _HonestDRConstructionResult:
+        frame, index = _frame(covariates)
+        if not index.is_unique:
+            raise ValueError("Honest DR-learner role tracking requires a unique row index.")
+        observed = _series(y, name="outcome", index=index)
+        assigned = _series(treatment, name="treatment", index=index)
+        treatment_levels = np.unique(assigned.to_numpy(dtype=float))
+        if len(treatment_levels) < 2:
+            raise ValueError("treatment must contain both arms coded exactly 0 and 1.")
+        if not np.array_equal(treatment_levels, np.array([0.0, 1.0])):
+            raise ValueError("treatment must be coded exactly 0 and 1.")
+        cluster_values = (
+            None if clusters is None else _labels(clusters, name="clusters", index=index)
+        )
+        roles = _role_assignment(
+            assigned,
+            evaluation_fraction=self.evaluation_fraction,
+            random_state=self.random_state,
+            clusters=cluster_values,
+        )
+        self._validate_role_capacity(assigned, roles, cluster_values)
+        construction = roles == "construction"
+        evaluation = roles == "evaluation"
+        construction_frame = frame.iloc[construction]
+        evaluation_frame = frame.iloc[evaluation]
+        construction_outcome = observed.iloc[construction]
+        construction_treatment = assigned.iloc[construction]
+        construction_clusters = (
+            None if cluster_values is None else cluster_values.iloc[construction]
+        )
+
+        outcome_factory = _FreshNuisanceFactory(self._outcome_factory(), label="outcome nuisance")
+        propensity_factory = _FreshNuisanceFactory(
+            self._propensity_factory(), label="propensity nuisance"
+        )
+        outcome_crossfit = CrossFitter(
+            n_splits=self.n_splits,
+            random_state=self.random_state,
+        ).fit_predict_tasks(
+            construction_frame,
+            tasks=(
+                CrossFitTask(
+                    name="outcome_control",
+                    target=construction_outcome,
+                    train_mask=construction_treatment.eq(0.0),
+                    factory=outcome_factory,
+                    predict=self.outcome_predict,
+                ),
+                CrossFitTask(
+                    name="outcome_treated",
+                    target=construction_outcome,
+                    train_mask=construction_treatment.eq(1.0),
+                    factory=outcome_factory,
+                    predict=self.outcome_predict,
+                ),
+            ),
+            strata=construction_treatment,
+            clusters=construction_clusters,
+        )
+        propensity_crossfit = CrossFitter(
+            propensity_factory=propensity_factory,
+            n_splits=self.n_splits,
+            random_state=self.random_state,
+            propensity_predict=self.propensity_predict,
+        ).fit_predict_class_probabilities(
+            construction_frame,
+            classes=construction_treatment,
+            clusters=construction_clusters,
+        )
+        if not outcome_crossfit.fold.equals(propensity_crossfit.fold):
+            raise RuntimeError("Outcome and propensity cross-fitting folds must be identical.")
+        if 1.0 not in propensity_crossfit.probabilities.columns:
+            raise ValueError("Propensity predictions must expose treated class 1.")
+        construction_propensity = propensity_crossfit.probabilities[1.0].rename("propensity")
+
+        control_mask = construction_treatment.eq(0.0)
+        treated_mask = construction_treatment.eq(1.0)
+        full_control_result = _fit(
+            outcome_factory,
+            construction_frame.loc[control_mask],
+            construction_outcome.loc[control_mask],
+        )
+        full_treated_result = _fit(
+            outcome_factory,
+            construction_frame.loc[treated_mask],
+            construction_outcome.loc[treated_mask],
+        )
+        full_propensity_result = _fit(
+            propensity_factory,
+            construction_frame,
+            construction_treatment,
+        )
+        evaluation_outcome_control = pd.Series(
+            _prediction(
+                full_control_result,
+                evaluation_frame,
+                adapter=self.outcome_predict,
+                propensity=False,
+                expected=len(evaluation_frame),
+            ),
+            index=evaluation_frame.index,
+            name="outcome_control",
+        )
+        evaluation_outcome_treated = pd.Series(
+            _prediction(
+                full_treated_result,
+                evaluation_frame,
+                adapter=self.outcome_predict,
+                propensity=False,
+                expected=len(evaluation_frame),
+            ),
+            index=evaluation_frame.index,
+            name="outcome_treated",
+        )
+        evaluation_propensity = pd.Series(
+            _prediction(
+                full_propensity_result,
+                evaluation_frame,
+                adapter=self.propensity_predict,
+                propensity=True,
+                expected=len(evaluation_frame),
+            ),
+            index=evaluation_frame.index,
+            name="propensity",
+        )
+        for probability in (construction_propensity, evaluation_propensity):
+            values = probability.to_numpy(dtype=float)
+            if np.any((values < self.overlap_floor) | (values > 1.0 - self.overlap_floor)):
+                raise ValueError(
+                    "Propensity predictions must lie inside the declared overlap interval; "
+                    "CauseKit does not clip them."
+                )
+
+        construction_predictions = pd.DataFrame(
+            {
+                "outcome_control": outcome_crossfit.predictions["outcome_control"],
+                "outcome_treated": outcome_crossfit.predictions["outcome_treated"],
+                "propensity": construction_propensity,
+            },
+            index=construction_frame.index.copy(),
+        )
+        evaluation_predictions = pd.DataFrame(
+            {
+                "outcome_control": evaluation_outcome_control,
+                "outcome_treated": evaluation_outcome_treated,
+                "propensity": evaluation_propensity,
+            },
+            index=evaluation_frame.index.copy(),
+        )
+        construction_dr_score = _dr_pseudo_outcome(
+            construction_outcome,
+            construction_treatment,
+            construction_predictions["outcome_control"],
+            construction_predictions["outcome_treated"],
+            construction_predictions["propensity"],
+        )
+        cate_result = _fit_cate(
+            self._dr_cate_factory(),
+            construction_frame,
+            construction_dr_score,
+        )
+        construction_cate = pd.Series(
+            _cate_prediction(cate_result, construction_frame, adapter=self.cate_predict),
+            index=construction_frame.index.copy(),
+            name="cate",
+        )
+        evaluation_cate = pd.Series(
+            _cate_prediction(cate_result, evaluation_frame, adapter=self.cate_predict),
+            index=evaluation_frame.index.copy(),
+            name="cate",
+        )
+        construction_error = construction_dr_score.to_numpy(
+            dtype=float
+        ) - construction_cate.to_numpy(dtype=float)
+
+        propensity_diagnostics = propensity_crossfit.model_diagnostics.copy()
+        propensity_diagnostics["task"] = "propensity"
+        refit_diagnostics = pd.DataFrame(
+            [
+                _model_diagnostic_row(
+                    full_control_result,
+                    task="outcome_control_refit",
+                    fold=-1,
+                    train_nobs=int(control_mask.sum()),
+                    holdout_nobs=len(evaluation_frame),
+                ),
+                _model_diagnostic_row(
+                    full_treated_result,
+                    task="outcome_treated_refit",
+                    fold=-1,
+                    train_nobs=int(treated_mask.sum()),
+                    holdout_nobs=len(evaluation_frame),
+                ),
+                _model_diagnostic_row(
+                    full_propensity_result,
+                    task="propensity_refit",
+                    fold=-1,
+                    train_nobs=len(construction_frame),
+                    holdout_nobs=len(evaluation_frame),
+                ),
+            ]
+        )
+        nuisance_diagnostics = pd.concat(
+            [outcome_crossfit.model_diagnostics, propensity_diagnostics, refit_diagnostics],
+            ignore_index=True,
+            sort=False,
+        )
+        cate_diagnostics = pd.DataFrame(
+            [
+                _model_diagnostic_row(
+                    cate_result,
+                    task="cate",
+                    fold=-1,
+                    train_nobs=len(construction_frame),
+                    holdout_nobs=len(evaluation_frame),
+                )
+            ]
+        )
+        cluster_labels: pd.Index | None = None
+        cluster_role_values: tuple[str, ...] | None = None
+        if cluster_values is not None:
+            cluster_labels = pd.Index(pd.unique(cluster_values), name=cluster_values.name)
+            role_series = pd.Series(roles, index=index)
+            cluster_role_values = tuple(
+                str(role_series.loc[cluster_values.eq(label)].iloc[0]) for label in cluster_labels
+            )
+        return _HonestDRConstructionResult(
+            _estimation_index=index.copy(),
+            _construction_index=construction_frame.index.copy(),
+            _evaluation_index=evaluation_frame.index.copy(),
+            _sample_role_values=tuple(str(role) for role in roles),
+            _construction_fold_values=tuple(int(value) for value in outcome_crossfit.fold),
+            _cluster_labels=cluster_labels,
+            _cluster_role_values=cluster_role_values,
+            _cate_result=cate_result,
+            _cate_predict=self.cate_predict,
+            _feature_names=frame.columns.copy(),
+            construction_nuisance_predictions=construction_predictions,
+            evaluation_nuisance_predictions=evaluation_predictions,
+            construction_dr_score=construction_dr_score,
+            construction_cate_predictions=construction_cate,
+            evaluation_cate_predictions=evaluation_cate,
+            nuisance_diagnostics=nuisance_diagnostics,
+            cate_diagnostics=cate_diagnostics,
+            construction_dr_objective=float(construction_error @ construction_error),
+            requested_evaluation_fraction=self.evaluation_fraction,
+            realized_evaluation_fraction=float(evaluation.sum() / len(frame)),
+            split_seed=self.random_state,
+            n_splits=self.n_splits,
+            overlap_floor=self.overlap_floor,
+            cluster_split=cluster_values is not None,
+            outcome_control_model_name=type(full_control_result).__name__,
+            outcome_treated_model_name=type(full_treated_result).__name__,
+            propensity_model_name=type(full_propensity_result).__name__,
+            cate_model_name=type(cate_result).__name__,
+        )
+
+
 def _strict_regression(
     design: np.ndarray,
     target: np.ndarray,
@@ -2404,6 +3128,434 @@ class RLearner:
         )
 
 
+class DRLearner:
+    """Honest binary-treatment DR learner with split-conditional inference.
+
+    Construction-only cross-fitting forms augmented inverse-probability scores and fits
+    the final CATE regression. The immutable evaluation role is used once for held-out
+    DR loss, calibration, and tie-preserving group effects.
+    """
+
+    def __init__(
+        self,
+        *,
+        outcome_factory: NuisanceFactory | None = None,
+        propensity_factory: NuisanceFactory | None = None,
+        cate_factory: CATEFactory | None = None,
+        n_splits: int = 5,
+        evaluation_fraction: float = 0.5,
+        random_state: int | None = None,
+        overlap_floor: float = 0.01,
+        covariance: DRLearnerCovariance = "robust",
+        calibration_groups: int = 5,
+        simultaneous_level: float = 0.95,
+        bootstrap_iterations: int = 999,
+        bootstrap_random_state: int | None = None,
+        outcome_predict: PredictionAdapter | None = None,
+        propensity_predict: PredictionAdapter | None = None,
+        cate_predict: PredictionAdapter | None = None,
+        outcome_alphas: Sequence[float] = DEFAULT_RIDGE_ALPHAS,
+        propensity_alphas: Sequence[float] = DEFAULT_RIDGE_ALPHAS,
+        cate_alphas: Sequence[float] = DEFAULT_RIDGE_ALPHAS,
+        propensity_tuning_splits: int = 3,
+    ) -> None:
+        if covariance not in {"robust", "clustered"}:
+            raise ValueError("covariance must be 'robust' or 'clustered'.")
+        if (
+            isinstance(calibration_groups, bool)
+            or not isinstance(calibration_groups, Integral)
+            or int(calibration_groups) < 2
+        ):
+            raise ValueError("calibration_groups must be an integer of at least two.")
+        if (
+            isinstance(bootstrap_iterations, bool)
+            or not isinstance(bootstrap_iterations, Integral)
+            or int(bootstrap_iterations) < 99
+        ):
+            raise ValueError("bootstrap_iterations must be an integer of at least 99.")
+        if bootstrap_random_state is not None and not isinstance(bootstrap_random_state, Integral):
+            raise TypeError("bootstrap_random_state must be an integer or None.")
+        if isinstance(simultaneous_level, bool):
+            raise TypeError("simultaneous_level must be numeric.")
+        try:
+            normalized_level = float(simultaneous_level)
+        except (TypeError, ValueError) as error:
+            raise TypeError("simultaneous_level must be numeric.") from error
+        if not np.isfinite(normalized_level) or not 0.0 < normalized_level < 1.0:
+            raise ValueError("simultaneous_level must be strictly between zero and one.")
+        for adapter, label in (
+            (outcome_predict, "outcome_predict"),
+            (propensity_predict, "propensity_predict"),
+            (cate_predict, "cate_predict"),
+        ):
+            if adapter is not None and not callable(adapter):
+                raise TypeError(f"{label} must be callable or None.")
+        self.outcome_factory: NuisanceFactory | None = outcome_factory
+        self.propensity_factory: NuisanceFactory | None = propensity_factory
+        self.cate_factory: CATEFactory | None = cate_factory
+        self.n_splits: int = n_splits
+        self.evaluation_fraction: float = float(evaluation_fraction)
+        self.random_state: int | None = random_state
+        self.overlap_floor: float = float(overlap_floor)
+        self.covariance: DRLearnerCovariance = cast(DRLearnerCovariance, covariance)
+        self.calibration_groups: int = int(calibration_groups)
+        self.simultaneous_level: float = normalized_level
+        self.bootstrap_iterations: int = int(bootstrap_iterations)
+        self.bootstrap_random_state: int | None = (
+            random_state if bootstrap_random_state is None else int(bootstrap_random_state)
+        )
+        self.outcome_predict: PredictionAdapter | None = outcome_predict
+        self.propensity_predict: PredictionAdapter | None = propensity_predict
+        self.cate_predict: PredictionAdapter | None = cate_predict
+        self.outcome_alphas: Sequence[float] = outcome_alphas
+        self.propensity_alphas: Sequence[float] = propensity_alphas
+        self.cate_alphas: Sequence[float] = cate_alphas
+        self.propensity_tuning_splits: int = propensity_tuning_splits
+        self._construction_estimator: _HonestDRConstruction = _HonestDRConstruction(
+            outcome_factory=outcome_factory,
+            propensity_factory=propensity_factory,
+            cate_factory=cate_factory,
+            n_splits=n_splits,
+            evaluation_fraction=evaluation_fraction,
+            random_state=random_state,
+            overlap_floor=overlap_floor,
+            outcome_predict=outcome_predict,
+            propensity_predict=propensity_predict,
+            cate_predict=cate_predict,
+            outcome_alphas=outcome_alphas,
+            propensity_alphas=propensity_alphas,
+            cate_alphas=cate_alphas,
+            propensity_tuning_splits=propensity_tuning_splits,
+        )
+
+    def fit(
+        self,
+        y: Any,
+        *,
+        treatment: Any,
+        covariates: Any,
+        clusters: Any | None = None,
+    ) -> DRLearnerResult:
+        """Fit on construction data and evaluate once on immutable honest roles."""
+
+        frame, index = _frame(covariates)
+        observed = _series(y, name="outcome", index=index)
+        assigned = _series(treatment, name="treatment", index=index)
+        if self.covariance == "clustered" and clusters is None:
+            raise ValueError("clusters must be provided when covariance='clustered'.")
+        if self.covariance != "clustered" and clusters is not None:
+            raise ValueError("clusters may be provided only when covariance='clustered'.")
+        cluster_values = (
+            None if clusters is None else _labels(clusters, name="clusters", index=index)
+        )
+        construction = self._construction_estimator.fit(
+            observed,
+            treatment=assigned,
+            covariates=frame,
+            clusters=cluster_values,
+        )
+        construction_index = construction.construction_index
+        evaluation_index = construction.evaluation_index
+        evaluation_outcome = observed.loc[evaluation_index]
+        evaluation_treatment = assigned.loc[evaluation_index]
+        evaluation_predictions = construction.evaluation_nuisance_predictions
+        evaluation_cate = construction.evaluation_cate_predictions
+        evaluation_dr_score = _dr_pseudo_outcome(
+            evaluation_outcome,
+            evaluation_treatment,
+            evaluation_predictions["outcome_control"],
+            evaluation_predictions["outcome_treated"],
+            evaluation_predictions["propensity"],
+        )
+        cate_values = evaluation_cate.to_numpy(dtype=float)
+        dr_values = evaluation_dr_score.to_numpy(dtype=float)
+        group_values = _tie_preserving_groups(
+            evaluation_cate,
+            groups=self.calibration_groups,
+        )
+
+        dr_error = dr_values - cate_values
+        honest_dr_loss = float(np.mean(dr_error**2))
+        construction_constant = float(construction.construction_dr_score.mean())
+        constant_error = dr_values - construction_constant
+        honest_constant_dr_loss = float(np.mean(constant_error**2))
+        loss_scale = max(
+            float(np.mean(dr_values**2)),
+            construction_constant**2,
+            np.finfo(float).tiny,
+        )
+        loss_tolerance = float(
+            100.0 * np.finfo(float).eps * max(len(evaluation_index), frame.shape[1], 1) * loss_scale
+        )
+        if not np.isfinite(honest_constant_dr_loss) or honest_constant_dr_loss <= loss_tolerance:
+            raise ValueError(
+                "The construction-fitted constant-effect evaluation loss is numerically zero; "
+                "DR-loss gain is unavailable."
+            )
+        dr_loss_gain = float(1.0 - honest_dr_loss / honest_constant_dr_loss)
+
+        calibration_center = float(cate_values.mean())
+        calibration_design = np.column_stack(
+            [np.ones(len(evaluation_index)), cate_values - calibration_center]
+        )
+        calibration_coefficients, calibration_error = _strict_regression(
+            calibration_design,
+            dr_values,
+            label="DR differential calibration",
+        )
+        evaluation_clusters = (
+            None if cluster_values is None else cluster_values.loc[evaluation_index]
+        )
+        calibration_covariance = ols_covariance(
+            calibration_design,
+            calibration_error,
+            covariance=cast(CovarianceType, self.covariance),
+            clusters=evaluation_clusters,
+        )
+        calibration_standard_errors = np.sqrt(
+            np.maximum(np.diag(calibration_covariance.matrix), 0.0)
+        )
+        if np.any(~np.isfinite(calibration_standard_errors)) or np.any(
+            calibration_standard_errors <= 0.0
+        ):
+            raise ValueError("DR calibration requires positive finite coefficient standard errors.")
+        calibration_index = pd.Index(["level", "heterogeneity"], dtype="object")
+        calibration_coefficients_series = pd.Series(
+            calibration_coefficients,
+            index=calibration_index,
+            name="coef",
+        )
+        calibration_covariance_frame = pd.DataFrame(
+            calibration_covariance.matrix,
+            index=calibration_index.copy(),
+            columns=calibration_index.copy(),
+        )
+        heterogeneity_estimate = float(calibration_coefficients[1])
+        heterogeneity_se = float(calibration_standard_errors[1])
+        calibration_nulls = np.array([0.0, 1.0])
+        calibration_statistics = (heterogeneity_estimate - calibration_nulls) / heterogeneity_se
+        calibration_tests = pd.DataFrame(
+            {
+                "null": calibration_nulls,
+                "estimate": heterogeneity_estimate,
+                "std_err": heterogeneity_se,
+                "statistic": calibration_statistics,
+                "p_value": _reference_probability(
+                    calibration_statistics,
+                    distribution=calibration_covariance.distribution,
+                    degrees_of_freedom=calibration_covariance.df,
+                ),
+            },
+            index=pd.Index(["heterogeneity=0", "heterogeneity=1"], dtype="object"),
+        )
+
+        for group in range(1, self.calibration_groups + 1):
+            in_group = group_values == group
+            group_treatment = evaluation_treatment.iloc[in_group]
+            if group_treatment.nunique() != 2:
+                raise ValueError(
+                    "Every honest calibration group must contain both treatment arms "
+                    "without splitting CATE score ties."
+                )
+            if evaluation_clusters is not None and evaluation_clusters.iloc[in_group].nunique() < 2:
+                raise ValueError(
+                    "Every clustered honest calibration group must contain at least two clusters."
+                )
+        group_design = np.zeros((len(evaluation_index), self.calibration_groups), dtype=float)
+        group_design[np.arange(len(evaluation_index)), group_values - 1] = 1.0
+        group_coefficients, group_error = _strict_regression(
+            group_design,
+            dr_values,
+            label="Honest DR calibration groups",
+        )
+        group_covariance = ols_covariance(
+            group_design,
+            group_error,
+            covariance=cast(CovarianceType, self.covariance),
+            clusters=evaluation_clusters,
+        )
+        group_standard_errors = np.sqrt(np.maximum(np.diag(group_covariance.matrix), 0.0))
+        if np.any(~np.isfinite(group_standard_errors)) or np.any(group_standard_errors <= 0.0):
+            raise ValueError(
+                "Honest DR calibration groups require positive finite standard errors."
+            )
+        group_statistic = group_coefficients / group_standard_errors
+        group_pvalue = _reference_probability(
+            group_statistic,
+            distribution=group_covariance.distribution,
+            degrees_of_freedom=group_covariance.df,
+        )
+        group_names = pd.Index(range(1, self.calibration_groups + 1), name="group")
+        group_bread = np.linalg.inv(group_design.T @ group_design)
+        group_influence_values = (
+            len(evaluation_index) * (group_design * group_error[:, None]) @ group_bread
+        )
+        simultaneous_critical = _group_multiplier_band(
+            group_influence_values,
+            group_standard_errors,
+            covariance=cast(RLearnerCovariance, self.covariance),
+            clusters=evaluation_clusters,
+            nparams=self.calibration_groups,
+            iterations=self.bootstrap_iterations,
+            random_state=self.bootstrap_random_state,
+            level=self.simultaneous_level,
+        )
+        point_critical = _reference_critical(
+            0.95,
+            distribution=group_covariance.distribution,
+            degrees_of_freedom=group_covariance.df,
+        )
+        group_rows: list[dict[str, float | int]] = []
+        for group in range(1, self.calibration_groups + 1):
+            in_group = group_values == group
+            group_scores = cate_values[in_group]
+            group_treatment = evaluation_treatment.iloc[in_group]
+            position = group - 1
+            group_rows.append(
+                {
+                    "nobs": int(in_group.sum()),
+                    "n_treated": int(group_treatment.sum()),
+                    "n_control": int(len(group_treatment) - group_treatment.sum()),
+                    "n_clusters": (
+                        int(evaluation_clusters.iloc[in_group].nunique())
+                        if evaluation_clusters is not None
+                        else np.nan
+                    ),
+                    "predicted_cate_mean": float(group_scores.mean()),
+                    "predicted_cate_min": float(group_scores.min()),
+                    "predicted_cate_max": float(group_scores.max()),
+                    "effect": float(group_coefficients[position]),
+                    "std_err": float(group_standard_errors[position]),
+                    "stat": float(group_statistic[position]),
+                    "p_value": float(group_pvalue[position]),
+                    "ci_lower": float(
+                        group_coefficients[position]
+                        - point_critical * group_standard_errors[position]
+                    ),
+                    "ci_upper": float(
+                        group_coefficients[position]
+                        + point_critical * group_standard_errors[position]
+                    ),
+                    "pointwise_level": 0.95,
+                    "simultaneous_level": self.simultaneous_level,
+                    "simultaneous_critical_value": simultaneous_critical,
+                    "simultaneous_lower": float(
+                        group_coefficients[position]
+                        - simultaneous_critical * group_standard_errors[position]
+                    ),
+                    "simultaneous_upper": float(
+                        group_coefficients[position]
+                        + simultaneous_critical * group_standard_errors[position]
+                    ),
+                }
+            )
+        group_effects = pd.DataFrame(group_rows, index=group_names)
+        group_covariance_frame = pd.DataFrame(
+            group_covariance.matrix,
+            index=group_names.copy(),
+            columns=group_names.copy(),
+        )
+        group_influence = pd.DataFrame(
+            group_influence_values,
+            index=evaluation_index.copy(),
+            columns=group_names.copy(),
+        )
+        all_propensities = pd.concat(
+            [
+                construction.construction_nuisance_predictions["propensity"],
+                evaluation_predictions["propensity"],
+            ]
+        )
+        notes = [
+            "All evaluation records are split-conditional and were used once.",
+            "Group effects are means of honest doubly robust scores, not unit-level truth.",
+            "No unit-level CATE intervals, policy values, or RATE claims are provided.",
+        ]
+        if self.outcome_factory is None and self.propensity_factory is None:
+            notes.append("Outcome and propensity nuisances used CauseKit-native learners.")
+        else:
+            notes.append(
+                "At least one external nuisance factory was supplied; fold-internal tuning "
+                "remains the analyst's responsibility."
+            )
+        return DRLearnerResult(
+            _estimation_index=construction.estimation_index,
+            _construction_index=construction_index,
+            _evaluation_index=evaluation_index,
+            _sample_role_values=tuple(construction.sample_role.astype(str)),
+            _construction_fold_values=tuple(construction.construction_fold.astype(int)),
+            _cluster_labels=(
+                None if construction.cluster_role.empty else construction.cluster_role.index.copy()
+            ),
+            _cluster_role_values=(
+                None
+                if construction.cluster_role.empty
+                else tuple(construction.cluster_role.astype(str))
+            ),
+            _evaluation_group_values=tuple(int(value) for value in group_values),
+            _cate_result=construction._cate_result,
+            _cate_predict=construction._cate_predict,
+            _feature_names=construction._feature_names.copy(),
+            construction_nuisance_predictions=construction.construction_nuisance_predictions.copy(),
+            evaluation_nuisance_predictions=evaluation_predictions.copy(),
+            construction_dr_score=construction.construction_dr_score.copy(),
+            evaluation_dr_score=evaluation_dr_score,
+            construction_cate_predictions=construction.construction_cate_predictions.copy(),
+            evaluation_cate_predictions=evaluation_cate.copy(),
+            nuisance_diagnostics=construction.nuisance_diagnostics.copy(),
+            cate_diagnostics=construction.cate_diagnostics.copy(),
+            calibration_coefficients=calibration_coefficients_series,
+            calibration_covariance=calibration_covariance_frame,
+            calibration_tests=calibration_tests,
+            group_effects=group_effects,
+            group_covariance=group_covariance_frame,
+            group_influence=group_influence,
+            honest_dr_loss=honest_dr_loss,
+            honest_constant_dr_loss=honest_constant_dr_loss,
+            dr_loss_gain=dr_loss_gain,
+            construction_constant_effect=construction_constant,
+            calibration_center=calibration_center,
+            construction_dr_objective=construction.construction_dr_objective,
+            requested_evaluation_fraction=construction.requested_evaluation_fraction,
+            realized_evaluation_fraction=construction.realized_evaluation_fraction,
+            split_seed=construction.split_seed,
+            n_splits=construction.n_splits,
+            overlap_floor=construction.overlap_floor,
+            minimum_propensity=float(all_propensities.min()),
+            maximum_propensity=float(all_propensities.max()),
+            cluster_split=construction.cluster_split,
+            nobs=len(frame),
+            construction_nobs=len(construction_index),
+            evaluation_nobs=len(evaluation_index),
+            calibration_groups=self.calibration_groups,
+            covariance_type=self.covariance,
+            inference_distribution=calibration_covariance.distribution,
+            inference_df=calibration_covariance.df,
+            n_clusters=calibration_covariance.n_clusters,
+            simultaneous_level=self.simultaneous_level,
+            simultaneous_critical_value=simultaneous_critical,
+            bootstrap_iterations=self.bootstrap_iterations,
+            bootstrap_random_state=self.bootstrap_random_state,
+            outcome_control_model_name=construction.outcome_control_model_name,
+            outcome_treated_model_name=construction.outcome_treated_model_name,
+            propensity_model_name=construction.propensity_model_name,
+            cate_model_name=construction.cate_model_name,
+            native_outcome=self.outcome_factory is None,
+            native_propensity=self.propensity_factory is None,
+            native_cate=self.cate_factory is None,
+            assumptions=(
+                "Binary treatment consistency",
+                "No interference",
+                "Conditional exchangeability given declared pre-treatment covariates",
+                "Overlap inside the declared interval without clipping",
+                "Correct propensity or both treatment-arm outcome regressions with valid rates",
+                "Independent honest evaluation not used for fitting or tuning",
+                "Independent sampling across declared clusters for clustered inference",
+            ),
+            notes=tuple(notes),
+        )
+
+
 class PartiallyLinearDML:
     """DML2 for a scalar treatment in a partially linear structural model.
 
@@ -2601,6 +3753,9 @@ class PartiallyLinearDML:
 
 __all__ = [
     "DMLCovariance",
+    "DRLearner",
+    "DRLearnerCovariance",
+    "DRLearnerResult",
     "PartiallyLinearDML",
     "PartiallyLinearDMLResult",
     "RLearner",

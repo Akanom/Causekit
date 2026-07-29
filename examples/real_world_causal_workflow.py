@@ -27,6 +27,7 @@ from causekit import (
     IV2SLS,
     CrossFitter,
     DifferenceInDifferences,
+    DRLearner,
     EfficientDiD,
     NearestNeighborMatch,
     PartiallyLinearDML,
@@ -169,6 +170,17 @@ def _observational_workflow(data: pd.DataFrame) -> None:
         treatment=treatment,
         covariates=covariates,
     )
+    drlearner = DRLearner(
+        n_splits=5,
+        evaluation_fraction=0.5,
+        random_state=20_260_730,
+        calibration_groups=5,
+        bootstrap_iterations=999,
+    ).fit(
+        outcome,
+        treatment=treatment,
+        covariates=covariates,
+    )
     print("\nObservational effects — maternal smoking and birthweight")
     print(pd.concat([ipw.summary_frame(), aipw.summary_frame()], keys=["IPW", "AIPW"]))
     print(matched.summary_frame().rename(index={"att": "matching_att"}).to_string())
@@ -190,12 +202,26 @@ def _observational_workflow(data: pd.DataFrame) -> None:
     )
     print("\nTie-preserving honest calibration groups")
     print(rlearner.calibration_plot_data().to_string())
+    print("\nCauseKit-native honest DR-learner differential calibration")
+    print(drlearner.summary_frame().to_string())
+    print("\nHonest DR-score loss comparison")
+    print(
+        pd.Series(
+            {
+                "dr_loss": drlearner.honest_dr_loss,
+                "constant_dr_loss": drlearner.honest_constant_dr_loss,
+                "dr_loss_gain": drlearner.dr_loss_gain,
+            }
+        ).to_string()
+    )
     print("The DML coefficient is an ATE only under a constant-effect partially linear")
     print("model and the documented exchangeability, variation, and nuisance conditions.")
     print("Matching uncertainty is intentionally absent: cross-fitted scores do not satisfy")
     print("CauseKit's narrow full-sample Logit-MLE analytical-inference contract.")
     print("R-learner evidence is split-conditional. Group effects are overlap-weighted")
     print("residual moments; no unit-level CATE intervals or policy-value claim is made.")
+    print("DR-learner evidence is also split-conditional. Double robustness requires a")
+    print("correct propensity or both arm outcome regressions; it does not fix confounding.")
 
 
 def _hospital_panel(data: pd.DataFrame) -> pd.DataFrame:
