@@ -83,6 +83,15 @@ future task can resume without reconstructing intent from chat history.
     performance comparison records native and optional external learner results without
     adding an ML dependency.
 
+12. `0.7.0a2` ridge audit and heterogeneous-effect design: the native GCV path now uses
+    SVD shrinkage identities without fitted-vector reconstruction. A denser grid lowered
+    training GCV but slightly worsened the same real-data OOF errors and was rejected as
+    the default. `NuisanceDiagnosticsProtocol` carries scalar per-task/fold
+    tuning records through CrossFitter, DML results, and OutputHub. The five-fold Cattaneo
+    smoke was revalidated without rerunning external comparators. The honest R-learner
+    construction/evaluation, R-loss, calibration, grouping, uncertainty, graphing, and
+    refusal contract is recorded; no placeholder estimator is exported.
+
 ## Open promotion gates
 
 - Matching still defaults to `inference="none"`. Known-score reuse-aware inference and a
@@ -98,9 +107,11 @@ future task can resume without reconstructing intent from chat history.
   and a larger covariate benchmark remain open. Covariate-efficient external parity was
   audited: the pinned public R implementation has no covariate path and reviewed Stata
   estimators target different moments, so those cells remain explicitly unavailable.
-- R/DR learners, heterogeneous-effect diagnostics, and their materially useful graphing
-  contracts are not yet implemented. The partially linear DML residual-stage parity row
-  passes in Python, base R 4.5.1, and a reviewed manual Stata/IC 17 run.
+- R/DR learners and heterogeneous-effect diagnostics/graphs are not yet implemented. The
+  R-learner contract is complete, but its native penalized-probability prerequisite,
+  weighted CATE learner, leakage tests, and honest evaluation remain open. The partially
+  linear DML residual-stage parity row passes in Python, base R 4.5.1, and a reviewed manual
+  Stata/IC 17 run.
 
 ## Required implementation patterns
 
@@ -125,18 +136,21 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Design the native heterogeneous-effect R-learner contract, including honest evaluation
-   and the CATE/calibration graphing surface, before implementation.
-2. Add the doubly robust learner only after its propensity, pseudo-outcome, honest second-
+1. Implement the R-learner prerequisites in `docs/R_LEARNER_CONTRACT.md`: native
+   penalized-probability and weighted-CATE protocols, then leakage/refusal contracts.
+2. Implement the honest construction/evaluation split, R-loss, differential calibration,
+   group bands, and graph-data surface; run simulation/parity/real-data gates before
+   promotion.
+3. Add the doubly robust learner only after its propensity, pseudo-outcome, honest second-
    stage, and uncertainty contracts are settled.
-3. Continue matching promotion from `docs/MATCHING_CONTRACT.md`: extend publication-scale
+4. Continue matching promotion from `docs/MATCHING_CONTRACT.md`: extend publication-scale
    sensitivity/coverage evidence without weakening either analytical refusal boundary.
-4. Return to DiD for pre-trend/Hausman diagnostics, repeated cross-sections,
+5. Return to DiD for pre-trend/Hausman diagnostics, repeated cross-sections,
    publication-scale coverage, direct-ratio nuisance support if justified, and broader
    reference evidence.
-5. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
+6. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
    manipulation checks, bias correction, and local estimand.
-6. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
+7. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
    effects, and clustered covariance contracts.
 
 Continue to preserve the matching tie/inference, target-population, and no-quadratic-

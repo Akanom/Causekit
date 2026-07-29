@@ -107,7 +107,7 @@ def _download(specification: RealDataset, destination: Path) -> None:
     temporary.unlink(missing_ok=True)
     request = Request(
         specification.url,
-        headers={"User-Agent": "causekit-real-data-example/0.7.0a1"},
+        headers={"User-Agent": "causekit-real-data-example/0.7.0a2"},
     )
     opener = build_opener(
         HTTPSHandler(context=ssl.create_default_context()),

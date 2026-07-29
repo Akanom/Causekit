@@ -45,6 +45,37 @@ class _LinearOutcome:
         return _LinearResult(np.linalg.lstsq(design, np.asarray(y), rcond=None)[0])
 
 
+class _DiagnosticLinearResult(_LinearResult):
+    def nuisance_diagnostics(self):
+        return {"selected_alpha": 0.25, "effective_df": 2.5}
+
+
+class _DiagnosticLinearOutcome:
+    def fit(self, X, y):
+        design = np.column_stack([np.ones(len(X)), np.asarray(X, dtype=float)])
+        coefficients = np.linalg.lstsq(design, np.asarray(y), rcond=None)[0]
+        return _DiagnosticLinearResult(coefficients)
+
+
+class _PayloadDiagnosticLinearResult(_LinearResult):
+    def __init__(self, coefficients, payload) -> None:
+        super().__init__(coefficients)
+        self.payload = payload
+
+    def nuisance_diagnostics(self):
+        return self.payload
+
+
+class _PayloadDiagnosticLinearOutcome:
+    def __init__(self, payload) -> None:
+        self.payload = payload
+
+    def fit(self, X, y):
+        design = np.column_stack([np.ones(len(X)), np.asarray(X, dtype=float)])
+        coefficients = np.linalg.lstsq(design, np.asarray(y), rcond=None)[0]
+        return _PayloadDiagnosticLinearResult(coefficients, self.payload)
+
+
 class _ClassProbabilityResult:
     def __init__(self, classes: np.ndarray, probabilities: np.ndarray) -> None:
         self.classes_ = classes
@@ -86,6 +117,13 @@ def test_cross_fitter_returns_complete_aligned_out_of_fold_predictions() -> None
     assert result.outcome_control.index.equals(X.index)
     assert set(result.fold.unique()) == set(range(5))
     assert np.isfinite(result.propensity).all()
+    assert len(result.model_diagnostics) == 15
+    assert set(result.model_diagnostics["task"]) == {
+        "propensity",
+        "outcome_treated",
+        "outcome_control",
+    }
+    assert not result.model_diagnostics["diagnostics_available"].any()
     for fold in range(5):
         held_out = result.fold == fold
         assert treatment[held_out].nunique() == 2
@@ -158,6 +196,8 @@ def test_multiclass_probabilities_are_aligned_out_of_fold_and_sum_to_one() -> No
     assert result.probabilities.columns.tolist() == [2.0, 4.0, np.inf]
     np.testing.assert_allclose(result.probabilities.sum(axis=1), 1.0, rtol=0, atol=1e-14)
     assert result.fold.index.equals(X.index)
+    assert len(result.model_diagnostics) == 3
+    assert result.model_diagnostics["task"].eq("class_probability").all()
     for fold in range(3):
         assert set(classes[result.fold == fold]) == {2.0, 4.0, np.inf}
 
@@ -182,6 +222,60 @@ def test_masked_regression_tasks_share_folds_and_preserve_task_labels() -> None:
     assert result.predictions.index.equals(X.index)
     np.testing.assert_allclose(result.predictions, np.column_stack([target, target]), atol=1e-12)
     assert set(result.model_names) == {"all", "stratum_zero"}
+
+
+def test_task_cross_fitting_exposes_provider_neutral_fold_diagnostics() -> None:
+    X = pd.DataFrame({"x": np.arange(12, dtype=float)})
+    target = pd.Series(1.0 + 0.5 * X["x"], index=X.index)
+    result = CrossFitter(n_splits=3, random_state=7).fit_predict_tasks(
+        X,
+        tasks=[
+            CrossFitTask(
+                name="mean",
+                target=target,
+                factory=_DiagnosticLinearOutcome,
+            )
+        ],
+    )
+
+    diagnostics = result.model_diagnostics
+    assert diagnostics[["task", "fold"]].to_records(index=False).tolist() == [
+        ("mean", 0),
+        ("mean", 1),
+        ("mean", 2),
+    ]
+    assert diagnostics["model"].eq("_DiagnosticLinearResult").all()
+    assert diagnostics["train_nobs"].eq(8).all()
+    assert diagnostics["holdout_nobs"].eq(4).all()
+    assert diagnostics["diagnostics_available"].all()
+    assert diagnostics["selected_alpha"].eq(0.25).all()
+    assert diagnostics["effective_df"].eq(2.5).all()
+
+
+@pytest.mark.parametrize(
+    ("payload", "error", "message"),
+    [
+        (["not", "a", "mapping"], TypeError, "diagnostics must return a mapping"),
+        ({"fold": 1}, ValueError, "is reserved"),
+        ({"loss": np.inf}, ValueError, "must be finite"),
+        ({"path": [1.0, 2.0]}, TypeError, "only scalar values"),
+    ],
+)
+def test_cross_fitting_refuses_malformed_declared_diagnostics(payload, error, message) -> None:
+    X = pd.DataFrame({"x": np.arange(8, dtype=float)})
+    target = pd.Series(1.0 + X["x"], index=X.index)
+
+    with pytest.raises(error, match=message):
+        CrossFitter(n_splits=2, random_state=3).fit_predict_tasks(
+            X,
+            tasks=[
+                CrossFitTask(
+                    name="mean",
+                    target=target,
+                    factory=lambda: _PayloadDiagnosticLinearOutcome(payload),
+                )
+            ],
+        )
 
 
 def test_generic_cross_fitting_refuses_duplicate_tasks_and_too_small_strata() -> None:

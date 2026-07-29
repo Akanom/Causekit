@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "causekit"
-version = "0.7.0a1"
+version = "0.7.0a2"
 description = "Identification-aware causal inference and instrumental-variable workflows for Python."
 readme = "README.md"
 requires-python = ">=3.10"

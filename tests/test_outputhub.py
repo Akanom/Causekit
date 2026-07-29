@@ -127,6 +127,9 @@ def test_partially_linear_dml_converts_without_reestimating_nuisance_models() ->
     hub = outputhub.OutputHub("Causal ML")
     add_to_outputhub(hub, result)
     assert len(hub.models) == 1
+    assert len(hub.tables) == 1
+    assert hub.tables[0].name == "Partially linear DML nuisance tuning"
+    assert set(hub.tables[0].data["task"]) == {"outcome_mean", "treatment_mean"}
 
 
 def test_did_converts_and_adds_auditable_effect_tables() -> None:

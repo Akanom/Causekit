@@ -5,7 +5,7 @@ identification. Inclusion requires more than a method being common in applied ec
 the package must be able to state the estimand, identifying assumptions, supported data
 structure, inference target, diagnostics, and validation boundary.
 
-## Public `0.7.0a1` alpha surface
+## Public `0.7.0a2` alpha surface
 
 The surface is estimator-specific. Cross-sectional linear instrumental variables retain
 the following contract:
@@ -52,10 +52,11 @@ not a replacement default.
 The causal-ML surface adds `PartiallyLinearDML` for the scalar DML2 coefficient in a
 declared constant-effect partially linear model. CauseKit owns its default standardized
 ridge-GCV nuisance learner, performs selection independently inside each outer training
-fold, and exposes aligned predictions, residuals, fold assignments, orthogonal scores,
-influence functions, HC1/CR1 inference, residual-treatment diagnostics, and OutputHub
-metadata. Optional public nuisance factories remain available only when a design needs a
-different learner; they do not create a runtime dependency.
+fold, and exposes aligned predictions, residuals, fold assignments, fold-level tuning
+diagnostics, orthogonal scores, influence functions, HC1/CR1 inference,
+residual-treatment diagnostics, and OutputHub metadata/tables. Optional public nuisance
+factories remain available only when a design needs a different learner; they do not
+create a runtime dependency.
 
 ## Deliberate boundaries in this release
 
@@ -159,7 +160,7 @@ and validation gates:
 | --- | --- |
 | Matching promotion | Remaining publication-scale sensitivity/coverage evidence; fixed-score and supported estimated-Logit Python/R/Stata evidence is recorded where estimand-aligned comparators exist |
 | DiD promotion | Pre-trend/Hausman diagnostics, repeated cross-sections, publication-scale coverage, covariate performance, and broader parity |
-| Causal ML promotion | Repeated-splitting sensitivity, broader real-data evidence, then separate R/DR-learner and heterogeneous-effect graphing contracts; aligned Python/R/Stata residual-stage parity is recorded |
+| Causal ML promotion | Implement the approved honest R-learner contract, including a native probability prerequisite, R-loss/calibration evidence, and graph-data parity; design the DR learner only afterward |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
 | Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |
 

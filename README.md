@@ -1,7 +1,7 @@
 # CauseKit
 
 CauseKit (installed and imported as `causekit`) is an identification-aware Python package for causal inference and
-instrumental-variable workflows. The `0.7.0a1` surface provides linear two-stage least
+instrumental-variable workflows. The `0.7.0a2` surface provides linear two-stage least
 squares, randomized-experiment effects, reusable nuisance cross-fitting, IPW/AIPW ATE,
 ATT, and ATC, scalar propensity-score matching with separate fixed- and estimated-score
 analytical inference paths, conventional staggered DiD, and cross-fitted covariate-adjusted
@@ -118,6 +118,7 @@ dml = PartiallyLinearDML(
 
 print(dml.summary_frame())
 print(dml.nuisance_predictions)
+print(dml.nuisance_diagnostics)
 print(dml.residual_treatment_second_moment)
 ```
 
@@ -127,6 +128,9 @@ necessary, while `CrossFitter` retains the shared out-of-fold plan. The reported
 is an ATE only under a credible constant-effect partially linear model, consistency, no
 interference, conditional exchangeability, residual treatment variation, and the DML
 nuisance-rate/regularity conditions. See the [causal-ML contract](docs/ML_CONTRACT.md).
+The native learner reports one tuning row per task and outer fold, including its selected
+penalty, effective degrees of freedom, GCV score, training RMSE, numerical rank, grid size,
+and whether selection reached a grid boundary.
 
 ### Nearest-neighbor matching
 
@@ -324,7 +328,7 @@ attrition correction, or multi-arm experiments.
 From PyPI after publication:
 
 ```bash
-python -m pip install causekit==0.7.0a1
+python -m pip install causekit==0.7.0a2
 ```
 
 From a source checkout:
@@ -553,9 +557,10 @@ score inference smokes are implemented, with fixed-score parity against pinned R
 checked against `statsmodels` and a reviewed Stata/IC 17 `teffects psmatch` fixture. DiD
 promotion includes cross-fitted covariate nuisances and simultaneous
 event-study bands; pre-trend/Hausman diagnostics and repeated cross-sections remain.
-The causal-ML alpha starts with native partially linear DML; R- and DR-learner contracts,
-heterogeneous-effect diagnostics, and graphing are next-stage candidates rather than
-placeholder APIs.
+The causal-ML alpha starts with native partially linear DML. The
+[honest R-learner contract](docs/R_LEARNER_CONTRACT.md) now fixes its construction/evaluation
+split, R-loss, differential calibration, group-inference, and graphing requirements before
+implementation. The R- and later DR-learner remain absent rather than placeholder APIs.
 Available aligned Python/R/Stata parity rows are recorded, while unavailable comparator
 cells remain explicit. Later releases may add regression discontinuity and panel IV. Each family
 must define its estimand, assumptions, failure behavior, diagnostics, and independent

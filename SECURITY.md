@@ -58,6 +58,10 @@ serialized estimators, execute provider code, or contact an external service. Su
 custom nuisance factory executes user-provided Python by design; callers must treat that
 factory and any model artifacts it loads as trusted code. Optional benchmark comparators
 are development-only and are not imported by the installed native execution path.
+Optional nuisance diagnostics accept only named scalar values. Arrays, fitted objects,
+nonfinite numbers, and reserved CrossFitter fields are refused before reporting, limiting
+accidental bulk export through OutputHub. Custom scalar strings still originate in trusted
+provider code and must be reviewed before external reporting.
 
 ## Dependency and release policy
 

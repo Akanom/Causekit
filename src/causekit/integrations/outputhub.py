@@ -197,6 +197,11 @@ def to_outputhub_model(
             source="causekit",
         )
     if isinstance(result, PartiallyLinearDMLResult):
+        boundary_fits = (
+            int(result.nuisance_diagnostics["alpha_at_boundary"].sum())
+            if "alpha_at_boundary" in result.nuisance_diagnostics
+            else None
+        )
         return RegressionModel(
             name=name or "Partially linear DML",
             depvar="outcome",
@@ -212,6 +217,7 @@ def to_outputhub_model(
                 "Residual treatment second moment": (result.residual_treatment_second_moment),
                 "Residual treatment tolerance": result.residual_treatment_tolerance,
                 "Orthogonal score mean": result.orthogonal_score_mean,
+                "Nuisance alpha boundary fits": boundary_fits,
             },
             metadata={
                 "estimator": result.estimator,
@@ -366,6 +372,16 @@ def add_to_outputhub(
                 caption="Pre-treatment covariate balance before and after matching.",
                 metadata=table_metadata,
             )
+    elif isinstance(result, PartiallyLinearDMLResult) and hasattr(hub, "add_table"):
+        hub.add_table(
+            f"{model_name} nuisance tuning",
+            result.nuisance_diagnostics.copy(),
+            caption=(
+                "Fold-local nuisance tuning and training diagnostics; every row was fitted "
+                "without its corresponding holdout fold."
+            ),
+            metadata={"source": "causekit", "estimator": result.estimator},
+        )
     elif isinstance(result, RandomizedATEResult) and result.balance and hasattr(hub, "add_table"):
         hub.add_table(
             f"{model_name} covariate balance",

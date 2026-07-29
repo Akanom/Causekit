@@ -162,6 +162,8 @@ def _observational_workflow(data: pd.DataFrame) -> None:
     print(matched.summary_frame().rename(index={"att": "matching_att"}).to_string())
     print("\nCauseKit-native partially linear DML")
     print(dml.summary_frame().to_string())
+    print("\nFold-level native nuisance tuning")
+    print(dml.nuisance_diagnostics.to_string(index=False))
     print("The DML coefficient is an ATE only under a constant-effect partially linear")
     print("model and the documented exchangeability, variation, and nuisance conditions.")
     print("Matching uncertainty is intentionally absent: cross-fitted scores do not satisfy")

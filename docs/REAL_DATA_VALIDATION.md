@@ -41,8 +41,9 @@ not establish exclusion; the smoking analysis remains observational; cross-fitte
 matching is not given an unsupported analytical standard error; and PT-All efficient DiD
 is displayed beside the conventional estimator rather than replacing it.
 
-The real-data causal-ML workflow returned `theta=-225.350625` with robust standard error
-`22.439969` under the documented five-fold native ridge-GCV specification. This is a
+The `0.7.0a2` real-data causal-ML workflow returned `theta=-225.350625` with robust standard
+error `22.439969` under the documented five-fold native ridge-GCV specification. All ten
+outcome/treatment fold fits selected interior penalties. This is a
 deterministic software smoke, not evidence that smoking is conditionally exchangeable or
 that a constant treatment effect is scientifically credible. The separate one-run
 performance record is [Causal-ML real-data performance](ML_BENCHMARK.md).

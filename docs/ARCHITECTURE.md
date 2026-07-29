@@ -1,6 +1,6 @@
 # Architecture
 
-`causekit` is organized around small, auditable estimation paths. The `0.7.0a1`
+`causekit` is organized around small, auditable estimation paths. The `0.7.0a2`
 architecture keeps causal assumptions visible, separates numerical estimation from
 inference and diagnostics, and returns frozen labelled result containers suitable for
 reporting. The pandas objects stored inside a result should be treated as read-only; helper
@@ -82,7 +82,7 @@ The installed source tree assigns one primary responsibility to each module:
 | `causekit.crossfit` | Public nuisance protocols, deterministic stratified fold orchestration, binary/multiclass probabilities, masked scalar tasks, fresh-model fitting, prediction adaptation, and aligned out-of-fold records |
 | `causekit.matching` | Supplied-score ATT/ATC/ATE matching, sorted scalar neighbor search, support/caliper rules, fractional ties, weights, reuse, balance, and separate fixed-score or validated Logit-MLE analytical inference |
 | `causekit.did` | Balanced-panel validation, conventional group-time DiD, cross-fitted covariate PT-All scores/conditional weights, pointwise and simultaneous influence inference, and cohort/event/calendar aggregation |
-| `causekit.ml` | Native ridge-GCV nuisance fitting, shared-fold partially linear DML2 score, influence inference, diagnostics, and fitted result |
+| `causekit.ml` | Native ridge-GCV nuisance fitting, shared-fold partially linear DML2 score, influence inference, fold-level tuning diagnostics, and fitted result |
 | `causekit.postestimation` | Summary, covariance, confidence interval, prediction, residual, fitted-value, linear-combination, and Wald helpers |
 | `causekit.integrations.outputhub` | Lazy optional conversion and insertion into Universal Output Hub |
 | `causekit.datasets` | Opt-in HTTPS-only, SHA-256-pinned real-data cache used by examples and parity; source datasets are not redistributed |
@@ -239,6 +239,11 @@ treatment conditional-mean tasks through the same `CrossFitter` plan, residualiz
 and evaluates the pooled DML2 orthogonal score with vectorized arrays. When no factories
 are supplied, every fold receives a fresh CauseKit-native standardized ridge learner; its
 penalty is selected by generalized cross-validation using only that fold's training rows.
+The SVD path evaluates candidate residual sums of squares without reconstructing fitted
+vectors. A denser candidate grid did not improve the recorded real-data out-of-fold errors,
+so the original six-point default remains. The optional public
+`NuisanceDiagnosticsProtocol` carries scalar tuning diagnostics through `CrossFitter` into
+the DML result and OutputHub.
 The residual second stage reuses the one-column HC1/CR1 covariance kernel, for which the
 linear score and influence-function formulas coincide exactly. Zero or numerically weak
 residual treatment variation refuses before inference rather than receiving ridge repair.
@@ -295,6 +300,8 @@ architecture.
 - Aggregate cluster scores in one pass over normalized cluster codes.
 - Keep DML nuisance selection inside each outer training fold and pool only aligned
   out-of-fold scores; never tune against an outer held-out row.
+- Keep nuisance diagnostics scalar and fold-labelled; do not expose raw training rows or
+  fitted provider objects through the result surface.
 - Fail before expensive factorization when shapes, missing data, or exact rank make the
   model invalid.
 - Never log raw observations, instrument values, or cluster identifiers by default.

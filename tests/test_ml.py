@@ -114,6 +114,8 @@ def test_hand_computed_dml2_score_influence_and_hc1_contract() -> None:
         "treatment_mean",
     ]
     assert result.fold.index.equals(result.estimation_index)
+    assert len(result.nuisance_diagnostics) == 4
+    assert not result.nuisance_diagnostics["diagnostics_available"].any()
 
 
 def test_clustered_dml_aggregates_the_same_influence_function() -> None:
@@ -171,6 +173,100 @@ def test_native_ridge_gcv_is_the_dependency_free_default() -> None:
     assert result.treatment_model_name == "NativeRidgeCVResult"
     assert result.native_nuisance is True
     assert result.estimate == pytest.approx(1.4, abs=0.2)
+    diagnostics = result.nuisance_diagnostics
+    assert len(diagnostics) == 6
+    assert set(diagnostics["task"]) == {"outcome_mean", "treatment_mean"}
+    assert set(diagnostics["fold"]) == {0, 1, 2}
+    assert diagnostics["diagnostics_available"].all()
+    assert diagnostics["alpha_grid_size"].eq(6).all()
+    assert diagnostics["selected_alpha"].between(1e-6, 1e4).all()
+    assert diagnostics["effective_df"].between(1.0, 5.0).all()
+    assert diagnostics["gcv_score"].ge(0.0).all()
+    assert diagnostics["training_rmse"].ge(0.0).all()
+    assert diagnostics["numerical_rank"].between(0, 4).all()
+    assert diagnostics["train_nobs"].eq(120).all()
+    assert diagnostics["holdout_nobs"].eq(60).all()
+
+
+def test_supplied_dense_grid_weakly_improves_gcv_without_changing_default() -> None:
+    rng = np.random.default_rng(9207)
+    nobs = 240
+    covariates = pd.DataFrame(rng.normal(size=(nobs, 8)), columns=[f"x{i}" for i in range(8)])
+    treatment = (
+        0.8 * covariates["x0"]
+        - 0.35 * covariates["x1"]
+        + 0.15 * covariates["x2"]
+        + rng.normal(scale=1.4, size=nobs)
+    )
+    outcome = (
+        1.7 * treatment
+        + 0.5 * covariates["x0"]
+        - 0.4 * covariates["x3"]
+        + rng.normal(scale=2.0, size=nobs)
+    )
+    old_grid = (1e-6, 1e-4, 1e-2, 1.0, 100.0, 10_000.0)
+    default_estimator = PartiallyLinearDML(n_splits=4, random_state=29)
+    assert default_estimator.ridge_alphas == old_grid
+    refined_grid = tuple(float(10.0**exponent) for exponent in np.linspace(-6.0, 4.0, 41))
+    assert all(
+        any(candidate == pytest.approx(old_alpha) for candidate in refined_grid)
+        for old_alpha in old_grid
+    )
+    refined = PartiallyLinearDML(
+        n_splits=4,
+        random_state=29,
+        ridge_alphas=refined_grid,
+    ).fit(
+        outcome,
+        treatment=treatment,
+        covariates=covariates,
+    )
+    coarse = default_estimator.fit(
+        outcome,
+        treatment=treatment,
+        covariates=covariates,
+    )
+
+    keys = ["task", "fold"]
+    comparison = refined.nuisance_diagnostics.merge(
+        coarse.nuisance_diagnostics,
+        on=keys,
+        suffixes=("_refined", "_coarse"),
+        validate="one_to_one",
+    )
+    assert (comparison["gcv_score_refined"] <= comparison["gcv_score_coarse"] + 1e-12).all()
+    assert (comparison["gcv_score_refined"] < comparison["gcv_score_coarse"] - 1e-8).any()
+
+
+def test_native_fold_gcv_diagnostics_match_direct_fitted_vector_calculation() -> None:
+    rng = np.random.default_rng(1804)
+    covariates = pd.DataFrame(rng.normal(size=(90, 3)), columns=["a", "b", "c"])
+    treatment = 0.6 * covariates["a"] + rng.normal(size=len(covariates))
+    outcome = 1.5 * treatment - 0.4 * covariates["b"] + rng.normal(size=len(covariates))
+    result = PartiallyLinearDML(n_splits=3, random_state=13).fit(
+        outcome,
+        treatment=treatment,
+        covariates=covariates,
+    )
+    diagnostic = result.nuisance_diagnostics.query("task == 'outcome_mean' and fold == 0").iloc[0]
+    training = result.fold.ne(0).to_numpy()
+    raw = covariates.iloc[training].to_numpy(dtype=float)
+    target = outcome.iloc[training].to_numpy(dtype=float)
+    standardized = (raw - raw.mean(axis=0)) / raw.std(axis=0, ddof=0)
+    centered_target = target - target.mean()
+    left, singular_values, _ = np.linalg.svd(standardized, full_matrices=False)
+    alpha = float(diagnostic["selected_alpha"])
+    shrinkage = singular_values**2 / (singular_values**2 + alpha)
+    fitted = left @ (shrinkage * (left.T @ centered_target))
+    residual = centered_target - fitted
+    effective_df = 1.0 + float(shrinkage.sum())
+    direct_gcv = len(target) * float(residual @ residual) / (len(target) - effective_df) ** 2
+
+    assert diagnostic["effective_df"] == pytest.approx(effective_df, rel=2e-14)
+    assert diagnostic["training_rmse"] == pytest.approx(
+        float(np.sqrt((residual @ residual) / len(target))), rel=2e-14
+    )
+    assert diagnostic["gcv_score"] == pytest.approx(direct_gcv, rel=2e-14)
 
 
 @pytest.mark.simulation

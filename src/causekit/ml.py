@@ -38,6 +38,11 @@ class NativeRidgeCVResult:
     feature_names: pd.Index
     selected_alpha: float
     effective_df: float
+    gcv_score: float
+    training_rmse: float
+    numerical_rank: int
+    alpha_grid_size: int
+    alpha_at_boundary: bool
 
     def predict(self, X: Any) -> np.ndarray:
         if isinstance(X, pd.DataFrame):
@@ -54,6 +59,19 @@ class NativeRidgeCVResult:
             raise ValueError("Prediction covariates must contain only finite values.")
         standardized = (raw - self.feature_mean) / self.feature_scale
         return self.intercept + standardized @ self.coefficients
+
+    def nuisance_diagnostics(self) -> dict[str, float | int | bool]:
+        """Return scalar tuning diagnostics for CrossFitter's fold audit table."""
+
+        return {
+            "selected_alpha": self.selected_alpha,
+            "effective_df": self.effective_df,
+            "gcv_score": self.gcv_score,
+            "training_rmse": self.training_rmse,
+            "numerical_rank": self.numerical_rank,
+            "alpha_grid_size": self.alpha_grid_size,
+            "alpha_at_boundary": self.alpha_at_boundary,
+        }
 
 
 class _NativeRidgeCV:
@@ -81,25 +99,43 @@ class _NativeRidgeCV:
         left, singular_values, right = np.linalg.svd(standardized, full_matrices=False)
         projected = left.T @ centered_target
         squared = singular_values**2
+        projected_squared = projected**2
+        orthogonal_residual = centered_target - left @ projected
+        orthogonal_sum_squares = float(orthogonal_residual @ orthogonal_residual)
+        if len(singular_values) and singular_values[0] > 0.0:
+            rank_tolerance = (
+                np.finfo(float).eps * max(standardized.shape) * float(singular_values[0])
+            )
+            numerical_rank = int(np.sum(singular_values > rank_tolerance))
+        else:
+            numerical_rank = 0
 
         best_alpha = self.alphas[-1]
         best_gcv = float("inf")
+        best_residual_sum_squares = float("inf")
         best_effective_df = 1.0
-        for alpha in self.alphas:
+        best_position = len(self.alphas) - 1
+        for position, alpha in enumerate(self.alphas):
             shrinkage = squared / (squared + alpha)
-            fitted = left @ (shrinkage * projected)
-            residual = centered_target - fitted
             effective_df = 1.0 + float(shrinkage.sum())
             residual_df = len(raw) - effective_df
+            residual_sum_squares = orthogonal_sum_squares + float(
+                ((1.0 - shrinkage) ** 2 * projected_squared).sum()
+            )
             gcv = (
-                float(len(raw) * (residual @ residual) / residual_df**2)
+                float(len(raw) * residual_sum_squares / residual_df**2)
                 if residual_df > np.sqrt(np.finfo(float).eps)
                 else float("inf")
             )
             if gcv < best_gcv:
                 best_alpha = alpha
                 best_gcv = gcv
+                best_residual_sum_squares = residual_sum_squares
                 best_effective_df = effective_df
+                best_position = position
+
+        if not np.isfinite(best_gcv):
+            raise ValueError("Native ridge could not identify a finite GCV candidate.")
 
         coefficients = right.T @ (singular_values / (squared + best_alpha) * projected)
         return NativeRidgeCVResult(
@@ -110,6 +146,11 @@ class _NativeRidgeCV:
             feature_names=X.columns.copy(),
             selected_alpha=float(best_alpha),
             effective_df=float(best_effective_df),
+            gcv_score=float(best_gcv),
+            training_rmse=float(np.sqrt(best_residual_sum_squares / len(raw))),
+            numerical_rank=numerical_rank,
+            alpha_grid_size=len(self.alphas),
+            alpha_at_boundary=best_position in {0, len(self.alphas) - 1},
         )
 
 
@@ -127,6 +168,7 @@ class PartiallyLinearDMLResult:
     residualized_outcome: pd.Series
     residualized_treatment: pd.Series
     nuisance_predictions: pd.DataFrame
+    nuisance_diagnostics: pd.DataFrame
     fold: pd.Series
     nobs: int
     covariance_type: DMLCovariance
@@ -383,6 +425,7 @@ class PartiallyLinearDML:
                 treatment_residual, index=index, name="residualized_treatment"
             ),
             nuisance_predictions=predictions.copy(),
+            nuisance_diagnostics=nuisance.model_diagnostics.copy(),
             fold=nuisance.fold.copy(),
             nobs=len(frame),
             covariance_type=self.covariance,

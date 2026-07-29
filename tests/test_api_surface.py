@@ -26,6 +26,7 @@ PUBLIC_EXPORTS = {
     "CrossFitTaskResult",
     "ClassProbabilityCrossFitResult",
     "NuisanceEstimatorProtocol",
+    "NuisanceDiagnosticsProtocol",
     "PropensityResultProtocol",
     "OutcomeResultProtocol",
     "NearestNeighborMatch",
@@ -80,8 +81,8 @@ def test_distribution_and_import_namespace_are_causekit_only() -> None:
     metadata = (repository_root / "pyproject.toml").read_text(encoding="utf-8")
 
     assert 'name = "causekit"' in metadata
-    assert 'version = "0.7.0a1"' in metadata
-    assert causekit.__version__ == "0.7.0a1"
+    assert 'version = "0.7.0a2"' in metadata
+    assert causekit.__version__ == "0.7.0a2"
     assert (repository_root / "src" / "causekit" / "__init__.py").is_file()
     assert not (repository_root / "src" / "causalkit").exists()
 

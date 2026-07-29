@@ -4,6 +4,37 @@ All notable changes to CauseKit are recorded here. The project follows
 [Semantic Versioning](https://semver.org/) once a public contract is released. Alpha
 versions may refine APIs, but breaking changes must still be documented explicitly.
 
+## [0.7.0a2] - Unreleased
+
+### Added
+
+- Public `NuisanceDiagnosticsProtocol` and provider-neutral per-task/per-fold diagnostic
+  tables on every CrossFitter result.
+- Native ridge audit fields for selected penalty, effective degrees of freedom, GCV score,
+  training RMSE, numerical rank, grid size, and boundary selection; the complete table is
+  retained on `PartiallyLinearDMLResult` and exported through OutputHub.
+- An honest R-learner design contract covering construction/evaluation separation,
+  overlap, weighted fitting, held-out R-loss, differential calibration, group effects,
+  simultaneous bands, graph-data parity, refusals, and promotion evidence.
+
+### Changed
+
+- Candidate GCV residual sums of squares now use the SVD shrinkage identity without
+  reconstructing a fitted vector for each penalty. A denser 41-point grid was evaluated
+  but rejected as the default after it slightly worsened the recorded real-data OOF errors;
+  the proven six-point default remains.
+- Revalidated the five-fold Cattaneo workflow at `theta=-225.350625` with robust standard
+  error `22.439969`; all ten nuisance fits selected interior penalties. The frozen
+  `0.7.0a1` external-learner rows were not rerun or overwritten.
+
+### Known limitations
+
+- Weakly lower training-fold GCV under a denser supplied grid did not improve the recorded
+  held-out errors and does not imply stronger causal identification.
+- The R-learner is contract-only. A native probability learner, weighted CATE learner,
+  leakage tests, honest calibration inference, and simulation/real-data validation remain
+  implementation gates.
+
 ## [0.7.0a1] - Unreleased
 
 ### Added

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
+from numbers import Integral, Real
 from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
@@ -31,6 +32,13 @@ class OutcomeResultProtocol(Protocol):
     def predict(self, X: Any) -> Any: ...
 
 
+@runtime_checkable
+class NuisanceDiagnosticsProtocol(Protocol):
+    """Optional scalar diagnostics exposed by a fitted nuisance result."""
+
+    def nuisance_diagnostics(self) -> Mapping[str, Any]: ...
+
+
 NuisanceFactory = Callable[[], NuisanceEstimatorProtocol]
 PredictionAdapter = Callable[[Any, Any], Any]
 
@@ -47,6 +55,7 @@ class CrossFitResult:
     random_state: int | None
     propensity_model_name: str
     outcome_model_name: str
+    model_diagnostics: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
 @dataclass(frozen=True)
@@ -74,6 +83,7 @@ class CrossFitTaskResult:
     n_splits: int
     random_state: int | None
     model_names: dict[str, str]
+    model_diagnostics: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
 @dataclass(frozen=True)
@@ -85,6 +95,7 @@ class ClassProbabilityCrossFitResult:
     n_splits: int
     random_state: int | None
     model_name: str
+    model_diagnostics: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
 def _fit(factory: NuisanceFactory, X: Any, y: Any) -> Any:
@@ -93,6 +104,60 @@ def _fit(factory: NuisanceFactory, X: Any, y: Any) -> Any:
         raise TypeError("Each nuisance factory must return an object with fit(X, y).")
     result = estimator.fit(X, y)
     return estimator if result is None else result
+
+
+_DIAGNOSTIC_RESERVED_COLUMNS = {
+    "task",
+    "fold",
+    "model",
+    "train_nobs",
+    "holdout_nobs",
+    "diagnostics_available",
+}
+
+
+def _model_diagnostic_row(
+    result: Any,
+    *,
+    task: str,
+    fold: int,
+    train_nobs: int,
+    holdout_nobs: int,
+) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "task": task,
+        "fold": fold,
+        "model": type(result).__name__,
+        "train_nobs": train_nobs,
+        "holdout_nobs": holdout_nobs,
+        "diagnostics_available": False,
+    }
+    if not isinstance(result, NuisanceDiagnosticsProtocol):
+        return row
+    supplied = result.nuisance_diagnostics()
+    if not isinstance(supplied, Mapping):
+        raise TypeError("nuisance diagnostics must return a mapping of scalar values.")
+    normalized: dict[str, Any] = {}
+    for key, raw_value in supplied.items():
+        if not isinstance(key, str) or not key.strip():
+            raise TypeError("nuisance diagnostic names must be non-empty strings.")
+        if key in _DIAGNOSTIC_RESERVED_COLUMNS:
+            raise ValueError(f"nuisance diagnostic name {key!r} is reserved by CrossFitter.")
+        value = raw_value.item() if isinstance(raw_value, np.generic) else raw_value
+        if isinstance(value, bool) or value is None or isinstance(value, str):
+            normalized[key] = value
+        elif isinstance(value, Integral):
+            normalized[key] = int(value)
+        elif isinstance(value, Real):
+            numeric = float(value)
+            if not np.isfinite(numeric):
+                raise ValueError("numeric nuisance diagnostics must be finite.")
+            normalized[key] = numeric
+        else:
+            raise TypeError("nuisance diagnostics must contain only scalar values.")
+    row["diagnostics_available"] = True
+    row.update(normalized)
+    return row
 
 
 def _default_propensity_prediction(result: Any, X: Any) -> np.ndarray:
@@ -336,6 +401,7 @@ class CrossFitter:
         mu1 = np.empty(len(frame), dtype=float)
         mu0 = np.empty(len(frame), dtype=float)
         propensity_name = outcome_name = "unknown"
+        diagnostic_rows: list[dict[str, Any]] = []
         assigned_values = assigned.to_numpy(dtype=float)
         for fold in range(self.n_splits):
             test = folds == fold
@@ -352,6 +418,15 @@ class CrossFitter:
                 propensity=True,
                 expected=int(test.sum()),
             )
+            diagnostic_rows.append(
+                _model_diagnostic_row(
+                    propensity_result,
+                    task="propensity",
+                    fold=fold,
+                    train_nobs=int(train.sum()),
+                    holdout_nobs=int(test.sum()),
+                )
+            )
             arm_results: list[Any] = []
             for arm, target in ((1.0, mu1), (0.0, mu0)):
                 arm_train = train & (assigned_values == arm)
@@ -363,6 +438,15 @@ class CrossFitter:
                     adapter=self.outcome_predict,
                     propensity=False,
                     expected=int(test.sum()),
+                )
+                diagnostic_rows.append(
+                    _model_diagnostic_row(
+                        result,
+                        task="outcome_treated" if arm == 1.0 else "outcome_control",
+                        fold=fold,
+                        train_nobs=int(arm_train.sum()),
+                        holdout_nobs=int(test.sum()),
+                    )
                 )
             outcome_name = type(arm_results[0]).__name__
 
@@ -379,6 +463,7 @@ class CrossFitter:
             random_state=self.random_state,
             propensity_model_name=propensity_name,
             outcome_model_name=outcome_name,
+            model_diagnostics=pd.DataFrame(diagnostic_rows),
         )
 
     def fit_predict_class_probabilities(
@@ -404,6 +489,7 @@ class CrossFitter:
         )
         probabilities = np.empty((len(frame), len(observed_classes)), dtype=float)
         model_name = "unknown"
+        diagnostic_rows: list[dict[str, Any]] = []
         for fold in range(self.n_splits):
             test = folds == fold
             train = ~test
@@ -415,6 +501,15 @@ class CrossFitter:
                 classes=observed_classes,
                 adapter=self.propensity_predict,
             )
+            diagnostic_rows.append(
+                _model_diagnostic_row(
+                    result,
+                    task="class_probability",
+                    fold=fold,
+                    train_nobs=int(train.sum()),
+                    holdout_nobs=int(test.sum()),
+                )
+            )
         return ClassProbabilityCrossFitResult(
             probabilities=pd.DataFrame(
                 probabilities,
@@ -425,6 +520,7 @@ class CrossFitter:
             n_splits=self.n_splits,
             random_state=self.random_state,
             model_name=model_name,
+            model_diagnostics=pd.DataFrame(diagnostic_rows),
         )
 
     def fit_predict_tasks(
@@ -456,6 +552,7 @@ class CrossFitter:
         )
         predictions = np.empty((len(frame), len(task_list)), dtype=float)
         model_names: dict[str, str] = {}
+        diagnostic_rows: list[dict[str, Any]] = []
         for task_position, task in enumerate(task_list):
             target = _series(task.target, name=task.name, index=index)
             train_mask = (
@@ -482,12 +579,22 @@ class CrossFitter:
                     propensity=False,
                     expected=int(test.sum()),
                 )
+                diagnostic_rows.append(
+                    _model_diagnostic_row(
+                        result,
+                        task=task.name,
+                        fold=fold,
+                        train_nobs=int(train.sum()),
+                        holdout_nobs=int(test.sum()),
+                    )
+                )
         return CrossFitTaskResult(
             predictions=pd.DataFrame(predictions, index=index.copy(), columns=names),
             fold=pd.Series(folds, index=index.copy(), name="fold"),
             n_splits=self.n_splits,
             random_state=self.random_state,
             model_names=model_names,
+            model_diagnostics=pd.DataFrame(diagnostic_rows),
         )
 
 
@@ -498,6 +605,7 @@ __all__ = [
     "CrossFitTaskResult",
     "CrossFitter",
     "NuisanceEstimatorProtocol",
+    "NuisanceDiagnosticsProtocol",
     "NuisanceFactory",
     "OutcomeResultProtocol",
     "PredictionAdapter",

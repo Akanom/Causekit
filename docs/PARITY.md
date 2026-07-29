@@ -47,6 +47,9 @@ Stata harness is `benchmarks/validate_dml_stata.do`; its reviewed Stata/IC 17 ou
 `benchmarks/validate_dml_stata_output.txt`. The estimate difference is
 `2.220446049250313e-16` and the standard-error difference is
 `5.551115123125783e-17`, both below the declared `1e-10` tolerance.
+Those immutable comparator artifacts record `0.7.0a1`. Version `0.7.0a2` changes native
+nuisance-grid selection and diagnostic transport, not the fixed-OOF residual-stage moment
+used by the parity fixture, so the reviewed R/Stata second-stage evidence remains aligned.
 
 The no-covariate efficient-DiD R harness is
 `benchmarks/validate_edid_reference.R`; its maintained fixture compares every candidate

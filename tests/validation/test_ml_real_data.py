@@ -30,3 +30,5 @@ def test_real_cattaneo_native_partially_linear_dml_smoke() -> None:
     assert native.standard_error > 0.0
     assert native.estimate == pytest.approx(-225.350625, abs=2e-6)
     assert native.standard_error == pytest.approx(22.439969, abs=2e-6)
+    assert len(native.nuisance_diagnostics) == 10
+    assert not native.nuisance_diagnostics["alpha_at_boundary"].any()

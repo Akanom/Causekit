@@ -64,7 +64,18 @@ With no factories supplied, the public constructor uses CauseKit's native ridge-
 nuisance learner for both the outcome and treatment regressions. Its centering, scaling,
 penalty grid, tie behavior, and numerical solve are package-owned and tested. Selection is
 nested inside each outer fold, so it never evaluates a penalty on that fold's held-out
-observations.
+observations. A tested 41-point candidate grid weakly lowered training-fold GCV but did not
+improve the one-run real-data out-of-fold errors, so the proven six-point default remains.
+Users can supply a denser ordered grid explicitly; lower training GCV is not represented as
+a guarantee of lower held-out error or better causal identification.
+
+The GCV path computes residual sums of squares from the SVD shrinkage factors without
+reconstructing a fitted length-`n` vector for every candidate. Each fitted native result
+implements the public `NuisanceDiagnosticsProtocol`. `CrossFitter` exposes one row per
+task/fold with training and holdout counts, selected penalty, effective degrees of freedom,
+GCV score, training RMSE, numerical rank, grid size, and boundary-selection flag. Custom
+models without the optional protocol retain a row with `diagnostics_available=False`;
+malformed declared diagnostics refuse rather than disappearing silently.
 
 The constructor also accepts fresh factories for the outcome and treatment regressions
 when the native learner is substantively inadequate. Each factory must return an object
@@ -124,9 +135,10 @@ Credible alternatives were assessed before implementation:
 | Native honest causal forest | Strong adaptive heterogeneity workflow | Requires a separate splitting, honesty, treatment-overlap, prediction, and inference contract; it will not be delegated to another runtime package |
 | Partially linear DML | Orthogonal scalar target, cross-fitting, auditable influence inference | Selected as the smallest complete specialized causal-ML model |
 
-The next heterogeneous-effect candidates are an R-learner based on the residual objective
-of [Nie and Wager](https://arxiv.org/abs/1712.04912), followed by a doubly robust learner
-whose two-stage contract follows [Kennedy](https://arxiv.org/abs/2004.14497). Neither is a
+The next heterogeneous-effect candidate is governed by the separate
+[honest R-learner contract](R_LEARNER_CONTRACT.md), based on the residual objective of
+[Nie and Wager](https://arxiv.org/abs/1712.04912). A doubly robust learner whose two-stage
+contract follows [Kennedy](https://arxiv.org/abs/2004.14497) comes later. Neither is a
 placeholder public import in this milestone.
 
 ## Validation and promotion gates

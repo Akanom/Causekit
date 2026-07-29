@@ -51,6 +51,10 @@ score, influence function, residual-treatment Jacobian, HC1 covariance, cluster-
 covariance, and reference distribution. They also verify shared binary-stratified folds,
 native fold-local ridge-GCV defaults, deterministic continuous-treatment recovery,
 alignment/factory/fold/cluster refusals, and numerical residual-treatment identification.
+A supplied dense-grid test proves that nesting the default candidates weakly lowers every
+fold's selected GCV and improves at least one deterministic fold strictly. The dense grid
+is not the default because the one-run real-data OOF errors did not improve. CrossFitter
+contract tests reconstruct provider-neutral diagnostic rows and refuse malformed mappings.
 Statsmodels and base R independently reproduce the fixed residual-stage coefficient and
 HC1 standard error. The manually executed Stata/IC 17 harness writes its result before
 asserting; the reviewed saved output passes both estimate and standard-error assertions at
@@ -215,7 +219,8 @@ passing only after its tests have executed successfully in the recorded environm
 | Efficient DiD | Multiple pre-periods and auxiliary cohorts under PT-All | Candidate effects, inverse-covariance weights, efficient influence, singular refusal, R parity |
 | Covariate-efficient DiD | Multiple moments, valid/invalid overlap and covariance systems | OOF alignment, equation (4.4) scores, equation (3.12) weights, exact refusal boundaries |
 | DiD inference | Entity and higher-level clustered sampling | HC1/cluster score identities, pointwise metadata, robust/cluster max-t band identities |
-| Partially linear DML | Binary/continuous treatment, native/custom nuisance, robust/clustered inference | DML2 score, OOF fold alignment, native ridge-GCV, influence/Jacobian identities, strict weak-signal refusal |
+| Partially linear DML | Binary/continuous treatment, native/custom nuisance, robust/clustered inference | DML2 score, OOF fold alignment, native ridge-GCV, fold tuning audit, direct GCV identity, influence/Jacobian identities, strict weak-signal refusal |
+| Honest R-learner design | Binary treatment, honest construction/evaluation roles, overlap, calibration, grouping | Contract only: leakage/refusal, R-loss, differential calibration, group bands, simulation and real-data gates before implementation |
 | Causal-ML performance | One hash-verified real dataset, one identically folded run per model | Estimate, standard error, OOF outcome/treatment RMSE, elapsed time, Python peak memory, versions, no runtime comparator dependency |
 
 ## Cross-software parity matrix
