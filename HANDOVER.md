@@ -92,6 +92,14 @@ future task can resume without reconstructing intent from chat history.
     construction/evaluation, R-loss, calibration, grouping, uncertainty, graphing, and
     refusal contract is recorded; no placeholder estimator is exported.
 
+    A separate one-run NSW job-training benchmark now exercises the same scalar DML path
+    on 445 observations and eight pre-treatment covariates. CauseKit native ridge-GCV had
+    the lowest outcome OOF RMSE (6608.467270), runtime (0.0456 seconds), and
+    Python-managed peak memory (0.210 MiB); fold-local standardized scikit-learn RidgeCV
+    had a 0.180% lower treatment OOF RMSE. Histogram boosting and random forest were worse
+    on both nuisance targets. This supports keeping native ridge-GCV as the efficient
+    default, not a universal superiority or CATE claim. The Cattaneo rows were not rerun.
+
 ## Open promotion gates
 
 - Matching still defaults to `inference="none"`. Known-score reuse-aware inference and a

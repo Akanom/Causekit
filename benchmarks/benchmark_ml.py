@@ -1,11 +1,12 @@
-"""One-run causal-ML performance comparison on verified Cattaneo real data.
+"""One-run causal-ML performance comparison on verified real data.
 
 CauseKit's installed package has no external ML dependency. Comparator imports in this
 benchmark are optional and never serve as an estimation backend for the native model.
 
 Example:
 
-    python benchmarks/benchmark_ml.py --models all --output ml-benchmark.json
+    python benchmarks/benchmark_ml.py --dataset nsw_mixtape --models all \
+        --output ml-benchmark-nsw.json
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import platform
 import time
 import tracemalloc
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -29,6 +31,7 @@ from causekit import PartiallyLinearDML
 from causekit.datasets import REAL_DATASETS, load_real_dataset
 
 SEED = 20_260_729
+DEFAULT_DATASET = "cattaneo2"
 MODEL_NAMES = (
     "causekit_native_ridge_gcv",
     "sklearn_ridge_cv",
@@ -37,17 +40,67 @@ MODEL_NAMES = (
 )
 
 
-def _design(*, data_directory: Path | None, download: bool) -> dict[str, Any]:
+@dataclass(frozen=True)
+class _DesignSpecification:
+    design_id: str
+    outcome: str
+    treatment: str
+    covariates: tuple[str, ...]
+
+
+_DESIGNS = {
+    "cattaneo2": _DesignSpecification(
+        design_id="cattaneo2_maternal_smoking_birthweight_v1",
+        outcome="bweight",
+        treatment="mbsmoke",
+        covariates=("mmarried", "mage", "medu", "fbaby"),
+    ),
+    "nsw_mixtape": _DesignSpecification(
+        design_id="nsw_job_training_earnings_v1",
+        outcome="re78",
+        treatment="treat",
+        covariates=(
+            "age",
+            "educ",
+            "black",
+            "hisp",
+            "marr",
+            "nodegree",
+            "re74",
+            "re75",
+        ),
+    ),
+}
+DATASET_NAMES = tuple(_DESIGNS)
+
+
+def _design(
+    dataset: str = DEFAULT_DATASET,
+    *,
+    data_directory: Path | None,
+    download: bool,
+) -> dict[str, Any]:
+    try:
+        specification = _DESIGNS[dataset]
+    except KeyError as error:  # pragma: no cover - protected by command-line choices
+        available = ", ".join(DATASET_NAMES)
+        raise ValueError(
+            f"Unknown ML benchmark dataset {dataset!r}; choose one of: {available}."
+        ) from error
     data = load_real_dataset(
-        "cattaneo2",
+        dataset,
         data_directory=data_directory,
         download=download,
     )
-    covariates = data[["mmarried", "mage", "medu", "fbaby"]].astype(float)
+    covariates = data.loc[:, list(specification.covariates)].astype(float)
     return {
+        "design_id": specification.design_id,
+        "outcome_name": specification.outcome,
+        "treatment_name": specification.treatment,
+        "covariate_names": specification.covariates,
         "covariates": covariates,
-        "treatment": data["mbsmoke"].astype(float),
-        "outcome": data["bweight"].astype(float),
+        "treatment": data[specification.treatment].astype(float),
+        "outcome": data[specification.outcome].astype(float),
     }
 
 
@@ -56,13 +109,18 @@ def _sklearn_factories(name: str) -> tuple[Callable[[], Any], Callable[[], Any],
         import sklearn
         from sklearn.ensemble import HistGradientBoostingRegressor, RandomForestRegressor
         from sklearn.linear_model import RidgeCV
+        from sklearn.pipeline import make_pipeline
+        from sklearn.preprocessing import StandardScaler
     except ImportError as error:
         raise RuntimeError("scikit-learn is not installed in this benchmark environment") from error
 
     if name == "sklearn_ridge_cv":
 
         def factory() -> Any:
-            return RidgeCV(alphas=np.logspace(-6, 4, 6))
+            return make_pipeline(
+                StandardScaler(),
+                RidgeCV(alphas=np.logspace(-6, 4, 6)),
+            )
 
     elif name == "sklearn_hist_gradient_boosting":
 
@@ -151,6 +209,12 @@ def _run_once(name: str, design: dict[str, Any]) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--dataset",
+        choices=DATASET_NAMES,
+        default=DEFAULT_DATASET,
+        help="Hash-pinned real-data design to benchmark.",
+    )
+    parser.add_argument(
         "--models",
         nargs="+",
         choices=[*MODEL_NAMES, "all"],
@@ -165,12 +229,19 @@ def main() -> None:
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     names = list(MODEL_NAMES) if "all" in args.models else list(dict.fromkeys(args.models))
-    design = _design(data_directory=args.data_directory, download=args.download)
+    design = _design(
+        args.dataset,
+        data_directory=args.data_directory,
+        download=args.download,
+    )
     report = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "design": "cattaneo2_maternal_smoking_birthweight_v1",
-        "dataset": "cattaneo2",
-        "dataset_source_sha256": REAL_DATASETS["cattaneo2"].sha256,
+        "design": design["design_id"],
+        "dataset": args.dataset,
+        "dataset_source_sha256": REAL_DATASETS[args.dataset].sha256,
+        "outcome": design["outcome_name"],
+        "treatment": design["treatment_name"],
+        "covariates": list(design["covariate_names"]),
         "seed": SEED,
         "nobs": len(design["outcome"]),
         "benchmark_repetitions": 1,

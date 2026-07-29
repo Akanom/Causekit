@@ -1,16 +1,18 @@
-# Causal-ML real-data performance record
+# Causal-ML real-data performance records
 
-This is the frozen `0.7.0a1` baseline. Version `0.7.0a2` exposes fold diagnostics and uses
-an algebraically equivalent, lower-allocation GCV calculation without changing the
-six-point default grid; the external rows were not rerun or overwritten. A tested denser
-grid slightly worsened the same real-data OOF errors and was rejected as the default.
+These are deliberately one-run engineering records on two hash-verified datasets, not
+benchmark repetitions. The original Cattaneo `0.7.0a1` baseline remains frozen. Version
+`0.7.0a2` exposes fold diagnostics and uses an algebraically equivalent, lower-allocation
+GCV calculation without changing the six-point default grid; the Cattaneo external rows
+were not rerun or overwritten. A tested denser grid slightly worsened the same Cattaneo
+out-of-fold (OOF) errors and was rejected as the default.
 
-This record compares CauseKit's native nuisance learner with optional external learners on
-the same hash-verified Cattaneo maternal-smoking and birthweight data. It is a one-run
-engineering benchmark, not a Monte Carlo study, causal model-selection rule, or claim that
-the smallest prediction error identifies the most credible causal specification.
+Each record compares CauseKit's native nuisance learner with optional external learners on
+identical folds within that dataset. Neither record is a Monte Carlo study, causal
+model-selection rule, or claim that the smallest prediction error identifies the most
+credible causal specification.
 
-## Recorded design
+## Cattaneo maternal-smoking design
 
 - Dataset: Stata `cattaneo2`, 4,642 rows.
 - Source SHA-256:
@@ -58,6 +60,60 @@ to external RidgeCV. This does not establish general superiority: the covariate 
 small, observed-target RMSE includes irreducible outcome/treatment variation, and no true
 causal effect is known in real data. Different specifications may favor nonlinear learners.
 
+## NSW job-training design
+
+The second record tests the same CauseKit estimator in a different domain and a much
+smaller sample without rerunning the Cattaneo benchmark.
+
+- Dataset: National Supported Work experimental sample (`nsw_mixtape`), 445 rows.
+- Source SHA-256:
+  `fc424cfc9d7861f4b95a6612f27c7e842671fea5a8612edcfe0273ee62e6f0a4`.
+- Outcome: 1978 earnings (`re78`).
+- Treatment: job-training assignment (`treat`).
+- Pre-treatment covariates: age, education, Black and Hispanic indicators, marital
+  status, no-degree indicator, and 1974/1975 earnings.
+- Estimator: `PartiallyLinearDML`, robust inference, three outer folds.
+- Fold seed: `20260729`; every learner receives the identical outer fold assignment.
+- Repetitions: exactly one fit per model.
+- External ridge fairness rule: `StandardScaler` and `RidgeCV` are one fold-local pipeline,
+  with the same six penalties as CauseKit. Scaling is fitted only on the outer training
+  sample. The tree learners retain their declared Cattaneo configurations.
+- Environment: Windows 11, Python 3.14.6, CauseKit 0.7.0a2, NumPy 2.4.6, pandas 3.0.3,
+  scikit-learn 1.9.0.
+- CauseKit estimator implementation commit: `ece84f7` (the benchmark-harness extension
+  and this record were the only working-tree changes at execution).
+- Recorded: 2026-07-29.
+
+Because treatment was randomized, `RandomizedATE` remains the identification-appropriate
+primary analysis for this dataset; its separately parity-validated unadjusted estimate is
+1794.342382 (HC1 standard error 670.824491). DML is used here only to stress the nuisance
+learning path on a second design. The randomized estimate is not the unknown ground truth
+and is not a model-selection target.
+
+| Nuisance learner | DML estimate | Standard error | Outcome OOF RMSE | Treatment OOF RMSE | Seconds | Python peak MiB |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| CauseKit native ridge-GCV | 1823.114035 | 668.916001 | **6608.467270** | 0.491269 | **0.0456** | **0.210** |
+| scikit-learn standardized RidgeCV | 1790.295534 | 676.185984 | 6609.956633 | **0.490387** | 0.1255 | 1.351 |
+| scikit-learn histogram gradient boosting | 1809.187334 | 672.085065 | 7013.913010 | 0.516963 | 6.6055 | 0.893 |
+| scikit-learn random forest | 1774.886429 | 638.692982 | 6744.085770 | 0.495810 | 3.1711 | 0.402 |
+
+The ridge comparison is effectively split on predictive error: CauseKit's outcome RMSE is
+0.023% lower, while standardized scikit-learn RidgeCV's treatment RMSE is 0.180% lower.
+CauseKit is 2.75 times faster and uses 6.43 times less Python-managed peak memory than the
+external ridge pipeline in this single run. Both nonlinear configurations have higher OOF
+RMSE for both nuisance targets. All four effect estimates lie between 1774.89 and 1823.11;
+their proximity is useful sensitivity evidence but does not reveal which estimate is
+closest to the unknown causal effect.
+
+Together, the two datasets support retaining native ridge-GCV as the package default: it
+is dependency-free, computationally smallest, and prediction-competitive across both
+declared designs. They do not prove that ridge is best for nonlinear confounding or CATE
+estimation. Honest R-learner evaluation remains a separate contract.
+
+The saved NSW JSON is external to the repository at
+`%LOCALAPPDATA%/causekit/benchmarks/causekit-ml-nsw-benchmark-v1.json`; its SHA-256 is
+`a41758370e4ce0e2fd14003699f33154842ee35d867a3afb7547266e0b275a8c`.
+
 `tracemalloc` reports Python-managed peak allocations and may not capture every native
 allocation made by NumPy or a comparator. Timing was sequential on one machine; it is not
 a hardware-independent performance guarantee.
@@ -75,12 +131,21 @@ python benchmarks/benchmark_ml.py --models all \
   --output causekit-ml-real-benchmark-v1.json
 ```
 
+Run the separate NSW design once with:
+
+```bash
+python benchmarks/benchmark_ml.py --dataset nsw_mixtape --models all \
+  --output causekit-ml-nsw-benchmark-v1.json
+```
+
 To opt into the HTTPS download and mandatory hash check when the source is absent:
 
 ```bash
 python benchmarks/benchmark_ml.py --models all --download \
   --output causekit-ml-real-benchmark-v1.json
 ```
+
+Add `--dataset nsw_mixtape` to the download command when the verified NSW source is absent.
 
 The scikit-learn rows are optional comparators. Their absence records `unavailable`; it
 does not prevent the CauseKit-native row from running and does not alter package

@@ -287,8 +287,13 @@ python benchmarks/benchmark_matching.py --scenario known_score_ate_inference --n
 python benchmarks/benchmark_matching.py --scenario estimated_score_ate_inference --n 100000 --measure-memory
 python benchmarks/benchmark_did.py --scenario all --n-entities 20000
 python benchmarks/benchmark_ml.py --models all
+python benchmarks/benchmark_ml.py --dataset nsw_mixtape --models all
 Rscript benchmarks/validate_dml_reference.R
 ```
+
+The two ML commands are separate one-run real-data records, not benchmark repetitions;
+their frozen results and interpretation limits are documented in
+[Causal-ML real-data performance](ML_BENCHMARK.md).
 
 Stata is manual: from the repository root run
 `do "benchmarks/validate_dml_stata.do"`. The harness persists

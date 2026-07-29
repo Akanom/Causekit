@@ -26,6 +26,10 @@ versions may refine APIs, but breaking changes must still be documented explicit
 - Revalidated the five-fold Cattaneo workflow at `theta=-225.350625` with robust standard
   error `22.439969`; all ten nuisance fits selected interior penalties. The frozen
   `0.7.0a1` external-learner rows were not rerun or overwritten.
+- Extended the one-run ML harness to the hash-pinned NSW job-training data. Native
+  ridge-GCV had the lowest outcome OOF RMSE, runtime, and Python-managed peak memory;
+  standardized scikit-learn RidgeCV had a 0.180% lower treatment OOF RMSE. The nonlinear
+  configurations were worse on both nuisance targets, so the native default remains.
 
 ### Known limitations
 
