@@ -1,4 +1,4 @@
-"""Ecosystem-aligned post-estimation for causalkit results."""
+"""Ecosystem-aligned post-estimation for causekit results."""
 
 from __future__ import annotations
 

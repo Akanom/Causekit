@@ -23,7 +23,7 @@ Identification requires consistency, no interference, conditional exchangeabilit
 the pre-treatment information used by the nuisance functions, and positivity. These are
 substantive assumptions; fitted propensity support cannot detect omitted confounders.
 
-Supplied nuisance predictions preserve ownership boundaries with `limiteddepkit` and make
+Supplied nuisance predictions preserve provider-neutral ownership boundaries and make
 data leakage auditable. Adaptive nuisance fits should be cross-fitted. The AIPW score has
 the usual double-robust property only under regularity conditions and valid inference also
 depends on nuisance convergence rates or justified low-complexity fitting. Clipping limits
@@ -317,7 +317,7 @@ At minimum, an IV analysis should report:
 8. the Sargan result only when its homoskedastic conditions apply, with its limitations;
 9. sensitivity to instrument sets, controls, functional form, influential observations,
    and clustering choices; and
-10. the exact `causalkit` version and reproduction command.
+10. the exact `causekit` version and reproduction command.
 
 Use phrases such as “the 2SLS coefficient is consistent under the stated relevance,
 independence, and exclusion assumptions,” not “the package proves a causal effect.”

@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from causalkit import NearestNeighborMatch
+from causekit import NearestNeighborMatch
 
 
 def test_stata_harness_uses_stata_supported_variance_neighbor_count() -> None:
@@ -59,10 +59,10 @@ def test_saved_stata_17_result_matches_native_fixed_score_contract(estimand: str
 
 @pytest.fixture(scope="module")
 def matching_reference() -> dict[str, str]:
-    reference_root = os.environ.get("CAUSALKIT_MATCHING_REFERENCE")
+    reference_root = os.environ.get("CAUSEKIT_MATCHING_REFERENCE")
     rscript = shutil.which("Rscript")
     if reference_root is None or rscript is None:
-        pytest.skip("set CAUSALKIT_MATCHING_REFERENCE and install Rscript for matching parity")
+        pytest.skip("set CAUSEKIT_MATCHING_REFERENCE and install Rscript for matching parity")
 
     repository_root = Path(__file__).resolve().parents[2]
     completed = subprocess.run(

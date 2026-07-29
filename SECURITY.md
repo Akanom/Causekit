@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-`causalkit` has not made a stable release. Security fixes are provided for the latest
+`causekit` has not made a stable release. Security fixes are provided for the latest
 prerelease and the current `main` branch on the Python versions declared in
 `pyproject.toml` (currently Python 3.10 through 3.13). Older prereleases may not receive
 backported fixes.
@@ -39,13 +39,19 @@ and exported reports. Do not attach confidential data to bug reports; provide a 
 reproducer instead.
 
 Treat files from untrusted sources as untrusted before loading them with third-party data
-tools. `causalkit` does not make Python pickle or arbitrary serialized objects safe.
+tools. `causekit` does not make Python pickle or arbitrary serialized objects safe.
 Optional reporting integrations can move results beyond the core process; review their
 destination, access controls, and redaction policy before sending sensitive output.
 
 Large or adversarial arrays can cause excessive memory use or expensive matrix
 factorizations. Validate dimensions and resource limits before exposing fitting through a
 multi-user service. Do not log raw rows or identifiers in application error handlers.
+
+The optional real-data registry is the package-owned path that may access the network.
+Network access is disabled unless the caller explicitly requests a download. Downloads
+must use HTTPS, follow only HTTPS redirects, write through a temporary file, match the
+release-pinned SHA-256 digest exactly, and fail closed on any mismatch. Verified files are
+cached outside the repository by default; they are never imported as package data.
 
 ## Dependency and release policy
 

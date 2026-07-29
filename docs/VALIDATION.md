@@ -1,6 +1,6 @@
 # Validation strategy
 
-`causalkit` separates implementation checks from evidence claims. A command returning
+`causekit` separates implementation checks from evidence claims. A command returning
 success in one environment supports the tested version, fixture, specification, comparator,
 and tolerance. It does not establish universal numerical parity or validate an empirical
 instrument.
@@ -35,14 +35,16 @@ and clustered inference. Its Stata/MP 17 `teffects nnmatch` output is recorded.
 
 The estimated-Logit path has hand-reconstructed ATT, ATC, and ATE adjustment vectors,
 target derivatives, normalized information, variances, and standard errors. An independent
-`statsmodels.Logit` fixture verifies fitted-result consumption without re-estimation, and
-the public protocol has been exercised directly with `limiteddepkit.BinaryLogitResult`.
+`statsmodels.Logit` fixture verifies provider-neutral fitted-result consumption without
+re-estimation.
 Refusals cover missing first-step structure, nonstationary/penalized fits, convergence,
 sample/feature/parameter/prediction/index drift, singular information, wrong score status
 or metric, and support/caliper selection. A fixed-seed 40-replication ATE smoke checks
 recovery, standard-error scale, and interval coverage. This evidence does not extend to
-generic or cross-fitted learners. The Stata `teffects psmatch` harness awaits a manual run;
-R `Matching` is non-comparable because it treats the supplied score as fixed.
+generic or cross-fitted learners. The reviewed Stata/IC 17 `teffects psmatch` artifact
+passes the ATT/ATC/ATE point, known-variance, first-step, and final-standard-error
+components at `1e-8`; R `Matching` is non-comparable because it treats the supplied score
+as fixed.
 
 For DiD, maintained evidence must keep the conventional and efficient estimators
 separate. Conventional tests hand-compute every `ATT(g,t)`, event-time, calendar-time, and
@@ -213,10 +215,11 @@ tolerances, and observed discrepancy. “Unavailable” and “non-comparable”
 when a platform lacks the estimator or implements different identifying moments; neither
 state is a pass.
 
-The maintained no-covariate efficient DiD row currently pins the public R `edid`
-implementation. Covariate-efficient DiD parity and the repository-wide Python/R/Stata
-matrix remain open. Adding an arbitrary regression that happens to return a similar
-number does not satisfy this gate.
+The maintained no-covariate efficient DiD row pins the public R `edid` implementation.
+The published `edid` reference has no covariate-adjusted estimator, and the reviewed
+Stata estimators target different identifying moments; those covariate-efficient cells
+are therefore recorded as unavailable rather than fabricated parity. Adding an arbitrary
+regression that happens to return a similar number does not satisfy this gate.
 
 The live status and completion rule are maintained in [Cross-software parity
 register](PARITY.md).
@@ -265,14 +268,28 @@ python -m pytest -m simulation
 python benchmarks/benchmark_matching.py --scenario balanced_ate --n 100000 --measure-memory
 python benchmarks/benchmark_matching.py --scenario known_score_ate_inference --n 100000 --measure-memory
 python benchmarks/benchmark_matching.py --scenario estimated_score_ate_inference --n 100000 --measure-memory
-python benchmarks/validate_matching_limiteddepkit.py
 python benchmarks/benchmark_did.py --scenario all --n-entities 20000
 ```
+
+Prepare and run the pinned real-data certificate against the exact R reference checkouts:
+
+```bash
+python benchmarks/prepare_real_data.py --download
+CAUSEKIT_REAL_DATA_DIR=/path/to/prepared/data \
+CAUSEKIT_EDID_REFERENCE=/path/to/edid \
+CAUSEKIT_MATCHING_REFERENCE=/path/to/Matching \
+python -m pytest tests/validation/test_real_data_parity.py
+```
+
+Stata is a manual final gate. From the repository root, run
+`do "benchmarks/validate_real_data_stata.do"`; it writes a machine-readable result before
+asserting. Dataset provenance, comparator boundaries, and exact commands are recorded in
+[Real-data validation](REAL_DATA_VALIDATION.md).
 
 Run pinned R `edid` parity from a checkout at the recorded commit:
 
 ```bash
-CAUSALKIT_EDID_REFERENCE=/path/to/edid python -m pytest tests/validation/test_edid_parity.py
+CAUSEKIT_EDID_REFERENCE=/path/to/edid python -m pytest tests/validation/test_edid_parity.py
 Rscript benchmarks/validate_edid_reference.R /path/to/edid
 ```
 
@@ -280,7 +297,7 @@ Run pinned R `Matching` parity from the CRAN mirror checkout at tag 4.10-15, the
 run the Stata script manually when Stata is available:
 
 ```bash
-CAUSALKIT_MATCHING_REFERENCE=/path/to/Matching python -m pytest tests/validation/test_matching_parity.py
+CAUSEKIT_MATCHING_REFERENCE=/path/to/Matching python -m pytest tests/validation/test_matching_parity.py
 Rscript benchmarks/validate_matching_reference.R /path/to/Matching
 stata -b do benchmarks/validate_matching_stata.do
 stata -b do benchmarks/validate_matching_estimated_stata.do
@@ -289,15 +306,20 @@ stata -b do benchmarks/validate_matching_estimated_stata.do
 The Stata harness uses one opposite-arm effect match and two same-arm variance
 neighbors. This is the smallest robust-variance contract accepted by Stata and maps to
 `NearestNeighborMatch(..., variance_neighbors=2)`; the R harness separately validates
-CausalKit's supported one-neighbor conditional-variance contract. The reviewed
+CauseKit's supported one-neighbor conditional-variance contract. The reviewed
 Stata/MP 17 result is preserved in
 `benchmarks/validate_matching_stata_17_output.txt`; its maximum absolute standard-error
-difference from CausalKit is `4.440892098500626e-16`.
+difference from CauseKit is `4.440892098500626e-16`.
 
-The estimated-score Stata harness maps raw fitted propensity distance, one effect match,
-two robust-variance/local-covariance neighbors, and the default one-neighbor local
-regression/covariate derivative contract. Do not record it as a pass until its printed
-`parity_status=pass` and all ATT/ATC/ATE values have been reviewed.
+The estimated-score Stata harness maps raw fitted propensity distance and one effect
+match. Stata's `vce(robust, nn(2))` local set includes the focal observation: its
+`nocorrection` variance maps to CauseKit `variance_neighbors=1`, while the first-step
+moments use two-observation local covariances, two leave-own-out outcome-regression
+neighbors, and one opposite-arm covariate neighbor. The reviewed Stata/IC 17 artifact is
+`benchmarks/validate_matching_estimated_stata_output.txt`; all point-estimate,
+known-variance, first-step-adjustment, and final-standard-error statuses pass at the
+declared `1e-8` tolerance. Its maximum absolute standard-error difference is
+`2.62713550913674e-9`.
 
 Run the README example in a clean installation and inspect both wheel and source
 distribution before release. Archive the commands, operating system, Python version,

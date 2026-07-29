@@ -15,8 +15,8 @@ cross-cohort restrictions needed for efficiency are not substantively justified.
 `EfficientDiD` must never silently weaken or relabel those assumptions.
 
 The efficient estimator supports both the paper's closed-form no-covariate path and a
-covariate-adjusted path. It does not copy nuisance estimators from `limiteddepkit`.
-Covariate adjustment consumes user-owned model factories through causalkit's public
+covariate-adjusted path. It does not own or copy nuisance estimators.
+Covariate adjustment consumes user-owned model factories through causekit's public
 `CrossFitter` protocol and implements the paper's conditional covariance contract.
 
 ## Data and timing

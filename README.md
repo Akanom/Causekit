@@ -1,6 +1,6 @@
-# causalkit
+# CauseKit
 
-`causalkit` is an identification-aware Python package for causal inference and
+CauseKit (installed and imported as `causekit`) is an identification-aware Python package for causal inference and
 instrumental-variable workflows. The `0.6.0a4` surface provides linear two-stage least
 squares, randomized-experiment effects, reusable nuisance cross-fitting, IPW/AIPW ATE,
 ATT, and ATC, scalar propensity-score matching with separate fixed- and estimated-score
@@ -10,6 +10,10 @@ Chen-Sant'Anna-Xie efficient DiD for short panels.
 This is alpha research software. A successful fit is not evidence that an instrument is
 valid, and an IV coefficient is not automatically an average treatment effect. State the
 estimand and defend the identifying assumptions before using causal language.
+
+The project was renamed before its first release because the intended `causalkit`
+distribution name is already used by an unrelated project. CauseKit does not install a
+`causalkit` compatibility namespace; use `pip install causekit` and `import causekit`.
 
 ## Current scope
 
@@ -33,11 +37,11 @@ The `0.2.0a1` randomized-experiment layer adds:
   and explicit causal-assumption metadata.
 
 The `0.3.0a1` observational layer adds `IPWATE` and `AIPWATE`. It deliberately accepts
-propensity and potential-outcome predictions rather than duplicating the binary and
-limited-outcome estimators already maintained by `limiteddepkit`.
+propensity and potential-outcome predictions through provider-neutral public boundaries
+rather than owning nuisance-model likelihoods.
 
 ```python
-from causalkit import AIPWATE
+from causekit import AIPWATE
 
 result = AIPWATE().fit(
     outcome,
@@ -57,14 +61,13 @@ reporting because it changes the estimating equation.
 
 ### Reusable cross-fitting
 
-`CrossFitter` accepts factories so every fold receives fresh models. A model may follow
-the `limiteddepkit` convention (`fit` returns a fitted result) or the scikit-learn
-convention (`fit` returns the estimator). Default fitted results expose `predict_proba`
-for propensity models and `predict` for outcome models; explicit adapters support other
-public APIs.
+`CrossFitter` accepts factories so every fold receives fresh models. A model may return
+an immutable fitted result or follow the scikit-learn convention where `fit` returns the
+estimator. Default fitted results expose `predict_proba` for propensity models and
+`predict` for outcome models; explicit adapters support other public APIs.
 
 ```python
-from causalkit import AIPWATE, CrossFitter
+from causekit import AIPWATE, CrossFitter
 
 nuisance = CrossFitter(
     propensity_factory=make_propensity_model,
@@ -94,14 +97,14 @@ optional; when omitted, the outcome factory is reused.
 
 ### Nearest-neighbor matching
 
-`NearestNeighborMatch` consumes a supplied propensity rather than copying a binary model
-from `limiteddepkit`. The implemented slice supports ATT, ATC, and bidirectional-imputation
-ATE; logit-propensity distance; replacement; inclusive numeric or automatic calipers;
-intersection common support; deterministic fractional boundary ties; effect/reuse
-weights; and before/after covariate balance.
+`NearestNeighborMatch` consumes a supplied propensity through a provider-neutral boundary.
+The implemented slice supports ATT, ATC, and bidirectional-imputation ATE;
+logit-propensity distance; replacement; inclusive numeric or automatic calipers;
+intersection common support; deterministic fractional boundary ties; effect/reuse weights;
+and before/after covariate balance.
 
 ```python
-from causalkit import NearestNeighborMatch
+from causekit import NearestNeighborMatch
 
 matched = NearestNeighborMatch(
     estimand="att",
@@ -142,32 +145,31 @@ print(fixed_score_match.summary_frame())
 print(fixed_score_match.conditional_variances)
 ```
 
-For a regular full-sample unpenalized Logit MLE, use the separate fitted-result protocol.
-For example, `limiteddepkit.BinaryLogitResult` satisfies it directly:
+For a regular full-sample unpenalized Logit MLE, use the separate provider-neutral
+fitted-result protocol:
 
 ```python
-from limiteddepkit import BinaryLogit
-
-propensity_fit = BinaryLogit().fit(propensity_design, treated)
 estimated_score_match = NearestNeighborMatch(
     estimand="att",
     metric="propensity",
     caliper=None,
     common_support=None,
     inference="abadie_imbens_estimated",
-    variance_neighbors=2,
+    variance_neighbors=1,
 ).fit(
     outcome,
     treatment=treated,
     propensity_model=propensity_fit,
     propensity_design=propensity_design,
     propensity_score_status="estimated",
-    propensity_provenance="limiteddepkit.BinaryLogit full-sample MLE",
+    propensity_provenance="full_sample_unpenalized_logit_mle",
 )
 ```
 
-CausalKit validates convergence, sample size, feature/parameter order, fitted Logit
-probabilities, the likelihood first-order condition, and Fisher-information conditioning.
+CauseKit does not fit `propensity_fit`. It requires public `params`, `converged`, `nobs`,
+`feature_names`, and `predict_proba`, then validates sample size, feature/parameter order,
+fitted Logit probabilities, the likelihood first-order condition, and Fisher-information
+conditioning.
 It then reports the known-score variance and Abadie–Imbens first-step adjustment separately.
 Cross-fitted, penalized, probit, or otherwise unverifiable scores do not satisfy this
 contract and must retain `inference="none"`.
@@ -190,7 +192,7 @@ inverse-covariance weights. It is not a silent default because PT-All is stronge
 conventional post-treatment parallel-trends contract.
 
 ```python
-from causalkit import DifferenceInDifferences, EfficientDiD
+from causekit import DifferenceInDifferences, EfficientDiD
 
 conventional = DifferenceInDifferences(
     control_group="never_treated",
@@ -262,12 +264,12 @@ tracked in the [cross-software parity register](docs/PARITY.md).
 ## Randomized-experiment example
 
 ```python
-from causalkit import RandomizedATE
+from causekit import RandomizedATE
 
 result = RandomizedATE(adjustment="lin", covariance="robust").fit(
     outcome,
-    treatment=assigned,       # exactly 0/1 with both arms present
-    covariates=baseline_data, # pre-treatment covariates only
+    treatment=assigned,  # exactly 0/1 with both arms present
+    covariates=baseline_data,  # pre-treatment covariates only
 )
 print(result.summary_frame())
 print(result.balance)
@@ -286,6 +288,12 @@ attrition correction, or multi-arm experiments.
 
 ## Installation
 
+From PyPI after publication:
+
+```bash
+python -m pip install causekit==0.6.0a4
+```
+
 From a source checkout:
 
 ```bash
@@ -300,6 +308,26 @@ python -m pip install -e ".[dev]"
 
 Python 3.10 through 3.13 is supported by the package metadata.
 
+## Real-world workflow
+
+The runnable workflow covers IV, randomized effects, cross-fitted IPW/AIPW, matching,
+conventional DiD, and efficient DiD on four pinned real datasets. The project does not
+redistribute the source files: downloads are opt-in, HTTPS-only, cached outside the
+repository, and checked against release-pinned SHA-256 digests.
+
+```bash
+python -m pip install -e ".[validation]"
+python examples/real_world_causal_workflow.py --download
+```
+
+The output keeps identification boundaries visible: numerical IV diagnostics cannot
+validate exclusion, observational estimates require exchangeability and positivity,
+cross-fitted matching receives no unsupported analytical standard error, and efficient
+DiD is reported beside—not instead of—the conventional estimator.
+
+See [real-data validation](docs/REAL_DATA_VALIDATION.md) for source provenance, pinned
+digests, cross-language comparator mappings, and reproduction commands.
+
 ## Runnable example
 
 The following example creates an endogenous treatment, fits 2SLS with one excluded
@@ -309,7 +337,7 @@ instrument, and requests HC1 inference. All pandas objects share the same index.
 import numpy as np
 import pandas as pd
 
-from causalkit import IV2SLS
+from causekit import IV2SLS
 
 rng = np.random.default_rng(20260722)
 nobs = 800
@@ -318,12 +346,7 @@ index = pd.RangeIndex(nobs, name="observation")
 instrument = rng.normal(size=nobs)
 baseline = rng.normal(size=nobs)
 confounder = rng.normal(size=nobs)
-treatment = (
-    0.9 * instrument
-    + 0.4 * baseline
-    + 0.7 * confounder
-    + rng.normal(size=nobs)
-)
+treatment = 0.9 * instrument + 0.4 * baseline + 0.7 * confounder + rng.normal(size=nobs)
 outcome = 2.0 * treatment + 0.5 * baseline + confounder + rng.normal(size=nobs)
 
 result = IV2SLS(covariance="robust").fit(
@@ -425,7 +448,7 @@ require additional conditions such as monotonicity for a local average treatment
 interpretation. The resulting local estimand need not equal the population average
 treatment effect.
 
-`causalkit` reports numerical evidence relevant to some implications of the design. It
+`causekit` reports numerical evidence relevant to some implications of the design. It
 cannot learn exclusion or independence from the observed covariance matrix, and it does
 not turn observational association into causation. See
 [Identification and interpretation](docs/IDENTIFICATION.md) for the formal contract and a
@@ -435,13 +458,14 @@ reporting checklist.
 
 The historical `limiteddepkit.TreatmentEffect` was an ordinary homoskedastic linear 2SLS
 estimator, not a limited-dependent-variable model. `limiteddepkit` therefore removed it
-from its public namespaces and retained a non-installable snapshot under its
-`_out_of_scope/` migration area.
+from its public namespaces. The migration is complete and its obsolete source snapshot
+has also been removed from that repository.
 
-`causalkit.IV2SLS` is the supported destination. Its design was informed by the migration
+`causekit.IV2SLS` is the supported destination. Its design was informed by the migration
 requirements and the public econometric definition of 2SLS; no private implementation
-code was copied into this package. `causalkit` has its own validation, covariance,
-diagnostic, and result contracts.
+code was copied into this package. `causekit` has its own validation, covariance,
+diagnostic, and result contracts, including a numerical test that reconstructs the old
+homoskedastic matrix result after explicitly mapping the full instrument matrix.
 
 The migration is not a drop-in rename:
 
@@ -473,18 +497,17 @@ drop-in interchangeability across estimators.
 
 The packages remain separated by estimand:
 
-- `causalkit` owns identification-aware causal and cross-sectional IV workflows;
+- `causekit` owns identification-aware causal and cross-sectional IV workflows;
 - `limiteddepkit` owns limited-outcome and observation-rule models; and
 - `systemgmmkit` owns panel-data and dynamic-panel GMM workflows.
 
 Applicable validation, indexing, covariance, diagnostics, and reporting conventions are
 reused conceptually without importing private source or coupling the packages at runtime.
-Existing `limiteddepkit` binary, count, censoring, duration, and ordinal estimators are
-not duplicated here. The supplied-nuisance IPW/AIPW and matching APIs let their
-out-of-sample predictions participate while keeping causal identification inside
-`causalkit`; the narrow estimated-score matching path additionally consumes the public
-`BinaryLogitResult` directly for its full-sample first-step correction. `CrossFitter` owns
-only reusable fold orchestration and prediction adaptation.
+Limited-outcome likelihoods are not duplicated here. The supplied-nuisance IPW/AIPW and
+matching APIs accept provider-neutral predictions while keeping causal identification
+inside `causekit`; the narrow estimated-score matching path consumes only the public
+`FittedPropensityMLEProtocol`. `CrossFitter` owns reusable fold orchestration and
+prediction adaptation, not nuisance estimators.
 
 ## Roadmap
 
@@ -492,11 +515,12 @@ The matching alpha follows the
 [nearest-neighbor matching contract](docs/MATCHING_CONTRACT.md). Known-score analytical
 inference, R reference parity, OutputHub adaptation, and 100,000-row fixed- and estimated-
 score inference smokes are implemented, with fixed-score parity against pinned R `Matching`
-4.10-15 and Stata/MP 17. Full-sample Logit-MLE first-step adjustment is implemented and
-independently checked against `statsmodels`; its Stata harness awaits a manual run. DiD promotion includes
-cross-fitted covariate nuisances and simultaneous
-event-study bands; pre-trend/Hausman diagnostics, repeated cross-sections, and broader
-parity remain. Later releases may add regression discontinuity and panel IV. Each family
+4.10-15 and Stata/MP 17. Full-sample Logit-MLE first-step adjustment is independently
+checked against `statsmodels` and a reviewed Stata/IC 17 `teffects psmatch` fixture. DiD
+promotion includes cross-fitted covariate nuisances and simultaneous
+event-study bands; pre-trend/Hausman diagnostics and repeated cross-sections remain.
+Available aligned Python/R/Stata parity rows are recorded, while unavailable comparator
+cells remain explicit. Later releases may add regression discontinuity and panel IV. Each family
 must define its estimand, assumptions, failure behavior, diagnostics, and independent
 validation evidence before promotion.
 
@@ -531,4 +555,4 @@ has passed them.
 - Changes are recorded in [CHANGELOG.md](CHANGELOG.md).
 - The active milestone sequence and reuse rules are recorded in [HANDOVER.md](HANDOVER.md).
 
-`causalkit` is distributed under the [MIT License](LICENSE).
+`causekit` is distributed under the [MIT License](LICENSE).

@@ -1,1 +1,1 @@
-"""Shared test configuration for causalkit."""
+"""Shared test configuration for causekit."""

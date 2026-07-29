@@ -56,27 +56,39 @@ future task can resume without reconstructing intent from chat history.
    in linear memory without a distance matrix.
 
 9. `0.6.0a4` matching estimated-Logit inference promotion: the public
-   `FittedPropensityMLEProtocol` consumes a regular full-sample unpenalized Logit result
-   such as `limiteddepkit.BinaryLogitResult`. CausalKit validates fit/sample/schema/score/
-   information identities and applies separate Abadie–Imbens ATE/ATT/ATC first-step
+   `FittedPropensityMLEProtocol` consumes a provider-neutral regular full-sample
+   unpenalized Logit result. CauseKit validates fit/sample/schema/score/information
+   identities and applies separate Abadie–Imbens ATE/ATT/ATC first-step
    corrections. Hand contracts, strict refusals, independent `statsmodels` parity,
-   direct sibling-result interoperability, seeded coverage smoke, OutputHub audit fields,
-   and a 100,000-row 85.20 MiB benchmark are implemented. A Stata `teffects psmatch`
-   harness is written but still needs a manual recorded run.
+   seeded coverage smoke, OutputHub audit fields, and a 100,000-row 85.20 MiB benchmark
+   are implemented. Reviewed Stata/IC 17 parity
+   establishes that `vce(robust, nn(2))` maps to CauseKit's one-neighbor known-score
+   variance and two leave-own-out local first-step regression neighbors. ATT/ATC/ATE
+   point estimates, variance components, and final standard errors pass at `1e-8`.
+
+10. `0.6.0a4` ownership and real-data release gate: the unreleased distribution/import
+    identity is now `causekit`, with no shim under the occupied `causalkit` name. CauseKit
+    owns all migrated causal models and has no LimitedDepKit runtime or validation
+    dependency. Four opt-in HTTPS datasets are pinned by SHA-256, a runnable example covers
+    every model family, and the real-data Python/R certificate passes 14 estimand-aligned
+    comparisons. The reviewed Stata/IC 17 saved-output certificate also passes every
+    comparable family; efficient PT-All DiD remains explicitly unavailable in Stata.
 
 ## Open promotion gates
 
 - Matching still defaults to `inference="none"`. Known-score reuse-aware inference and a
   separately validated full-sample Logit-MLE correction are implemented. Generic,
   cross-fitted, penalized, and unsupported-link scores still refuse. Fixed-score R/Stata
-  parity is recorded; the estimated-score Stata harness remains pending and R `Matching`
-  is non-comparable. Do not substitute a generic sandwich, ordinary bootstrap, or cluster
-  wrapper.
+  parity is recorded, including the estimated-score Stata decomposition; R `Matching`
+  is non-comparable because it conditions on the supplied score. Do not substitute a
+  generic sandwich, ordinary bootstrap, or cluster wrapper.
 - Efficient DiD owns no nuisance model classes. The implemented covariate path must keep
   consuming public cross-fitting factories; direct density-ratio regression remains a
   possible future stability enhancement over ratios of multiclass probabilities.
 - Pre-trend/Hausman diagnostics, repeated-cross-section DiD, publication-scale coverage,
-  covariate-path external parity, and a larger covariate benchmark remain open.
+  and a larger covariate benchmark remain open. Covariate-efficient external parity was
+  audited: the pinned public R implementation has no covariate path and reviewed Stata
+  estimators target different moments, so those cells remain explicitly unavailable.
 
 ## Required implementation patterns
 
@@ -87,9 +99,9 @@ future task can resume without reconstructing intent from chat history.
 - A fold loop is permitted where model fitting is inherently fold-specific. Each fold must
   receive fresh nuisance estimators from factories, and every reported nuisance prediction
   must be out of fold.
-- Do not copy binary, count, censoring, duration, or ordinal estimators from
-  `limiteddepkit`. Integrate their public fit/predict results through protocols or explicit
-  prediction adapters. Move model ownership only through a separately reviewed migration.
+- Do not copy binary, count, censoring, duration, or ordinal estimators into CauseKit.
+  Nuisance integration stays provider-neutral through protocols or explicit prediction
+  adapters; CauseKit has no LimitedDepKit runtime or validation dependency.
 - Do not claim that overlap diagnostics prove exchangeability, that AIPW repairs unmeasured
   confounding, or that clipping is an innocuous numerical operation.
 - Every model addition requires analytical identities, deterministic recovery,
@@ -98,9 +110,8 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Finish matching promotion from `docs/MATCHING_CONTRACT.md`: manually run and retain the
-   estimated-Logit Stata parity output, then extend publication-scale sensitivity/coverage
-   evidence without weakening either analytical refusal boundary.
+1. Continue matching promotion from `docs/MATCHING_CONTRACT.md`: extend publication-scale
+   sensitivity/coverage evidence without weakening either analytical refusal boundary.
 2. Return to DiD for pre-trend/Hausman diagnostics, repeated cross-sections,
    publication-scale coverage, direct-ratio nuisance support if justified, and broader
    reference evidence.

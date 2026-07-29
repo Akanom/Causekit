@@ -11,7 +11,7 @@ Every comparator harness must record:
 
 - the causal estimand and identifying moments;
 - data source or generator, seed, and retained sample;
-- CausalKit commit/version and external software/package versions;
+- CauseKit commit/version and external software/package versions;
 - treatment, outcome, covariate, instrument, cohort, time, and cluster mapping;
 - intercept, weighting, support, caliper, tie, anticipation, nuisance, and aggregation
   options as applicable;
@@ -26,17 +26,17 @@ uses different estimands or moments. Neither counts as a pass.
 
 ## Current matrix
 
-| CausalKit family | Python comparator | R comparator | Stata comparator | Current status |
+| CauseKit family | Python comparator | R comparator | Stata comparator | Current status |
 | --- | --- | --- | --- | --- |
-| `IV2SLS` | `linearmodels` aligned coefficient/covariance tests | pending | pending | partial |
-| `RandomizedATE` | `statsmodels` regression/covariance identities | pending | pending | partial |
-| `IPWATE` / `AIPWATE` ATE/ATT/ATC | analytical score identities; external comparator pending | pending | pending | pending |
+| `IV2SLS` | `linearmodels` aligned coefficient/covariance tests | real-data matrix/HC1 contract passes | Stata/IC 17 real-data native `ivregress` HC1 harness passes | pass |
+| `RandomizedATE` | `statsmodels` regression/covariance identities | real NSW raw/Lin HC1 contracts pass | Stata/IC 17 real-data native robust regressions pass | pass |
+| `IPWATE` / `AIPWATE` ATE/ATT/ATC | analytical score identities pass | real Cattaneo supplied-nuisance influence contracts pass | Stata/IC 17 same conditional influence contracts pass; `teffects` first-step variance is non-comparable | pass for aligned conditional-nuisance contract |
 | `CrossFitter` | protocol and leakage/alignment tests; not itself an estimand | non-comparable | non-comparable | internal protocol |
-| `NearestNeighborMatch` fixed-score ATT/ATC/ATE | hand/reuse/variance identities pass | CRAN `Matching` 4.10-15 fixture passes | Stata/MP 17 `teffects nnmatch` fixture passes | pass for recorded fixture |
-| `NearestNeighborMatch` estimated-Logit ATT/ATC/ATE | hand formulas, `statsmodels.Logit`, and `limiteddepkit.BinaryLogitResult` pass | `Matching` conditions on supplied scores: non-comparable | `teffects psmatch` harness written; manual run pending | partial |
-| Conventional staggered DiD | hand identities; external comparator pending | pending | pending | pending |
-| Efficient DiD, no covariates | native result checked against pinned fixture | public `edid` commit `f55a4a4aba14f0826f59ad7aa4af3bafaeba529b` | pending/unavailable pending audit | partial |
-| Efficient DiD, covariate adjusted | deterministic and simulation evidence only | pending | pending/unavailable pending audit | pending |
+| `NearestNeighborMatch` fixed-score ATT/ATC/ATE | hand/reuse/variance identities pass | CRAN `Matching` 4.10-15 fixture and real Cattaneo point estimates pass | Stata/MP 17 fixture and Stata/IC 17 real Cattaneo point harness pass | pass |
+| `NearestNeighborMatch` estimated-Logit ATT/ATC/ATE | hand formulas and independent `statsmodels.Logit` pass | `Matching` conditions on supplied scores: non-comparable | Stata/IC 17 `teffects psmatch` fixture passes | pass for available estimand-aligned comparators |
+| Conventional staggered DiD | hand/influence identities pass | real hospital group-time/influence contract passes | Stata/IC 17 same group-time/influence contract passes; `didregress` common-effect aggregation is non-comparable | pass for aligned contract |
+| Efficient DiD, no covariates | native result checked on fixture and real data | pinned public `edid` commit passes fixture and real hospital data | unavailable: Stata heterogeneous DiD does not implement PT-All optimal weighting | pass for available aligned comparator |
+| Efficient DiD, covariate adjusted | deterministic equation, refusal, and simulation evidence pass | unavailable: pinned public `edid` explicitly excludes covariates | unavailable: no identified Chen–Sant'Anna–Xie PT-All implementation | internal validation; external unavailable |
 
 The no-covariate efficient-DiD R harness is
 `benchmarks/validate_edid_reference.R`; its maintained fixture compares every candidate
@@ -51,20 +51,41 @@ errors on the no-tie, one-neighbor contract fixture. The maintained Stata script
 the reviewed output is `benchmarks/validate_matching_stata_17_output.txt`. The Stata ATC
 mapping reverses treatment, estimates ATET, and negates the coefficient while retaining
 its standard error. Stata requires at least two same-treatment neighbors in
-`vce(robust, nn(#))`, so that harness compares CausalKit's otherwise identical
+`vce(robust, nn(#))`, so that harness compares CauseKit's otherwise identical
 `variance_neighbors=2` contract; `nneighbor(1)` still governs the effect match.
 
 The estimated-Logit Python fixture independently fits the treatment model with
-`statsmodels.Logit`, passes that fitted result through `FittedPropensityMLEProtocol`, and
-compares all three effects and adjusted standard errors with hand-recorded values. The
-same protocol has been exercised directly with the current public
-`limiteddepkit.BinaryLogitResult`, without a CausalKit dependency or copied estimator;
-`benchmarks/validate_matching_limiteddepkit.py` retains that reproduction path.
-CRAN `Matching` accepts a supplied score but conditions on it for uncertainty, so it is
+`statsmodels.Logit`, passes that fitted result through the provider-neutral
+`FittedPropensityMLEProtocol`, and compares all three effects and adjusted standard errors
+with hand-recorded values. CRAN `Matching` accepts a supplied score but conditions on it
+for uncertainty, so it is
 not comparable to the fitted-score first-step correction. The maintained Stata harness is
 `benchmarks/validate_matching_estimated_stata.do`; it uses `teffects psmatch`, one effect
-neighbor, and `vce(robust, nn(2))`. Its status remains pending until the machine-readable
-output from a manual Stata run is reviewed and retained.
+neighbor, and `vce(robust, nn(2))`. Stata's two-observation local set includes the focal
+observation, so its `nocorrection` variance maps to CauseKit `variance_neighbors=1`.
+The first-step component maps to two-observation local covariance moments, two
+leave-own-out outcome-regression neighbors, and one opposite-arm covariate neighbor. The
+reviewed Stata/IC 17 output is
+`benchmarks/validate_matching_estimated_stata_output.txt`. All component statuses pass;
+the maximum absolute differences are `0` for estimates, `1.1102230246251565e-16` for the
+known-score variance, `2.601257653722655e-9` for the first-step adjustment, and
+`2.62713550913674e-9` for standard errors against a declared `1e-8` tolerance.
+
+Both committed Stata script/output pairs were executed immediately before the CauseKit
+rename. Their old `CausalKit`/`causalkit` labels and generator hashes are retained
+unchanged as provenance; the executable Python parity tests now import `causekit` and
+verify the same numerical contracts against those immutable artifacts.
+
+The real-data certificate uses the four hash-pinned sources documented in
+[Real-data validation](REAL_DATA_VALIDATION.md). `benchmarks/prepare_real_data.py`
+materializes one shared CSV representation; `benchmarks/validate_real_data_reference.R`
+then supplies independent base-R matrix/influence calculations, pinned CRAN `Matching`,
+and pinned public `edid` comparisons. The R 4.5.1 run passed all 14 assertions. The
+reviewed Stata/IC 17 artifact is
+`benchmarks/validate_real_data_stata_output.txt`; all five comparable family statuses and
+the overall status pass. Maximum absolute differences are `8.65e-7` for IV, `8.07e-7`
+for randomized ATE, `5.64e-7` for supplied-nuisance IPW/AIPW, `7.39e-13` for matching,
+and `1.11e-16` for conventional DiD.
 
 ## Completion rule
 

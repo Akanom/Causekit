@@ -1,10 +1,17 @@
 # Changelog
 
-All notable changes to `causalkit` are recorded here. The project follows
+All notable changes to CauseKit are recorded here. The project follows
 [Semantic Versioning](https://semver.org/) once a public contract is released. Alpha
 versions may refine APIs, but breaking changes must still be documented explicitly.
 
 ## [0.6.0a4] - Unreleased
+
+### Breaking change
+
+- Renamed the distribution and import namespace from the unreleased `causalkit` identity
+  to `causekit`. The former name is occupied on the public Python package index by an
+  unrelated project, so this release deliberately provides no compatibility shim under
+  that namespace.
 
 ### Added
 
@@ -13,14 +20,29 @@ versions may refine APIs, but breaking changes must still be documented explicit
 - Abadie–Imbens first-step covariance, target-derivative, and Fisher-information
   corrections with separately reported known-score and adjustment components.
 - Hand-computed three-estimand contracts, malformed-model and unsupported-design
-  refusals, independent `statsmodels.Logit` parity, direct `limiteddepkit.BinaryLogitResult`
-  interoperability verification, a seeded coverage smoke, and a 100,000-row benchmark.
-- A manual Stata `teffects psmatch` parity harness for the estimated-score contract.
+  refusals, independent `statsmodels.Logit` parity, a seeded coverage smoke, and a
+  100,000-row benchmark.
+- A manual Stata `teffects psmatch` parity harness that persists point estimates,
+  uncorrected variance components, first-step corrections, and final standard errors.
+- Reviewed Stata/IC 17 ATT/ATC/ATE parity, including separate known-score variance and
+  fitted-propensity first-step components, with maximum absolute standard-error
+  difference `2.62713550913674e-9` at tolerance `1e-8`.
+- An opt-in, SHA-256-verified real-data registry and runnable workflow spanning IV,
+  randomized, observational, matching, conventional-DiD, and efficient-DiD models.
+- A deterministic real-data parity preparation pipeline, 14 passing Python/R comparisons
+  against pinned `edid` and `Matching` checkouts, and a manual Stata saved-output harness
+  for all estimand-aligned rows available in Stata.
+- Reviewed Stata/IC 17 real-data parity passes for IV, randomized ATE, conditional-
+  nuisance IPW/AIPW, matching, and conventional DiD; PT-All efficient DiD is recorded as
+  unavailable rather than replaced by a non-aligned estimator.
 
 ### Architecture
 
-- CausalKit consumes the fitted nuisance result and never imports or duplicates the
-  binary Logit estimator owned by `limiteddepkit`.
+- CauseKit consumes fitted nuisance results through provider-neutral protocols and has
+  no LimitedDepKit runtime, validation, or benchmark dependency.
+- Completed the legacy `TreatmentEffect` ownership migration: `IV2SLS` is the sole
+  maintained causal/IV implementation and reconstructs the old homoskedastic numerical
+  contract in a package-owned migration test without retaining duplicate source.
 - The estimated-score path is intentionally narrower than `CrossFitter`: it validates
   convergence, sample/feature alignment, Logit predictions, likelihood stationarity, and
   nonsingular normalized information. Cross-fitted, penalized, probit, and generic scores
@@ -30,9 +52,8 @@ versions may refine APIs, but breaking changes must still be documented explicit
 
 ### Known limitations
 
-- The estimated-score Stata harness requires a manual Stata run before parity can be
-  recorded. R `Matching` treats a supplied score as fixed and is non-comparable for the
-  fitted-Logit first-step correction.
+- R `Matching` treats a supplied score as fixed and is non-comparable for the fitted-Logit
+  first-step correction.
 - Support/caliper selection, expanded ties, clustered/paired/survey uncertainty, bias
   correction, and arbitrary machine-learning first steps remain unsupported analytically.
 
@@ -162,7 +183,7 @@ versions may refine APIs, but breaking changes must still be documented explicit
 ### Architecture
 
 - The matcher consumes supplied propensity predictions and records their provenance; it
-  does not copy nuisance estimators from `limiteddepkit`.
+  does not own nuisance estimators.
 - Neighbor search sorts scalar arm scores and expands locally, avoiding a quadratic
   treated-by-control distance matrix.
 
@@ -203,9 +224,8 @@ versions may refine APIs, but breaking changes must still be documented explicit
 
 ### Architecture
 
-- Nuisance estimation remains external: existing `limiteddepkit` binary/outcome models
-  can generate predictions without being copied into `causalkit`. This package owns the
-  causal score, estimand, diagnostics, and inference.
+- Nuisance estimation remains external through provider-neutral public predictions. This
+  package owns the causal score, estimand, diagnostics, and inference.
 
 ## [0.2.0a1] - Unreleased
 
@@ -251,7 +271,7 @@ versions may refine APIs, but breaking changes must still be documented explicit
 
 ### Migration
 
-- Established `causalkit.IV2SLS` as the destination for ordinary linear 2SLS workflows
+- Established `causekit.IV2SLS` as the destination for ordinary linear 2SLS workflows
   formerly represented by the out-of-scope `limiteddepkit.TreatmentEffect` snapshot.
 - Replaced the legacy full-instrument-matrix convention with an explicit
   excluded-instrument contract. This is not a drop-in API rename.
@@ -270,6 +290,6 @@ versions may refine APIs, but breaking changes must still be documented explicit
   event studies, regression discontinuity, and panel IV remain roadmap items.
 - DADPLM and BDCPM are outside the current scope.
 
-The release date will be assigned when `0.1.0a1` is published. Entries above describe the
-target release surface and are not a claim that a particular checkout has passed the full
-verification gate.
+The earlier alpha milestones above are incorporated into the `0.6.0a4` release history;
+their retained headings describe the staged implementation sequence rather than separate
+public-package uploads.

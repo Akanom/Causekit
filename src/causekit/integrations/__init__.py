@@ -1,4 +1,4 @@
-"""Optional integrations for causalkit result objects."""
+"""Optional integrations for causekit result objects."""
 
 from .outputhub import add_to_outputhub, to_outputhub_model
 

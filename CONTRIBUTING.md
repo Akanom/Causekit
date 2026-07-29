@@ -1,6 +1,6 @@
-# Contributing to causalkit
+# Contributing to causekit
 
-Thank you for helping improve `causalkit`. This package treats estimator correctness,
+Thank you for helping improve `causekit`. This package treats estimator correctness,
 identification language, explicit failure behavior, and reproducible validation as part of
 the public API.
 
@@ -155,4 +155,4 @@ The roadmap includes built-in cross-fitting, matching, DiD/event studies, RDD,
 and panel IV. Roadmap placement is not automatic approval. Start with the estimand and
 validation design, then show how the feature fits [docs/PACKAGE_SCOPE.md](docs/PACKAGE_SCOPE.md)
 and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). DADPLM and BDCPM are not current
-`causalkit` scope.
+`causekit` scope.

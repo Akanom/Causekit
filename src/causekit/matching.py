@@ -23,9 +23,9 @@ class FittedPropensityMLEProtocol(Protocol):
     """Structural contract for a fitted full-sample parametric propensity MLE.
 
     The matching estimator validates the fitted probabilities, likelihood score,
-    convergence flag, feature ordering, and sample size. This protocol is intentionally
-    compatible with ``limiteddepkit.BinaryLogitResult`` without importing or duplicating
-    the binary-response estimator in CausalKit.
+    convergence flag, feature ordering, and sample size. The boundary is provider-neutral:
+    CauseKit neither imports a nuisance-estimation package nor owns a duplicate binary-
+    response likelihood.
     """
 
     params: Any
@@ -999,7 +999,7 @@ class NearestNeighborMatch:
         inference: str = "none",
         variance_neighbors: int = 1,
         first_step_covariance_neighbors: int = 2,
-        first_step_regression_neighbors: int = 1,
+        first_step_regression_neighbors: int = 2,
         first_step_covariate_neighbors: int = 1,
     ) -> None:
         if estimand not in {"ate", "att", "atc"}:

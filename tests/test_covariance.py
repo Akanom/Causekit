@@ -3,7 +3,7 @@ from dataclasses import FrozenInstanceError
 import numpy as np
 import pytest
 
-from causalkit._covariance import CovarianceEstimate, iv_covariance, ols_covariance
+from causekit._covariance import CovarianceEstimate, iv_covariance, ols_covariance
 
 
 @pytest.fixture

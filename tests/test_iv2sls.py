@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from causalkit import IV2SLS
+from causekit import IV2SLS
 
 
 def _iv_sample(
@@ -90,6 +90,62 @@ def test_iv2sls_recovers_coefficients_and_exposes_coherent_result() -> None:
     # The implemented overidentification diagnostic is the homoskedastic Sargan
     # test, so it must not be presented as valid alongside robust covariance.
     assert result.overidentification is None
+
+
+def test_iv2sls_replaces_legacy_treatment_effect_homoskedastic_contract() -> None:
+    """Preserve the migrated 2SLS numerical contract without a legacy implementation."""
+
+    rng = np.random.default_rng(45)
+    nobs = 400
+    z1 = rng.normal(size=nobs)
+    x1 = rng.normal(size=nobs)
+    full_instruments = np.column_stack([np.ones(nobs), z1, x1])
+    treatment = (full_instruments @ np.array([0.0, 0.4, 0.2]) + rng.normal(size=nobs) > 0).astype(
+        float
+    )
+    outcome = 2.5 * treatment + 0.8 * x1 + rng.normal(0.0, 0.6, nobs)
+    structural_design = np.column_stack([treatment, np.ones(nobs), x1])
+
+    ztz_inverse = np.linalg.inv(full_instruments.T @ full_instruments)
+    normal_matrix = (
+        structural_design.T
+        @ full_instruments
+        @ ztz_inverse
+        @ full_instruments.T
+        @ structural_design
+    )
+    legacy_params = np.linalg.solve(
+        normal_matrix,
+        structural_design.T @ full_instruments @ ztz_inverse @ full_instruments.T @ outcome,
+    )
+    legacy_residuals = outcome - structural_design @ legacy_params
+    legacy_sigma2 = float(legacy_residuals @ legacy_residuals / (nobs - 3))
+    legacy_covariance = legacy_sigma2 * np.linalg.inv(normal_matrix)
+
+    result = IV2SLS(covariance="unadjusted", add_constant=False).fit(
+        pd.Series(outcome, name="outcome"),
+        endogenous=pd.DataFrame({"T": treatment}),
+        exogenous=pd.DataFrame({"const": 1.0, "x1": x1}),
+        instruments=pd.DataFrame({"z1": z1}),
+    )
+    migrated_order = ["T", "const", "x1"]
+
+    np.testing.assert_allclose(result.params[migrated_order], legacy_params, atol=2e-14, rtol=0)
+    np.testing.assert_allclose(
+        result.covariance.loc[migrated_order, migrated_order],
+        legacy_covariance,
+        atol=2e-14,
+        rtol=0,
+    )
+    np.testing.assert_allclose(
+        result.predict(
+            pd.DataFrame({"T": treatment}),
+            exogenous=pd.DataFrame({"const": 1.0, "x1": x1}),
+        ),
+        structural_design @ legacy_params,
+        atol=2e-14,
+        rtol=0,
+    )
 
 
 @pytest.mark.parametrize("component", ["y", "endogenous", "instruments", "exogenous"])

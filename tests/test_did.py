@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from causalkit import CrossFitter, DiDResult, DifferenceInDifferences, EfficientDiD
+from causekit import CrossFitter, DiDResult, DifferenceInDifferences, EfficientDiD
 
 FIT_COLUMNS = {
     "outcome": "outcome",

@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 from scipy.special import expit
 
-from causalkit import AIPWATE, IPWATE, ObservationalATEResult
+from causekit import AIPWATE, IPWATE, ObservationalATEResult
 
 
 def _sample(nobs: int = 3000, seed: int = 20260729):

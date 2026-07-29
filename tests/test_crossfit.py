@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from causalkit import (
+from causekit import (
     AIPWATE,
     ClassProbabilityCrossFitResult,
     CrossFitResult,

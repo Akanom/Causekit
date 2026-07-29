@@ -1,6 +1,6 @@
 # Package scope
 
-`causalkit` contains estimators and workflows whose central problem is causal
+`causekit` contains estimators and workflows whose central problem is causal
 identification. Inclusion requires more than a method being common in applied economics:
 the package must be able to state the estimand, identifying assumptions, supported data
 structure, inference target, diagnostics, and validation boundary.
@@ -72,7 +72,7 @@ a different statistic merely to fill a result field.
 
 The three packages are separated by their main estimand and data structure:
 
-- `causalkit` owns identification-aware causal estimators and cross-sectional IV;
+- `causekit` owns identification-aware causal estimators and cross-sectional IV;
 - `limiteddepkit` owns models defined by limited outcomes, censoring, truncation, duration,
   choice, or another limited observation rule; and
 - `systemgmmkit` owns panel estimators and dynamic-panel GMM workflows.
@@ -85,14 +85,12 @@ reuse applicable `systemgmmkit` contracts instead of creating a disconnected par
 framework. Reuse does not require importing private sibling internals or adding a runtime
 dependency.
 
-`limiteddepkit` already owns binary logit/probit, count, censoring/truncation, duration,
-ordinal, and related limited-outcome likelihoods. `causalkit` must not add duplicate
-versions merely to obtain propensity scores or outcome regressions. Future IPW/AIPW or
-heterogeneous-outcome workflows should define a small public nuisance-model protocol and,
-where methodologically valid, adapt the public prediction interfaces of `limiteddepkit`
-as optional backends. Causal estimands, assignment/ignorability assumptions, overlap,
-cross-fitting, influence-function inference, and treatment-effect diagnostics remain the
-responsibility of `causalkit`.
+Binary logit/probit, count, censoring/truncation, duration, ordinal, and related
+limited-outcome likelihoods do not move into `causekit` merely to obtain nuisance
+predictions. IPW/AIPW and heterogeneous-outcome workflows use small provider-neutral
+public nuisance protocols. Causal estimands, assignment/ignorability assumptions,
+overlap, cross-fitting, influence-function inference, and treatment-effect diagnostics
+remain the responsibility of `causekit`.
 
 The first observational slice therefore consumes supplied propensity and potential-
 outcome predictions. `IPWATE` uses the Horvitz-Thompson ATE score; `AIPWATE` uses the
@@ -108,23 +106,24 @@ support the analysis-population ATE, treated-population ATT, and control-populat
 This is orchestration, not ownership transfer: nuisance estimators remain in their proper
 packages.
 
-Matching inference uses a second, deliberately narrower protocol because the Abadie–Imbens
-first-step formula requires a regular full-sample parametric MLE rather than an arbitrary
-prediction learner. `limiteddepkit.BinaryLogitResult` satisfies the structural contract
-directly. CausalKit validates its public fit result and owns only matching, the causal
-estimand, diagnostics, and uncertainty correction.
+Matching inference uses a second, deliberately narrower protocol because the
+Abadie–Imbens first-step formula requires a regular full-sample parametric MLE rather than
+an arbitrary prediction learner. CauseKit validates the provider-neutral public fit
+result and owns matching, the causal estimand, diagnostics, and uncertainty correction.
 
 ## `limiteddepkit.TreatmentEffect` migration provenance
 
 The historical `TreatmentEffect` class implemented ordinary homoskedastic 2SLS inside
 `limiteddepkit`. Because endogeneity does not make an outcome limited, the class was
-removed from that package's public and installable namespaces. A snapshot remains in
-`limiteddepkit/_out_of_scope/` solely as migration evidence.
+removed from that package's public and installable namespaces. The migration is now
+complete and the obsolete source snapshot has also been removed from LimitedDepKit.
 
-`causalkit.IV2SLS` is a new destination with a stronger contract. The migration rationale
+`causekit.IV2SLS` is a new destination with a stronger contract. The migration rationale
 and expected result conventions informed the design, but no private implementation code
 was copied. The estimator is implemented from the public matrix definition of 2SLS and
-package-owned validation, covariance, diagnostics, and result layers.
+package-owned validation, covariance, diagnostics, and result layers. A maintained
+CauseKit test reconstructs the legacy homoskedastic matrix contract and checks the new
+estimator after mapping the old full-`Z` interface to excluded instruments.
 
 The APIs differ materially. Legacy `TreatmentEffect.fit(..., Z=...)` expected a full
 instrument matrix that already spanned the exogenous regressors. New
@@ -140,7 +139,7 @@ and validation gates:
 
 | Family | Required design questions before promotion |
 | --- | --- |
-| Matching promotion | Manual Stata validation of the new estimated-Logit harness and remaining publication-scale sensitivity/coverage evidence; fixed-score Python/R/Stata parity is recorded |
+| Matching promotion | Remaining publication-scale sensitivity/coverage evidence; fixed-score and supported estimated-Logit Python/R/Stata evidence is recorded where estimand-aligned comparators exist |
 | DiD promotion | Pre-trend/Hausman diagnostics, repeated cross-sections, publication-scale coverage, covariate performance, and broader parity |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
 | Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |
@@ -160,7 +159,7 @@ and inference boundaries are recorded in [Difference-in-differences contract](DI
 ## Out of current scope
 
 DADPLM and BDCPM are separate research/modeling lines and are outside the current
-`causalkit` scope. This release does not reserve public imports, placeholder estimators, or
+`causekit` scope. This release does not reserve public imports, placeholder estimators, or
 compatibility claims for either project. Any future scope proposal must begin with a clear
 estimand and architecture review rather than assume inclusion from thematic proximity.
 

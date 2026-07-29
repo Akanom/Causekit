@@ -19,7 +19,7 @@ def _regression_model_class() -> Any:
     except ImportError as error:
         raise ImportError(
             "Universal Output Hub is required for this integration. "
-            "Install causalkit with the 'outputhub' extra."
+            "Install causekit with the 'outputhub' extra."
         ) from error
     return RegressionModel
 
@@ -109,7 +109,7 @@ def to_outputhub_model(
                 "causal_interpretation_requires_assumptions": True,
                 "assumptions": list(result.assumptions),
             },
-            source="causalkit",
+            source="causekit",
         )
     if isinstance(result, DiDResult):
         negative_weights = (
@@ -157,7 +157,7 @@ def to_outputhub_model(
                 "causal_interpretation_requires_assumptions": True,
                 "assumptions": list(result.assumptions),
             },
-            source="causalkit",
+            source="causekit",
         )
     if isinstance(result, ObservationalATEResult):
         return RegressionModel(
@@ -190,7 +190,7 @@ def to_outputhub_model(
                 "causal_interpretation_requires_assumptions": True,
                 "assumptions": list(result.assumptions),
             },
-            source="causalkit",
+            source="causekit",
         )
     if isinstance(result, RandomizedATEResult):
         return RegressionModel(
@@ -222,7 +222,7 @@ def to_outputhub_model(
                 "causal_interpretation_requires_assumptions": True,
                 "assumptions": list(result.assumptions),
             },
-            source="causalkit",
+            source="causekit",
         )
     diagnostics: dict[str, Any] = {}
     for endogenous, first_stage in result.first_stage.items():
@@ -259,7 +259,7 @@ def to_outputhub_model(
             "causal_interpretation_requires_assumptions": True,
             "assumptions": list(result.assumptions),
         },
-        source="causalkit",
+        source="causekit",
     )
 
 
@@ -303,10 +303,10 @@ def add_to_outputhub(
                 "The classical F < 10 warning is a heuristic, not a universal "
                 "weak-identification test."
             ),
-            metadata={"source": "causalkit", "estimator": "iv_2sls"},
+            metadata={"source": "causekit", "estimator": "iv_2sls"},
         )
     elif isinstance(result, NearestNeighborMatchResult) and hasattr(hub, "add_table"):
-        table_metadata = {"source": "causalkit", "estimator": "nearest_neighbor_match"}
+        table_metadata = {"source": "causekit", "estimator": "nearest_neighbor_match"}
         hub.add_table(
             f"{model_name} matches",
             result.match_table.copy(),
@@ -328,10 +328,10 @@ def add_to_outputhub(
             f"{model_name} covariate balance",
             pd.DataFrame([item.__dict__ for item in result.balance]),
             caption="Unadjusted pre-treatment covariate balance by randomized arm.",
-            metadata={"source": "causalkit", "estimator": "randomized_ate"},
+            metadata={"source": "causekit", "estimator": "randomized_ate"},
         )
     elif isinstance(result, DiDResult) and hasattr(hub, "add_table"):
-        table_metadata = {"source": "causalkit", "estimator": result.method}
+        table_metadata = {"source": "causekit", "estimator": result.method}
         hub.add_table(
             f"{model_name} group-time effects",
             result.group_time.reset_index(),

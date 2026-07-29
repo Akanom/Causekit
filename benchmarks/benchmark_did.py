@@ -1,4 +1,4 @@
-"""Deterministic balanced-panel performance smoke for causalkit DiD estimators."""
+"""Deterministic balanced-panel performance smoke for causekit DiD estimators."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ import tracemalloc
 import numpy as np
 import pandas as pd
 
-import causalkit
-from causalkit import CrossFitter, DifferenceInDifferences, EfficientDiD
+import causekit
+from causekit import CrossFitter, DifferenceInDifferences, EfficientDiD
 
 
 class _ClassProbabilityResult:
@@ -153,7 +153,7 @@ def main() -> None:
     print(
         json.dumps(
             {
-                "causalkit_version": causalkit.__version__,
+                "causekit_version": causekit.__version__,
                 "python": platform.python_version(),
                 "platform": platform.platform(),
                 "seed": args.seed,

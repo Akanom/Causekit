@@ -1,6 +1,6 @@
 # Architecture
 
-`causalkit` is organized around small, auditable estimation paths. The `0.6.0a4`
+`causekit` is organized around small, auditable estimation paths. The `0.6.0a4`
 architecture keeps causal assumptions visible, separates numerical estimation from
 inference and diagnostics, and returns frozen labelled result containers suitable for
 reporting. The pandas objects stored inside a result should be treated as read-only; helper
@@ -72,21 +72,22 @@ The installed source tree assigns one primary responsibility to each module:
 
 | Module | Responsibility |
 | --- | --- |
-| `causalkit.__init__` | Stable root exports and package version |
-| `causalkit._data` | Input coercion, labels, exact pandas alignment, joint missing-data policy, and prediction schema |
-| `causalkit._covariance` | Homoskedastic, HC1, and one-way CR1 covariance kernels and inference metadata |
-| `causalkit.diagnostics` | First-stage diagnostic records and homoskedastic Sargan testing |
-| `causalkit.iv` | Public `IV2SLS`, 2SLS execution path, and fitted `IV2SLSResult` |
-| `causalkit.randomized` | Two-arm difference-in-means and Lin-adjusted ATE execution path, balance records, and fitted result |
-| `causalkit.observational` | Supplied-nuisance IPW/AIPW scores, overlap diagnostics, vectorized influence-function and cluster inference |
-| `causalkit.crossfit` | Public nuisance protocols, deterministic stratified fold orchestration, binary/multiclass probabilities, masked scalar tasks, fresh-model fitting, prediction adaptation, and aligned out-of-fold records |
-| `causalkit.matching` | Supplied-score ATT/ATC/ATE matching, sorted scalar neighbor search, support/caliper rules, fractional ties, weights, reuse, balance, and separate fixed-score or validated Logit-MLE analytical inference |
-| `causalkit.did` | Balanced-panel validation, conventional group-time DiD, cross-fitted covariate PT-All scores/conditional weights, pointwise and simultaneous influence inference, and cohort/event/calendar aggregation |
-| `causalkit.postestimation` | Summary, covariance, confidence interval, prediction, residual, fitted-value, linear-combination, and Wald helpers |
-| `causalkit.integrations.outputhub` | Lazy optional conversion and insertion into Universal Output Hub |
+| `causekit.__init__` | Stable root exports and package version |
+| `causekit._data` | Input coercion, labels, exact pandas alignment, joint missing-data policy, and prediction schema |
+| `causekit._covariance` | Homoskedastic, HC1, and one-way CR1 covariance kernels and inference metadata |
+| `causekit.diagnostics` | First-stage diagnostic records and homoskedastic Sargan testing |
+| `causekit.iv` | Public `IV2SLS`, 2SLS execution path, and fitted `IV2SLSResult` |
+| `causekit.randomized` | Two-arm difference-in-means and Lin-adjusted ATE execution path, balance records, and fitted result |
+| `causekit.observational` | Supplied-nuisance IPW/AIPW scores, overlap diagnostics, vectorized influence-function and cluster inference |
+| `causekit.crossfit` | Public nuisance protocols, deterministic stratified fold orchestration, binary/multiclass probabilities, masked scalar tasks, fresh-model fitting, prediction adaptation, and aligned out-of-fold records |
+| `causekit.matching` | Supplied-score ATT/ATC/ATE matching, sorted scalar neighbor search, support/caliper rules, fractional ties, weights, reuse, balance, and separate fixed-score or validated Logit-MLE analytical inference |
+| `causekit.did` | Balanced-panel validation, conventional group-time DiD, cross-fitted covariate PT-All scores/conditional weights, pointwise and simultaneous influence inference, and cohort/event/calendar aggregation |
+| `causekit.postestimation` | Summary, covariance, confidence interval, prediction, residual, fitted-value, linear-combination, and Wald helpers |
+| `causekit.integrations.outputhub` | Lazy optional conversion and insertion into Universal Output Hub |
+| `causekit.datasets` | Opt-in HTTPS-only, SHA-256-pinned real-data cache used by examples and parity; source datasets are not redistributed |
 
 Underscored modules are internal. Users should import estimators, result types, diagnostics,
-and post-estimation helpers from `causalkit`; internal module paths may change during the
+and post-estimation helpers from `causekit`; internal module paths may change during the
 alpha series.
 
 ## Layer responsibilities
@@ -164,7 +165,7 @@ preserves a valid pandas index.
 
 ### Optional integrations
 
-Reporting adapters live below `causalkit.integrations` and translate a fitted result into
+Reporting adapters live below `causekit.integrations` and translate a fitted result into
 the external reporting contract. `universal-output-hub` is optional; importing and fitting
 the core estimator must not require it. When unavailable, the adapter should raise an
 actionable installation error only when called.
@@ -176,7 +177,7 @@ truth.
 ## Compatibility strategy
 
 `systemgmmkit` and `limiteddepkit` established useful conventions for labelled econometric
-results. `causalkit` follows compatible meanings for parameters, covariance, standard
+results. `causekit` follows compatible meanings for parameters, covariance, standard
 errors, test statistics, p-values, observation counts, confidence intervals, prediction,
 and table/report adapters.
 
@@ -188,9 +189,9 @@ Compatibility is structural rather than inheritance-based:
 - shared conventions are verified through public fields and adapter behavior.
 
 Limited-outcome estimators are not copied into this package. `CrossFitter` targets a
-documented fit/predict protocol so public `limiteddepkit` estimators can participate
-optionally without becoming a core dependency. The causal procedure still owns sample
-splitting, estimand construction, diagnostics, and valid uncertainty propagation.
+provider-neutral fit/predict protocol with no sibling-package import or validation
+dependency. The causal procedure owns sample splitting, estimand construction,
+diagnostics, and valid uncertainty propagation.
 
 The current observational fast path performs one strict alignment pass, constructs the
 IPW/AIPW score with vectorized array operations, and aggregates clustered influence sums
@@ -209,12 +210,12 @@ Matching uncertainty is intentionally separate from generic covariance code. The
 defaults to `inference="none"`. Its maintained Abadie–Imbens path estimates same-arm
 conditional variances, applies estimand-specific comparison-reuse formulas, and is exposed
 only for a declared fixed score without support/caliper selection or expanded ties.
-The separate `FittedPropensityMLEProtocol` consumes a public fitted result such as
-`limiteddepkit.BinaryLogitResult`; it does not fit or copy a binary model. The estimated-
-score path validates the full-sample unpenalized Logit score and normalized Fisher
-information, then applies the Abadie–Imbens first-step correction. Generic, cross-fitted,
-penalized, or unverifiable predictions still refuse analytical inference. The matcher does
-not reuse IV/ATE sandwich or CR1 kernels merely to populate standard-error fields.
+The separate `FittedPropensityMLEProtocol` consumes a provider-neutral public fitted
+result; it does not fit or copy a binary model. The estimated-score path validates the
+full-sample unpenalized Logit score and normalized Fisher information, then applies the
+Abadie–Imbens first-step correction. Generic, cross-fitted, penalized, or unverifiable
+predictions still refuse analytical inference. The matcher does not reuse IV/ATE sandwich
+or CR1 kernels merely to populate standard-error fields.
 
 The DiD path performs one long-to-wide balanced-panel validation and keeps the entity as
 the sampling unit. `DifferenceInDifferences` and `EfficientDiD` share this panel bundle,
@@ -232,10 +233,10 @@ conditional covariance assembly, normalized solve, aggregation, and uncertainty.
 cohort probability or singular weight system refuses rather than silently applying
 clipping, a ridge, or a pseudoinverse.
 
-The historical `limiteddepkit.TreatmentEffect` snapshot is provenance for migration, not a
-code dependency. `IV2SLS` was designed around the explicit excluded-instrument contract and
-new package-owned layers. Migration details belong in the README and package-scope guide,
-not in compatibility shims that preserve an ambiguous full-`Z` API.
+The historical `limiteddepkit.TreatmentEffect` migration is complete. `IV2SLS` owns the
+replacement and a maintained numerical migration contract; the obsolete source snapshot
+has been removed from LimitedDepKit. Migration details belong in the README and package-
+scope guide, not in compatibility shims that preserve an ambiguous full-`Z` API.
 
 ## Dependencies
 

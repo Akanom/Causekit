@@ -1,7 +1,7 @@
 cff-version: 1.2.0
-message: "If you use causalkit in research, please cite the software and the exact version used."
+message: "If you use causekit in research, please cite the software and the exact version used."
 type: software
-title: "causalkit: Identification-aware causal inference and instrumental variables for Python"
+title: "CauseKit: Identification-aware causal inference and instrumental variables for Python"
 abstract: >-
   An identification-aware Python toolkit for causal inference. Version 0.6.0a4
   provides IV, randomized effects, cross-fitted nuisance orchestration,
@@ -12,8 +12,8 @@ authors:
   - family-names: Akanbi
     given-names: "Oluwajuwon Mayomi"
 version: 0.6.0a4
-repository-code: "https://github.com/Akanom/causalkit"
-url: "https://github.com/Akanom/causalkit"
+repository-code: "https://github.com/Akanom/causekit"
+url: "https://github.com/Akanom/causekit"
 license: MIT
 keywords:
   - causal inference

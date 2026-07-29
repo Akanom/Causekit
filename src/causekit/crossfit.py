@@ -286,8 +286,8 @@ class CrossFitter:
     """Generate out-of-fold propensity and arm-specific outcome predictions.
 
     Factories create fresh estimators for every fold. This supports estimators that
-    return a fitted result (including ``limiteddepkit``) and estimators that mutate and
-    return themselves (including scikit-learn-style models).
+    return an immutable fitted result and estimators that mutate and return themselves,
+    including scikit-learn-style models.
     """
 
     def __init__(
