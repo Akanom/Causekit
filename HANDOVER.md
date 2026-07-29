@@ -100,6 +100,15 @@ future task can resume without reconstructing intent from chat history.
     on both nuisance targets. This supports keeping native ridge-GCV as the efficient
     default, not a universal superiority or CATE claim. The Cattaneo rows were not rerun.
 
+13. `0.7.0a2` R-learner prerequisites: public `WeightedCATEEstimatorProtocol` and
+    `CATEResultProtocol` define the provider-neutral weighted-fit/prediction boundary.
+    Internal native components implement standardized ridge-penalized binary Logit with
+    deterministic stratified training-only CV, plus weighted ridge-GCV whose transformed
+    loss is exactly the direct R-objective. Both retain construction indices and tuning
+    diagnostics. Hand score/objective, integration, leakage-audit, weight, schema, index,
+    malformed-provider, and prediction refusals pass. No `RLearner` placeholder is
+    exported; honest splitting and every evaluation/promotion gate remain open.
+
 ## Open promotion gates
 
 - Matching still defaults to `inference="none"`. Known-score reuse-aware inference and a
@@ -116,10 +125,11 @@ future task can resume without reconstructing intent from chat history.
   audited: the pinned public R implementation has no covariate path and reviewed Stata
   estimators target different moments, so those cells remain explicitly unavailable.
 - R/DR learners and heterogeneous-effect diagnostics/graphs are not yet implemented. The
-  R-learner contract is complete, but its native penalized-probability prerequisite,
-  weighted CATE learner, leakage tests, and honest evaluation remain open. The partially
-  linear DML residual-stage parity row passes in Python, base R 4.5.1, and a reviewed manual
-  Stata/IC 17 run.
+  R-learner contract and native probability/weighted-CATE prerequisites are complete, but
+  honest role splitting, cross-fitted CATE construction, leakage enforcement at the full
+  estimator boundary, evaluation, calibration, groups, bands, graphs, simulations,
+  parity, and real-data promotion remain open. The partially linear DML residual-stage
+  parity row passes in Python, base R 4.5.1, and a reviewed manual Stata/IC 17 run.
 
 ## Required implementation patterns
 
@@ -144,9 +154,9 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Implement the R-learner prerequisites in `docs/R_LEARNER_CONTRACT.md`: native
-   penalized-probability and weighted-CATE protocols, then leakage/refusal contracts.
-2. Implement the honest construction/evaluation split, R-loss, differential calibration,
+1. Implement the honest R-learner construction/evaluation split and cross-fitted
+   R-objective using the completed native probability/weighted-CATE prerequisites.
+2. Implement R-loss, differential calibration,
    group bands, and graph-data surface; run simulation/parity/real-data gates before
    promotion.
 3. Add the doubly robust learner only after its propensity, pseudo-outcome, honest second-

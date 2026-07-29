@@ -141,6 +141,13 @@ The next heterogeneous-effect candidate is governed by the separate
 contract follows [Kennedy](https://arxiv.org/abs/2004.14497) comes later. Neither is a
 placeholder public import in this milestone.
 
+CauseKit has implemented the R-learner's internal native prerequisites: stratified
+training-only-CV ridge Logit for binary probabilities and weighted ridge-GCV for the exact
+`u/v`, `v^2` CATE transformation. Public `WeightedCATEEstimatorProtocol` and
+`CATEResultProtocol` keep custom weighted learners provider-neutral. This foundation does
+not expose an `RLearner`, honest evaluation result, or heterogeneity claim; every remaining
+gate is maintained in the separate contract.
+
 ## Validation and promotion gates
 
 Before promotion, the implementation must have:

@@ -16,6 +16,9 @@ versions may refine APIs, but breaking changes must still be documented explicit
 - An honest R-learner design contract covering construction/evaluation separation,
   overlap, weighted fitting, held-out R-loss, differential calibration, group effects,
   simultaneous bands, graph-data parity, refusals, and promotion evidence.
+- Public provider-neutral `WeightedCATEEstimatorProtocol` and `CATEResultProtocol`, plus
+  internal native stratified-CV penalized Logit and weighted ridge-GCV prerequisites with
+  training-index/tuning audit state and strict malformed-provider refusals.
 
 ### Changed
 
@@ -35,9 +38,10 @@ versions may refine APIs, but breaking changes must still be documented explicit
 
 - Weakly lower training-fold GCV under a denser supplied grid did not improve the recorded
   held-out errors and does not imply stronger causal identification.
-- The R-learner is contract-only. A native probability learner, weighted CATE learner,
-  leakage tests, honest calibration inference, and simulation/real-data validation remain
-  implementation gates.
+- The public R-learner remains contract-only. Its native probability learner, weighted
+  CATE learner, and prerequisite hand/leakage/refusal tests are now implemented. Honest
+  role splitting, cross-fitted CATE construction, calibration inference, bands, graphs,
+  and simulation/parity/real-data validation remain implementation gates.
 
 ## [0.7.0a1] - Unreleased
 

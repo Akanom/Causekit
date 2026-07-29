@@ -4,18 +4,25 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from inspect import signature
 from typing import Any, Literal, cast
 
 import numpy as np
 import pandas as pd
+from scipy.optimize import minimize
+from scipy.special import expit
 from scipy.stats import norm, t
 
 from ._covariance import CovarianceType, ols_covariance
 from .crossfit import (
+    CATEResultProtocol,
     CrossFitTask,
     CrossFitter,
     NuisanceFactory,
     PredictionAdapter,
+    WeightedCATEEstimatorProtocol,
+    WeightedCATEFactory,
+    _fold_assignments,
     _frame,
     _labels,
     _series,
@@ -258,6 +265,433 @@ def _ridge_alphas(values: Sequence[float]) -> tuple[float, ...]:
     if any(left >= right for left, right in zip(alphas, alphas[1:], strict=False)):
         raise ValueError("ridge_alphas must be strictly increasing.")
     return alphas
+
+
+@dataclass(frozen=True)
+class NativePenalizedLogitResult:
+    """Fitted state for the native ridge-penalized binary probability learner."""
+
+    coefficients: np.ndarray
+    intercept: float
+    feature_mean: np.ndarray
+    feature_scale: np.ndarray
+    feature_names: pd.Index
+    classes_: np.ndarray
+    selected_alpha: float
+    cv_log_loss: float
+    training_log_loss: float
+    training_objective: float
+    converged: bool
+    iterations: int
+    numerical_rank: int
+    alpha_grid_size: int
+    alpha_at_boundary: bool
+    tuning_splits: int
+    training_index: pd.Index
+    tuning_fold: pd.Series
+
+    def predict_proba(self, X: Any) -> np.ndarray:
+        """Return control/treated probabilities without clipping."""
+
+        raw = _prediction_frame(
+            X,
+            feature_names=self.feature_names,
+            feature_count=len(self.feature_names),
+        )
+        standardized = (raw - self.feature_mean) / self.feature_scale
+        treated = expit(self.intercept + standardized @ self.coefficients)
+        return np.column_stack([1.0 - treated, treated])
+
+    def nuisance_diagnostics(self) -> dict[str, float | int | bool]:
+        """Return scalar tuning diagnostics suitable for CrossFitter."""
+
+        return {
+            "selected_alpha": self.selected_alpha,
+            "cv_log_loss": self.cv_log_loss,
+            "training_log_loss": self.training_log_loss,
+            "training_objective": self.training_objective,
+            "converged": self.converged,
+            "iterations": self.iterations,
+            "numerical_rank": self.numerical_rank,
+            "alpha_grid_size": self.alpha_grid_size,
+            "alpha_at_boundary": self.alpha_at_boundary,
+            "tuning_splits": self.tuning_splits,
+        }
+
+
+@dataclass(frozen=True)
+class NativeWeightedRidgeCVResult:
+    """Fitted state for the native weighted ridge-GCV CATE learner."""
+
+    coefficients: np.ndarray
+    intercept: float
+    feature_mean: np.ndarray
+    feature_scale: np.ndarray
+    feature_names: pd.Index
+    selected_alpha: float
+    effective_df: float
+    gcv_score: float
+    weighted_training_rmse: float
+    weighted_residual_sum_squares: float
+    numerical_rank: int
+    alpha_grid_size: int
+    alpha_at_boundary: bool
+    total_weight: float
+    minimum_weight: float
+    maximum_weight: float
+    training_index: pd.Index
+
+    def predict(self, X: Any) -> np.ndarray:
+        """Return one finite CATE prediction per row."""
+
+        raw = _prediction_frame(
+            X,
+            feature_names=self.feature_names,
+            feature_count=len(self.feature_names),
+        )
+        standardized = (raw - self.feature_mean) / self.feature_scale
+        return self.intercept + standardized @ self.coefficients
+
+    def nuisance_diagnostics(self) -> dict[str, float | int | bool]:
+        """Return scalar tuning diagnostics for the future R-learner audit table."""
+
+        return {
+            "selected_alpha": self.selected_alpha,
+            "effective_df": self.effective_df,
+            "gcv_score": self.gcv_score,
+            "weighted_training_rmse": self.weighted_training_rmse,
+            "weighted_residual_sum_squares": self.weighted_residual_sum_squares,
+            "numerical_rank": self.numerical_rank,
+            "alpha_grid_size": self.alpha_grid_size,
+            "alpha_at_boundary": self.alpha_at_boundary,
+            "total_weight": self.total_weight,
+            "minimum_weight": self.minimum_weight,
+            "maximum_weight": self.maximum_weight,
+        }
+
+
+@dataclass(frozen=True)
+class _LogitFit:
+    intercept: float
+    coefficients: np.ndarray
+    feature_mean: np.ndarray
+    feature_scale: np.ndarray
+    log_loss: float
+    objective: float
+    iterations: int
+
+
+def _prediction_frame(
+    X: Any,
+    *,
+    feature_names: pd.Index,
+    feature_count: int,
+) -> np.ndarray:
+    if isinstance(X, pd.DataFrame):
+        if not X.columns.equals(feature_names):
+            raise ValueError("Prediction covariate columns must match the fitted schema exactly.")
+        raw = X.to_numpy(dtype=float)
+    else:
+        raw = np.asarray(X, dtype=float)
+    if raw.ndim != 2 or raw.shape[1] != feature_count:
+        raise ValueError("Prediction covariates must match the fitted feature dimension.")
+    if not np.isfinite(raw).all():
+        raise ValueError("Prediction covariates must contain only finite values.")
+    return raw
+
+
+def _cate_prediction(
+    result: Any,
+    X: Any,
+    *,
+    adapter: PredictionAdapter | None = None,
+) -> np.ndarray:
+    """Validate one provider-neutral CATE prediction vector."""
+
+    if adapter is None and not isinstance(result, CATEResultProtocol):
+        raise TypeError("The fitted CATE result must provide predict(X).")
+    raw = adapter(result, X) if adapter is not None else result.predict(X)
+    if isinstance(raw, pd.Series) and isinstance(X, pd.DataFrame) and not raw.index.equals(X.index):
+        raise ValueError("CATE prediction index must match the prediction covariate index.")
+    values = np.asarray(raw, dtype=float)
+    if values.ndim != 1 or len(values) != len(X):
+        raise ValueError("A CATE prediction must provide one value per row.")
+    if not np.isfinite(values).all():
+        raise ValueError("CATE predictions must contain only finite values.")
+    return values
+
+
+def _fit_penalized_logit(raw: np.ndarray, target: np.ndarray, *, alpha: float) -> _LogitFit:
+    feature_mean = raw.mean(axis=0)
+    feature_scale = raw.std(axis=0, ddof=0)
+    feature_scale = np.where(feature_scale > 0.0, feature_scale, 1.0)
+    standardized = (raw - feature_mean) / feature_scale
+    treated_share = float(target.mean())
+    initial = np.zeros(standardized.shape[1] + 1, dtype=float)
+    initial[0] = float(np.log(treated_share / (1.0 - treated_share)))
+
+    def objective(parameters: np.ndarray) -> tuple[float, np.ndarray]:
+        linear = parameters[0] + standardized @ parameters[1:]
+        probability = expit(linear)
+        value = float(
+            np.logaddexp(0.0, linear).sum()
+            - target @ linear
+            + 0.5 * alpha * (parameters[1:] @ parameters[1:])
+        )
+        residual = probability - target
+        gradient = np.concatenate(
+            (
+                np.array([residual.sum()]),
+                standardized.T @ residual + alpha * parameters[1:],
+            )
+        )
+        return value, gradient
+
+    optimized = minimize(
+        objective,
+        initial,
+        method="L-BFGS-B",
+        jac=True,
+        options={"maxiter": 1000, "ftol": 1e-13, "gtol": 1e-9, "maxls": 50},
+    )
+    if not optimized.success or not np.isfinite(optimized.fun):
+        raise ValueError(f"Native penalized Logit did not converge: {optimized.message}.")
+    parameters = np.asarray(optimized.x, dtype=float)
+    linear = parameters[0] + standardized @ parameters[1:]
+    log_loss = float(np.mean(np.logaddexp(0.0, linear) - target * linear))
+    return _LogitFit(
+        intercept=float(parameters[0]),
+        coefficients=parameters[1:].copy(),
+        feature_mean=np.asarray(feature_mean, dtype=float),
+        feature_scale=np.asarray(feature_scale, dtype=float),
+        log_loss=log_loss,
+        objective=float(optimized.fun),
+        iterations=int(optimized.nit),
+    )
+
+
+class _NativePenalizedLogitCV:
+    """Standardized ridge-Logit with stratified training-only CV log-loss tuning."""
+
+    def __init__(
+        self,
+        *,
+        alphas: Sequence[float] = DEFAULT_RIDGE_ALPHAS,
+        tuning_splits: int = 3,
+        random_state: int | None = None,
+    ) -> None:
+        self.alphas = _ridge_alphas(alphas)
+        if isinstance(tuning_splits, bool) or not isinstance(tuning_splits, int):
+            raise TypeError("tuning_splits must be an integer.")
+        if tuning_splits < 2:
+            raise ValueError("tuning_splits must be at least two.")
+        if random_state is not None and not isinstance(random_state, int):
+            raise TypeError("random_state must be an integer or None.")
+        self.tuning_splits = tuning_splits
+        self.random_state = random_state
+
+    def fit(self, X: Any, y: Any) -> NativePenalizedLogitResult:
+        frame, index = _frame(X)
+        target = _series(y, name="binary_target", index=index)
+        observed = np.unique(target.to_numpy(dtype=float))
+        if len(observed) < 2:
+            raise ValueError("binary_target must contain both arms coded 0 and 1.")
+        if not np.array_equal(observed, np.array([0.0, 1.0])):
+            raise ValueError("binary_target must be coded exactly 0 and 1.")
+        counts = target.value_counts()
+        if int(counts.min()) < self.tuning_splits:
+            raise ValueError("Each binary arm must contain at least tuning_splits observations.")
+
+        raw = frame.to_numpy(dtype=float)
+        target_values = target.to_numpy(dtype=float)
+        folds = _fold_assignments(
+            len(frame),
+            n_splits=self.tuning_splits,
+            random_state=self.random_state,
+            strata=target,
+        )
+        best_alpha = self.alphas[-1]
+        best_loss = float("inf")
+        best_position = len(self.alphas) - 1
+        for position, alpha in enumerate(self.alphas):
+            heldout_loss = 0.0
+            heldout_nobs = 0
+            for fold in range(self.tuning_splits):
+                holdout = folds == fold
+                training = ~holdout
+                fitted = _fit_penalized_logit(
+                    raw[training],
+                    target_values[training],
+                    alpha=alpha,
+                )
+                standardized = (raw[holdout] - fitted.feature_mean) / fitted.feature_scale
+                linear = fitted.intercept + standardized @ fitted.coefficients
+                heldout_loss += float(
+                    np.sum(np.logaddexp(0.0, linear) - target_values[holdout] * linear)
+                )
+                heldout_nobs += int(holdout.sum())
+            cv_log_loss = heldout_loss / heldout_nobs
+            if cv_log_loss < best_loss:
+                best_alpha = alpha
+                best_loss = cv_log_loss
+                best_position = position
+
+        final = _fit_penalized_logit(raw, target_values, alpha=best_alpha)
+        standardized = (raw - final.feature_mean) / final.feature_scale
+        return NativePenalizedLogitResult(
+            coefficients=final.coefficients,
+            intercept=final.intercept,
+            feature_mean=final.feature_mean,
+            feature_scale=final.feature_scale,
+            feature_names=frame.columns.copy(),
+            classes_=np.array([0.0, 1.0]),
+            selected_alpha=float(best_alpha),
+            cv_log_loss=float(best_loss),
+            training_log_loss=final.log_loss,
+            training_objective=final.objective,
+            converged=True,
+            iterations=final.iterations,
+            numerical_rank=int(np.linalg.matrix_rank(standardized)),
+            alpha_grid_size=len(self.alphas),
+            alpha_at_boundary=best_position in {0, len(self.alphas) - 1},
+            tuning_splits=self.tuning_splits,
+            training_index=index.copy(),
+            tuning_fold=pd.Series(folds, index=index.copy(), name="tuning_fold"),
+        )
+
+
+def _weighted_cate_inputs(
+    X: Any,
+    pseudo_outcome: Any,
+    sample_weight: Any,
+) -> tuple[pd.DataFrame, pd.Series, pd.Series, pd.Index]:
+    frame, index = _frame(X)
+    target = _series(pseudo_outcome, name="pseudo_outcome", index=index)
+    weight = _series(sample_weight, name="sample_weight", index=index)
+    if np.any(weight.to_numpy(dtype=float) <= 0.0):
+        raise ValueError("sample_weight must contain only strictly positive values.")
+    if len(frame) < 2:
+        raise ValueError("Weighted CATE fitting requires at least two observations.")
+    return frame, target, weight, index
+
+
+class _NativeWeightedRidgeCV:
+    """Standardized weighted ridge-GCV for the future R-learner CATE stage."""
+
+    def __init__(self, *, alphas: Sequence[float] = DEFAULT_RIDGE_ALPHAS) -> None:
+        self.alphas = _ridge_alphas(alphas)
+
+    def fit(
+        self,
+        X: Any,
+        y: Any,
+        *,
+        sample_weight: Any,
+    ) -> NativeWeightedRidgeCVResult:
+        frame, target, weight, index = _weighted_cate_inputs(X, y, sample_weight)
+        raw = frame.to_numpy(dtype=float)
+        target_values = target.to_numpy(dtype=float)
+        weights = weight.to_numpy(dtype=float)
+        total_weight = float(weights.sum())
+        feature_mean = np.average(raw, axis=0, weights=weights)
+        centered = raw - feature_mean
+        feature_scale = np.sqrt(np.average(centered**2, axis=0, weights=weights))
+        feature_scale = np.where(feature_scale > 0.0, feature_scale, 1.0)
+        standardized = centered / feature_scale
+        intercept = float(np.average(target_values, weights=weights))
+        centered_target = target_values - intercept
+        root_weight = np.sqrt(weights)
+        weighted_design = root_weight[:, None] * standardized
+        weighted_target = root_weight * centered_target
+        left, singular_values, right = np.linalg.svd(weighted_design, full_matrices=False)
+        projected = left.T @ weighted_target
+        squared = singular_values**2
+        projected_squared = projected**2
+        orthogonal_residual = weighted_target - left @ projected
+        orthogonal_sum_squares = float(orthogonal_residual @ orthogonal_residual)
+        if len(singular_values) and singular_values[0] > 0.0:
+            rank_tolerance = (
+                np.finfo(float).eps * max(weighted_design.shape) * float(singular_values[0])
+            )
+            numerical_rank = int(np.sum(singular_values > rank_tolerance))
+        else:
+            numerical_rank = 0
+
+        best_alpha = self.alphas[-1]
+        best_gcv = float("inf")
+        best_residual_sum_squares = float("inf")
+        best_effective_df = 1.0
+        best_position = len(self.alphas) - 1
+        for position, alpha in enumerate(self.alphas):
+            shrinkage = squared / (squared + alpha)
+            effective_df = 1.0 + float(shrinkage.sum())
+            residual_df = len(frame) - effective_df
+            residual_sum_squares = orthogonal_sum_squares + float(
+                ((1.0 - shrinkage) ** 2 * projected_squared).sum()
+            )
+            gcv = (
+                float(len(frame) * residual_sum_squares / residual_df**2)
+                if residual_df > np.sqrt(np.finfo(float).eps)
+                else float("inf")
+            )
+            if gcv < best_gcv:
+                best_alpha = alpha
+                best_gcv = gcv
+                best_residual_sum_squares = residual_sum_squares
+                best_effective_df = effective_df
+                best_position = position
+        if not np.isfinite(best_gcv):
+            raise ValueError("Native weighted ridge could not identify a finite GCV candidate.")
+
+        coefficients = right.T @ (singular_values / (squared + best_alpha) * projected)
+        return NativeWeightedRidgeCVResult(
+            coefficients=np.asarray(coefficients, dtype=float),
+            intercept=intercept,
+            feature_mean=np.asarray(feature_mean, dtype=float),
+            feature_scale=np.asarray(feature_scale, dtype=float),
+            feature_names=frame.columns.copy(),
+            selected_alpha=float(best_alpha),
+            effective_df=float(best_effective_df),
+            gcv_score=float(best_gcv),
+            weighted_training_rmse=float(np.sqrt(best_residual_sum_squares / total_weight)),
+            weighted_residual_sum_squares=float(best_residual_sum_squares),
+            numerical_rank=numerical_rank,
+            alpha_grid_size=len(self.alphas),
+            alpha_at_boundary=best_position in {0, len(self.alphas) - 1},
+            total_weight=total_weight,
+            minimum_weight=float(weights.min()),
+            maximum_weight=float(weights.max()),
+            training_index=index.copy(),
+        )
+
+
+def _fit_weighted_cate(
+    factory: WeightedCATEFactory,
+    X: Any,
+    pseudo_outcome: Any,
+    *,
+    sample_weight: Any,
+) -> Any:
+    """Create and fit one weighted CATE model under the public structural protocol."""
+
+    if not callable(factory):
+        raise TypeError("The CATE factory must be callable.")
+    frame, target, weight, _ = _weighted_cate_inputs(X, pseudo_outcome, sample_weight)
+    estimator = factory()
+    if not isinstance(estimator, WeightedCATEEstimatorProtocol):
+        raise TypeError(
+            "Each CATE factory must return an object with "
+            "fit(X, pseudo_outcome, sample_weight=weight)."
+        )
+    try:
+        signature(estimator.fit).bind(frame, target, sample_weight=weight)
+    except (TypeError, ValueError) as error:
+        raise TypeError("The CATE estimator fit method must accept sample_weight=.") from error
+    result = estimator.fit(frame, target, sample_weight=weight)
+    fitted = estimator if result is None else result
+    if not isinstance(fitted, CATEResultProtocol):
+        raise TypeError("The fitted CATE result must provide predict(X).")
+    return fitted
 
 
 class PartiallyLinearDML:

@@ -1,7 +1,8 @@
 # Honest R-learner contract
 
-Status: design approved for a future alpha; no public `RLearner` implementation or
-placeholder import exists yet.
+Status: prerequisite learner boundary implemented; no public `RLearner` implementation or
+placeholder import exists yet. Honest role splitting, R-loss evaluation, calibration,
+group inference, graphs, simulations, parity, and real-data promotion remain open.
 
 This contract defines what CauseKit must identify, fit, evaluate, expose, and refuse
 before adding heterogeneous-effect learning. It deliberately separates CATE prediction
@@ -97,6 +98,37 @@ probability learner with a separately tested penalized-logit contract is a prere
 before the full R-learner can claim an entirely native default. Reusing unconstrained
 linear ridge probabilities without refusal, silently clipping them, or importing another
 package's model as the default are not acceptable shortcuts.
+
+### Implemented prerequisite boundary
+
+CauseKit now exposes the provider-neutral `WeightedCATEEstimatorProtocol` and
+`CATEResultProtocol`. A custom CATE factory must create an estimator whose bound method
+accepts `fit(X, pseudo_outcome, sample_weight=weight)`; the fitted result must provide
+`predict(X)`. CauseKit validates positive finite aligned weights, prediction length,
+finiteness, and pandas evaluation-index preservation. A method that merely has `fit` but
+does not accept `sample_weight` refuses before fitting.
+
+The package-owned probability prerequisite is standardized ridge-penalized binary Logit.
+For every candidate `alpha`, it minimizes
+
+```text
+sum_i [log(1 + exp(eta_i)) - W_i eta_i] + alpha ||beta||^2 / 2,
+```
+
+with an unpenalized intercept. Selection uses mean held-out log loss from deterministic,
+stratified inner folds created only from the supplied training sample. Scaling is refitted
+inside each inner training fold. The selected model is then refitted on that supplied
+training sample and retains its training index and inner-fold assignments for the future
+honesty audit. It requires both exact `0/1` arms and enough observations in each arm for
+every inner fold. It returns mathematical Logit probabilities without clipping; the
+future R-learner remains responsible for enforcing its declared overlap interval.
+
+The package-owned CATE prerequisite is weighted standardized ridge with an unpenalized
+weighted intercept and GCV-selected penalty. It fits the declared `u/v` pseudo-outcome
+using exactly `v^2` weights, so its weighted residual sum of squares equals
+`sum_i [u_i - v_i tau(X_i)]^2`. It retains training indices and scalar tuning diagnostics.
+Both native estimators remain internal components, not general regression APIs. Only the
+structural protocols are public until the complete honest estimator is promoted.
 
 ## Honest evaluation metrics
 
@@ -246,9 +278,16 @@ Implementation starts with failing contracts and is not promoted until it has:
 
 ## Implementation order
 
-1. Promote the weighted-fit/CATE prediction protocol and native probability contract.
-2. Write hand and leakage/refusal tests.
-3. Implement construction/evaluation splitting and cross-fitted R-objective fitting.
-4. Implement honest R-loss and differential calibration.
-5. Add group effects, simultaneous bands, and calibration graph-data parity.
-6. Run simulations, aligned parity, and one real-data comparison before publication.
+Completed prerequisite milestone:
+
+1. Promoted the weighted-fit/CATE prediction protocols and native probability contract.
+2. Added hand-computed weighted-objective/penalized-score, construction-only audit, and
+   malformed-input/provider refusal tests.
+
+Remaining implementation and promotion order:
+
+1. Implement construction/evaluation splitting and cross-fitted R-objective fitting.
+2. Implement honest R-loss and differential calibration.
+3. Add group effects, simultaneous bands, and calibration graph-data parity.
+4. Run simulations, aligned parity, performance, and one real-data comparison before
+   publication.

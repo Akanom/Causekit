@@ -1,6 +1,7 @@
 """Identification-aware causal inference and instrumental-variable workflows."""
 
 from .crossfit import (
+    CATEResultProtocol,
     ClassProbabilityCrossFitResult,
     CrossFitResult,
     CrossFitTask,
@@ -10,6 +11,7 @@ from .crossfit import (
     NuisanceEstimatorProtocol,
     OutcomeResultProtocol,
     PropensityResultProtocol,
+    WeightedCATEEstimatorProtocol,
 )
 from .diagnostics import FirstStageDiagnostic, SarganTest
 from .did import DiDResult, DifferenceInDifferences, EfficientDiD
@@ -36,6 +38,7 @@ from .postestimation import (
 from .randomized import CovariateBalance, RandomizedATE, RandomizedATEResult
 
 __all__ = [
+    "CATEResultProtocol",
     "FirstStageDiagnostic",
     "CovariateBalance",
     "ClassProbabilityCrossFitResult",
@@ -62,6 +65,7 @@ __all__ = [
     "PartiallyLinearDMLResult",
     "PropensityResultProtocol",
     "PropensityScoreStatus",
+    "WeightedCATEEstimatorProtocol",
     "SarganTest",
     "RandomizedATE",
     "RandomizedATEResult",

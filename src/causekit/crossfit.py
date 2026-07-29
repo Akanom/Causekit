@@ -33,6 +33,20 @@ class OutcomeResultProtocol(Protocol):
 
 
 @runtime_checkable
+class WeightedCATEEstimatorProtocol(Protocol):
+    """Fit contract for a CATE learner receiving the exact R-loss weights."""
+
+    def fit(self, X: Any, y: Any, *, sample_weight: Any) -> Any: ...
+
+
+@runtime_checkable
+class CATEResultProtocol(Protocol):
+    """Prediction contract for a fitted conditional-effect learner."""
+
+    def predict(self, X: Any) -> Any: ...
+
+
+@runtime_checkable
 class NuisanceDiagnosticsProtocol(Protocol):
     """Optional scalar diagnostics exposed by a fitted nuisance result."""
 
@@ -40,6 +54,7 @@ class NuisanceDiagnosticsProtocol(Protocol):
 
 
 NuisanceFactory = Callable[[], NuisanceEstimatorProtocol]
+WeightedCATEFactory = Callable[[], WeightedCATEEstimatorProtocol]
 PredictionAdapter = Callable[[Any, Any], Any]
 
 
@@ -599,6 +614,7 @@ class CrossFitter:
 
 
 __all__ = [
+    "CATEResultProtocol",
     "ClassProbabilityCrossFitResult",
     "CrossFitResult",
     "CrossFitTask",
@@ -610,4 +626,6 @@ __all__ = [
     "OutcomeResultProtocol",
     "PredictionAdapter",
     "PropensityResultProtocol",
+    "WeightedCATEEstimatorProtocol",
+    "WeightedCATEFactory",
 ]

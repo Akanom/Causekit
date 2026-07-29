@@ -12,6 +12,7 @@ import causekit
 from causekit import IV2SLS, IV2SLSResult
 
 PUBLIC_EXPORTS = {
+    "CATEResultProtocol",
     "IV2SLS",
     "IV2SLSResult",
     "RandomizedATE",
@@ -28,6 +29,7 @@ PUBLIC_EXPORTS = {
     "NuisanceEstimatorProtocol",
     "NuisanceDiagnosticsProtocol",
     "PropensityResultProtocol",
+    "WeightedCATEEstimatorProtocol",
     "OutcomeResultProtocol",
     "NearestNeighborMatch",
     "NearestNeighborMatchResult",
@@ -52,6 +54,8 @@ def test_initial_stable_namespace_exports_iv_and_postestimation_contract() -> No
     assert all(hasattr(causekit, name) for name in PUBLIC_EXPORTS)
     assert "TreatmentEffect" not in causekit.__all__
     assert not hasattr(causekit, "TreatmentEffect")
+    assert "RLearner" not in causekit.__all__
+    assert not hasattr(causekit, "RLearner")
 
 
 def test_causekit_has_no_limiteddepkit_dependency_or_import() -> None:

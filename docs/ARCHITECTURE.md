@@ -248,6 +248,14 @@ The residual second stage reuses the one-column HC1/CR1 covariance kernel, for w
 linear score and influence-function formulas coincide exactly. Zero or numerically weak
 residual treatment variation refuses before inference rather than receiving ridge repair.
 
+The future honest R-learner reuses the same provider-neutral boundary without being
+exported prematurely. Its public `WeightedCATEEstimatorProtocol` requires genuine
+`sample_weight` support and a separate `CATEResultProtocol` prediction surface. Internal
+native prerequisites provide stratified training-only-CV penalized Logit probabilities
+and weighted ridge-GCV for the algebraically exact R-loss transformation. Both retain
+training indices and tuning diagnostics. Construction/evaluation role assignment, honest
+metrics, calibration inference, simultaneous bands, and graphing remain future layers.
+
 The historical `limiteddepkit.TreatmentEffect` migration is complete. `IV2SLS` owns the
 replacement and a maintained numerical migration contract; the obsolete source snapshot
 has been removed from LimitedDepKit. Migration details belong in the README and package-
