@@ -46,6 +46,7 @@ dependencies = [
 
 [project.optional-dependencies]
 outputhub = ["universal-output-hub>=0.2.2,<1"]
+plot = ["matplotlib>=3.7,<4"]
 security = ["pip-audit>=2.7,<3"]
 validation = [
   "linearmodels>=5,<8",

@@ -40,6 +40,10 @@ PUBLIC_EXPORTS = {
     "DiDResult",
     "PartiallyLinearDML",
     "PartiallyLinearDMLResult",
+    "NativeSplineRidgeCATE",
+    "NativeSplineRidgeCATEResult",
+    "RLearner",
+    "RLearnerResult",
     "confint",
     "fitted_values",
     "predict",
@@ -54,8 +58,6 @@ def test_initial_stable_namespace_exports_iv_and_postestimation_contract() -> No
     assert all(hasattr(causekit, name) for name in PUBLIC_EXPORTS)
     assert "TreatmentEffect" not in causekit.__all__
     assert not hasattr(causekit, "TreatmentEffect")
-    assert "RLearner" not in causekit.__all__
-    assert not hasattr(causekit, "RLearner")
 
 
 def test_causekit_has_no_limiteddepkit_dependency_or_import() -> None:
@@ -148,6 +150,22 @@ def test_estimator_signatures_keep_identification_inputs_explicit() -> None:
     assert partially_linear_dml.parameters["treatment_factory"].default is None
     assert partially_linear_dml.parameters["n_splits"].default == 5
     assert partially_linear_dml.parameters["covariance"].default == "robust"
+
+    rlearner = inspect.signature(causekit.RLearner)
+    assert rlearner.parameters["outcome_factory"].default is None
+    assert rlearner.parameters["propensity_factory"].default is None
+    assert rlearner.parameters["cate_factory"].default is None
+    assert rlearner.parameters["n_splits"].default == 5
+    assert rlearner.parameters["evaluation_fraction"].default == 0.5
+    assert rlearner.parameters["overlap_floor"].default == 0.01
+    assert rlearner.parameters["covariance"].default == "robust"
+    assert rlearner.parameters["calibration_groups"].default == 5
+    assert rlearner.parameters["bootstrap_iterations"].default == 999
+
+    nonlinear_cate = inspect.signature(causekit.NativeSplineRidgeCATE)
+    assert nonlinear_cate.parameters["knot_counts"].default == (0, 1, 3)
+    assert nonlinear_cate.parameters["include_pairwise_interactions"].default is False
+    assert nonlinear_cate.parameters["max_basis_features"].default == 512
 
 
 def test_fit_returns_the_public_result_type() -> None:

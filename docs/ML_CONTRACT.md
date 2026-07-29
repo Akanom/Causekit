@@ -123,30 +123,47 @@ The estimator refuses:
 No ridge, pseudoinverse, treatment jitter, propensity clipping, fold merging, or in-sample
 fallback repairs these failures.
 
-## Why this estimator comes first
+## Implementation sequence
 
 Credible alternatives were assessed before implementation:
 
 | Candidate | Strength | Reason not first |
 | --- | --- | --- |
 | S/T/X meta-learners | Simple CATE baselines and broad learner compatibility | Plug-in heterogeneity estimates do not provide this scalar orthogonal-inference contract |
-| R-learner | Orthogonal residual objective for CATE estimation | Requires a weighted final-stage learner contract and separate honest CATE evaluation/inference |
+| R-learner | Orthogonal residual objective for CATE estimation | Implemented after its weighted final-stage and honest CATE evaluation/inference contracts were complete |
 | DR-learner | Doubly robust pseudo-outcome for CATE estimation | Requires propensity overlap rules plus an honest second-stage and CATE-specific uncertainty contract |
 | Native honest causal forest | Strong adaptive heterogeneity workflow | Requires a separate splitting, honesty, treatment-overlap, prediction, and inference contract; it will not be delegated to another runtime package |
 | Partially linear DML | Orthogonal scalar target, cross-fitting, auditable influence inference | Selected as the smallest complete specialized causal-ML model |
 
-The next heterogeneous-effect candidate is governed by the separate
+The implemented heterogeneous-effect path is governed by the separate
 [honest R-learner contract](R_LEARNER_CONTRACT.md), based on the residual objective of
 [Nie and Wager](https://arxiv.org/abs/1712.04912). A doubly robust learner whose two-stage
-contract follows [Kennedy](https://arxiv.org/abs/2004.14497) comes later. Neither is a
-placeholder public import in this milestone.
+contract follows [Kennedy](https://arxiv.org/abs/2004.14497) comes later and is not a
+placeholder public import.
 
-CauseKit has implemented the R-learner's internal native prerequisites: stratified
+CauseKit implements the R-learner's native prerequisites: stratified
 training-only-CV ridge Logit for binary probabilities and weighted ridge-GCV for the exact
 `u/v`, `v^2` CATE transformation. Public `WeightedCATEEstimatorProtocol` and
-`CATEResultProtocol` keep custom weighted learners provider-neutral. This foundation does
-not expose an `RLearner`, honest evaluation result, or heterogeneity claim; every remaining
-gate is maintained in the separate contract.
+`CATEResultProtocol` keep custom weighted learners provider-neutral. The public
+`RLearner` builds on this boundary without importing another ML package.
+
+The opt-in `NativeSplineRidgeCATE` uses construction-only empirical knots and weighted GCV
+to select a bounded additive linear-spline basis and ridge penalty. Its default candidate
+set includes the zero-knot linear basis, so nonlinear complexity is selected only when the
+construction objective supports it. Pairwise interactions and the feature ceiling are
+explicit. This is a specialized weighted-CATE surface, not a general-purpose ML backend or
+a native causal forest.
+
+The honest construction layer assigns immutable treatment-stratified row or
+whole-cluster roles, preserves whole clusters in outer folds, and cross-fits outcome and
+propensity nuisances only inside construction. A weighted CATE learner is also fit only on
+construction. Fresh full-construction nuisance refits and the construction-fitted CATE
+model produce evaluation predictions without using evaluation outcomes or treatments for
+fitting. Honest R-loss, calibration, group inference, graphs, and promotion evidence remain
+separate result surfaces. `RLearnerResult` retains held-out R-loss, a construction-fitted
+constant comparator, differential calibration, tie-preserving group effects, HC1/CR1
+inference, seeded simultaneous bands, prediction and graph data, and every audit record.
+It does not expose unit-level CATE intervals or policy claims.
 
 ## Validation and promotion gates
 

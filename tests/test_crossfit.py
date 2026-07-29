@@ -161,6 +161,31 @@ def test_factories_must_return_fresh_fit_capable_models() -> None:
     with pytest.raises(TypeError, match="fit"):
         fitter.fit_predict(X, treatment=treatment, outcome=outcome)
 
+    singleton = _LinearOutcome()
+    with pytest.raises(ValueError, match="fresh estimator"):
+        CrossFitter(outcome_factory=lambda: singleton, n_splits=2).fit_predict_tasks(
+            X,
+            tasks=[CrossFitTask(name="outcome", target=outcome)],
+            strata=treatment,
+        )
+
+    def shifted_adapter(result, heldout):
+        return pd.Series(result.predict(heldout), index=heldout.index[::-1])
+
+    with pytest.raises(ValueError, match="prediction index"):
+        CrossFitter(n_splits=2).fit_predict_tasks(
+            X,
+            tasks=[
+                CrossFitTask(
+                    name="outcome",
+                    target=outcome,
+                    factory=_LinearOutcome,
+                    predict=shifted_adapter,
+                )
+            ],
+            strata=treatment,
+        )
+
 
 def test_cross_fitting_refuses_small_arms_and_index_drift() -> None:
     X, treatment, outcome = _data(nobs=40)
@@ -222,6 +247,22 @@ def test_masked_regression_tasks_share_folds_and_preserve_task_labels() -> None:
     assert result.predictions.index.equals(X.index)
     np.testing.assert_allclose(result.predictions, np.column_stack([target, target]), atol=1e-12)
     assert set(result.model_names) == {"all", "stratum_zero"}
+
+
+def test_clustered_task_cross_fitting_keeps_clusters_wholly_within_folds() -> None:
+    clusters = pd.Series(np.repeat([f"cluster-{i}" for i in range(12)], 2))
+    treatment = pd.Series(np.repeat(np.tile([0.0, 1.0], 6), 2))
+    covariates = pd.DataFrame({"x": np.arange(len(clusters), dtype=float)})
+    target = pd.Series(1.0 + 0.5 * covariates["x"], index=covariates.index)
+    result = CrossFitter(n_splits=3, random_state=119).fit_predict_tasks(
+        covariates,
+        tasks=[CrossFitTask(name="mean", target=target, factory=_LinearOutcome)],
+        strata=treatment,
+        clusters=clusters,
+    )
+
+    assert result.fold.groupby(clusters).nunique().eq(1).all()
+    assert (pd.crosstab(result.fold, treatment) > 0).all().all()
 
 
 def test_task_cross_fitting_exposes_provider_neutral_fold_diagnostics() -> None:

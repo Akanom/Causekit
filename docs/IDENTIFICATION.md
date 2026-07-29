@@ -282,6 +282,28 @@ It does not validate PT-All or turn a pre-trend plot into an identification test
 current alpha has no pre-trend test, Hausman test, or repeated-cross-section
 interpretation, and refuses those unsupported paths.
 
+## Honest heterogeneous effects
+
+`RLearner` targets `tau(x) = E[Y(1)-Y(0) | X=x]` for an exact binary treatment. A causal
+interpretation requires consistency, no interference, conditional exchangeability given
+the declared pre-treatment covariates, overlap, and adequate nuisance rates. These are
+assumptions, not conclusions from a flexible learner or a wide CATE distribution.
+
+CauseKit assigns observations—or whole declared clusters—to immutable construction and
+evaluation roles. Only construction outcomes and treatments enter nuisance or CATE
+fitting. Evaluation is used once for residual R-loss, differential calibration, and
+tie-preserving groups. The R-loss gain compares against a constant effect fitted on
+construction and is not predictive R-squared. The differential heterogeneity coefficient
+tests whether the held-out proxy contains effect-ranking signal and whether its scale is
+near one; it does not establish pointwise CATE truth.
+
+Group effects solve `sum(v_i u_i) / sum(v_i^2)` inside fixed score groups. They are overlap-
+weighted residual-moment effects, not automatically ordinary group ATEs. HC1 or one-way
+CR1 inference is conditional on the recorded split, and the multiplier max-t band covers
+the complete reported group path under the declared sampling assumptions. The alpha does
+not provide unit-level CATE intervals, repeated-split aggregation, RATE, targeting curves,
+or policy value.
+
 ## Missing values, indices, and sample definition
 
 The default policy is `missing="raise"`. Missing or non-finite numeric values trigger an

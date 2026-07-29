@@ -108,7 +108,9 @@ closest to the unknown causal effect.
 Together, the two datasets support retaining native ridge-GCV as the package default: it
 is dependency-free, computationally smallest, and prediction-competitive across both
 declared designs. They do not prove that ridge is best for nonlinear confounding or CATE
-estimation. Honest R-learner evaluation remains a separate contract.
+estimation. Honest R-learner evaluation is recorded separately in
+[`R_LEARNER_BENCHMARK.md`](R_LEARNER_BENCHMARK.md); the scalar-DML rows above were not
+repurposed or rerun as CATE evidence.
 
 The saved NSW JSON is external to the repository at
 `%LOCALAPPDATA%/causekit/benchmarks/causekit-ml-nsw-benchmark-v1.json`; its SHA-256 is

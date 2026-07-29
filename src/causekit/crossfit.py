@@ -113,10 +113,20 @@ class ClassProbabilityCrossFitResult:
     model_diagnostics: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
-def _fit(factory: NuisanceFactory, X: Any, y: Any) -> Any:
+def _fit(
+    factory: NuisanceFactory,
+    X: Any,
+    y: Any,
+    *,
+    seen_estimators: list[Any] | None = None,
+) -> Any:
     estimator = factory()
     if not isinstance(estimator, NuisanceEstimatorProtocol):
         raise TypeError("Each nuisance factory must return an object with fit(X, y).")
+    if seen_estimators is not None:
+        if any(estimator is previous for previous in seen_estimators):
+            raise ValueError("Each nuisance factory call must return a fresh estimator instance.")
+        seen_estimators.append(estimator)
     result = estimator.fit(X, y)
     return estimator if result is None else result
 
@@ -182,6 +192,12 @@ def _default_propensity_prediction(result: Any, X: Any) -> np.ndarray:
             "propensity_predict=."
         )
     values = result.predict_proba(X)
+    if (
+        isinstance(values, (pd.Series, pd.DataFrame))
+        and isinstance(X, pd.DataFrame)
+        and not values.index.equals(X.index)
+    ):
+        raise ValueError("Propensity prediction index must match the held-out covariate index.")
     if isinstance(values, pd.DataFrame):
         if 1 in values.columns:
             raw = values[1].to_numpy(dtype=float)
@@ -201,7 +217,14 @@ def _default_outcome_prediction(result: Any, X: Any) -> np.ndarray:
         raise TypeError(
             "The fitted outcome result must provide predict(X), or supply outcome_predict=."
         )
-    return np.asarray(result.predict(X), dtype=float)
+    values = result.predict(X)
+    if (
+        isinstance(values, (pd.Series, pd.DataFrame))
+        and isinstance(X, pd.DataFrame)
+        and not values.index.equals(X.index)
+    ):
+        raise ValueError("Outcome prediction index must match the held-out covariate index.")
+    return np.asarray(values, dtype=float)
 
 
 def _prediction(
@@ -212,13 +235,20 @@ def _prediction(
     propensity: bool,
     expected: int,
 ) -> np.ndarray:
-    raw = (
-        adapter(result, X)
-        if adapter is not None
-        else _default_propensity_prediction(result, X)
-        if propensity
-        else _default_outcome_prediction(result, X)
-    )
+    if adapter is not None:
+        raw = adapter(result, X)
+        if (
+            isinstance(raw, (pd.Series, pd.DataFrame))
+            and isinstance(X, pd.DataFrame)
+            and not raw.index.equals(X.index)
+        ):
+            raise ValueError("Adapted prediction index must match the held-out covariate index.")
+    else:
+        raw = (
+            _default_propensity_prediction(result, X)
+            if propensity
+            else _default_outcome_prediction(result, X)
+        )
     values = np.asarray(raw, dtype=float)
     if values.ndim != 1 or len(values) != expected:
         raise ValueError("A nuisance prediction must provide one value per held-out row.")
@@ -301,8 +331,63 @@ def _fold_assignments(
     n_splits: int,
     random_state: int | None,
     strata: pd.Series | None,
+    clusters: pd.Series | None = None,
 ) -> np.ndarray:
     rng = np.random.default_rng(random_state)
+    if clusters is not None:
+        cluster_codes, cluster_labels = pd.factorize(clusters, sort=False)
+        n_clusters = len(cluster_labels)
+        if n_clusters < n_splits:
+            raise ValueError("Clustered cross-fitting requires at least n_splits clusters.")
+        if strata is None:
+            stratum_codes = np.zeros(nobs, dtype=int)
+            n_strata = 1
+        else:
+            stratum_codes, stratum_labels = pd.factorize(strata, sort=False)
+            n_strata = len(stratum_labels)
+        counts = np.zeros((n_clusters, n_strata), dtype=float)
+        np.add.at(counts, (cluster_codes, stratum_codes), 1.0)
+        if strata is not None and np.any((counts > 0.0).sum(axis=0) < n_splits):
+            raise ValueError(
+                "Each stratum must occur in at least n_splits clusters for clustered cross-fitting."
+            )
+        totals = counts.sum(axis=0)
+        targets = totals / n_splits
+        cluster_sizes = counts.sum(axis=1)
+        randomized = rng.permutation(n_clusters)
+        order = randomized[np.argsort(-cluster_sizes[randomized], kind="stable")]
+        fold_priority = rng.permutation(n_splits)
+        fold_counts = np.zeros((n_splits, n_strata), dtype=float)
+        fold_clusters = np.zeros(n_splits, dtype=float)
+        cluster_assignment = np.full(n_clusters, -1, dtype=int)
+        target_cluster_count = n_clusters / n_splits
+        scale = np.maximum(targets, 1.0)
+        for cluster_code in order:
+            best_fold = -1
+            best_score = float("inf")
+            for fold in fold_priority:
+                proposed_counts = fold_counts.copy()
+                proposed_counts[fold] += counts[cluster_code]
+                proposed_clusters = fold_clusters.copy()
+                proposed_clusters[fold] += 1.0
+                score = float(
+                    np.sum((proposed_counts - targets) ** 2 / scale)
+                    + 0.01 * np.sum((proposed_clusters - target_cluster_count) ** 2)
+                )
+                if score < best_score:
+                    best_score = score
+                    best_fold = int(fold)
+            cluster_assignment[cluster_code] = best_fold
+            fold_counts[best_fold] += counts[cluster_code]
+            fold_clusters[best_fold] += 1.0
+        if np.any(fold_clusters == 0.0):
+            raise ValueError("Clustered cross-fitting produced an empty fold.")
+        if strata is not None and np.any(fold_counts == 0.0):
+            raise ValueError(
+                "Clustered stratification could not retain every stratum in every fold."
+            )
+        return cluster_assignment[cluster_codes]
+
     folds = np.empty(nobs, dtype=int)
     if strata is None:
         positions = np.arange(nobs)
@@ -334,6 +419,14 @@ def _class_probability_prediction(
                 "supply propensity_predict=."
             )
         raw = result.predict_proba(X)
+    if (
+        isinstance(raw, (pd.Series, pd.DataFrame))
+        and isinstance(X, pd.DataFrame)
+        and not raw.index.equals(X.index)
+    ):
+        raise ValueError(
+            "Class-probability prediction index must match the held-out covariate index."
+        )
     if isinstance(raw, pd.DataFrame):
         missing = [label for label in classes if label not in raw.columns]
         if missing:
@@ -393,12 +486,28 @@ class CrossFitter:
         self.propensity_predict = propensity_predict
         self.outcome_predict = outcome_predict
 
-    def fit_predict(self, X: Any, *, treatment: Any, outcome: Any) -> CrossFitResult:
+    def fit_predict(
+        self,
+        X: Any,
+        *,
+        treatment: Any,
+        outcome: Any,
+        clusters: Any | None = None,
+    ) -> CrossFitResult:
+        """Cross-fit propensity and arm-specific outcomes on shared stratified folds.
+
+        When ``clusters`` is supplied, every cluster is assigned wholly to one fold and
+        each treatment arm must occur in at least ``n_splits`` clusters.
+        """
+
         if self.propensity_factory is None or self.outcome_factory is None:
             raise ValueError("fit_predict requires both propensity_factory and outcome_factory.")
         frame, index = _frame(X)
         assigned = _series(treatment, name="treatment", index=index)
         observed = _series(outcome, name="outcome", index=index)
+        cluster_values = (
+            None if clusters is None else _labels(clusters, name="clusters", index=index)
+        )
         if not np.array_equal(np.unique(assigned), np.array([0.0, 1.0])):
             raise ValueError("treatment must contain both arms and be coded exactly 0 and 1.")
         counts = assigned.value_counts()
@@ -410,6 +519,7 @@ class CrossFitter:
             n_splits=self.n_splits,
             random_state=self.random_state,
             strata=assigned,
+            clusters=cluster_values,
         )
 
         propensity = np.empty(len(frame), dtype=float)
@@ -417,6 +527,7 @@ class CrossFitter:
         mu0 = np.empty(len(frame), dtype=float)
         propensity_name = outcome_name = "unknown"
         diagnostic_rows: list[dict[str, Any]] = []
+        seen_estimators: list[Any] = []
         assigned_values = assigned.to_numpy(dtype=float)
         for fold in range(self.n_splits):
             test = folds == fold
@@ -424,7 +535,12 @@ class CrossFitter:
             X_train = frame.iloc[train]
             X_test = frame.iloc[test]
             treatment_train = assigned.iloc[train]
-            propensity_result = _fit(self.propensity_factory, X_train, treatment_train)
+            propensity_result = _fit(
+                self.propensity_factory,
+                X_train,
+                treatment_train,
+                seen_estimators=seen_estimators,
+            )
             propensity_name = type(propensity_result).__name__
             propensity[test] = _prediction(
                 propensity_result,
@@ -445,7 +561,12 @@ class CrossFitter:
             arm_results: list[Any] = []
             for arm, target in ((1.0, mu1), (0.0, mu0)):
                 arm_train = train & (assigned_values == arm)
-                result = _fit(self.outcome_factory, frame.iloc[arm_train], observed.iloc[arm_train])
+                result = _fit(
+                    self.outcome_factory,
+                    frame.iloc[arm_train],
+                    observed.iloc[arm_train],
+                    seen_estimators=seen_estimators,
+                )
                 arm_results.append(result)
                 target[test] = _prediction(
                     result,
@@ -486,13 +607,20 @@ class CrossFitter:
         X: Any,
         *,
         classes: Any,
+        clusters: Any | None = None,
     ) -> ClassProbabilityCrossFitResult:
-        """Cross-fit one multiclass model and return all class probabilities."""
+        """Cross-fit one multiclass model and return all class probabilities.
+
+        Optional cluster labels keep each cluster wholly within one outer fold.
+        """
 
         if self.propensity_factory is None:
             raise ValueError("fit_predict_class_probabilities requires propensity_factory.")
         frame, index = _frame(X)
         labels = _labels(classes, name="classes", index=index)
+        cluster_values = (
+            None if clusters is None else _labels(clusters, name="clusters", index=index)
+        )
         observed_classes = pd.Index(pd.unique(labels), name="class")
         if len(observed_classes) < 2:
             raise ValueError("classes must contain at least two observed levels.")
@@ -501,14 +629,21 @@ class CrossFitter:
             n_splits=self.n_splits,
             random_state=self.random_state,
             strata=labels,
+            clusters=cluster_values,
         )
         probabilities = np.empty((len(frame), len(observed_classes)), dtype=float)
         model_name = "unknown"
         diagnostic_rows: list[dict[str, Any]] = []
+        seen_estimators: list[Any] = []
         for fold in range(self.n_splits):
             test = folds == fold
             train = ~test
-            result = _fit(self.propensity_factory, frame.iloc[train], labels.iloc[train])
+            result = _fit(
+                self.propensity_factory,
+                frame.iloc[train],
+                labels.iloc[train],
+                seen_estimators=seen_estimators,
+            )
             model_name = type(result).__name__
             probabilities[test] = _class_probability_prediction(
                 result,
@@ -544,8 +679,12 @@ class CrossFitter:
         *,
         tasks: Sequence[CrossFitTask],
         strata: Any | None = None,
+        clusters: Any | None = None,
     ) -> CrossFitTaskResult:
-        """Cross-fit arbitrary scalar regressions on shared deterministic folds."""
+        """Cross-fit arbitrary scalar regressions on shared deterministic folds.
+
+        Optional cluster labels keep each cluster wholly within one outer fold.
+        """
 
         frame, index = _frame(X)
         task_list = list(tasks)
@@ -559,15 +698,20 @@ class CrossFitter:
         if len(set(names)) != len(names):
             raise ValueError("Cross-fitting task names must be unique.")
         strata_series = None if strata is None else _labels(strata, name="strata", index=index)
+        cluster_values = (
+            None if clusters is None else _labels(clusters, name="clusters", index=index)
+        )
         folds = _fold_assignments(
             len(frame),
             n_splits=self.n_splits,
             random_state=self.random_state,
             strata=strata_series,
+            clusters=cluster_values,
         )
         predictions = np.empty((len(frame), len(task_list)), dtype=float)
         model_names: dict[str, str] = {}
         diagnostic_rows: list[dict[str, Any]] = []
+        seen_estimators: list[Any] = []
         for task_position, task in enumerate(task_list):
             target = _series(task.target, name=task.name, index=index)
             train_mask = (
@@ -585,7 +729,12 @@ class CrossFitter:
                     raise ValueError(
                         f"Task {task.name!r} has no training observations outside fold {fold}."
                     )
-                result = _fit(factory, frame.iloc[train], target.iloc[train])
+                result = _fit(
+                    factory,
+                    frame.iloc[train],
+                    target.iloc[train],
+                    seen_estimators=seen_estimators,
+                )
                 model_names[task.name] = type(result).__name__
                 predictions[test, task_position] = _prediction(
                     result,

@@ -60,6 +60,19 @@ HC1 standard error. The manually executed Stata/IC 17 harness writes its result 
 asserting; the reviewed saved output passes both estimate and standard-error assertions at
 the declared `1e-10` tolerance.
 
+For the honest R-learner, hand contracts reconstruct immutable row/cluster roles, shared
+cluster-preserving outer folds, `u/v` and `v^2`, the direct/weighted R-objective identity,
+held-out R-loss, the construction-fitted constant comparator, differential calibration,
+HC1/CR1 covariance, tie-preserving group moments, the full influence matrix, and the
+seeded max-t critical value. Leakage logs prove that evaluation indices never reach a fit
+target. Seeded simulations cover native linear and piecewise-nonlinear CATE recovery plus
+null/power and complete-path band-coverage smokes. Base R 4.5.1 independently reproduces
+fixed evaluation loss, calibration, and group covariance. The reviewed Stata/IC 17 do-file
+reconstructs the same HC1 moments and passes at `1e-8`; its maximum absolute difference is
+`1.56e-15`. The hash-pinned NSW benchmark retains the negative finding that no comparator
+showed significant differential calibration. The separate Hillstrom randomized-email
+record compares native linear and adaptive spline stages on one identical honest split.
+
 For DiD, maintained evidence must keep the conventional and efficient estimators
 separate. Conventional tests hand-compute every `ATT(g,t)`, event-time, calendar-time, and
 ESavg aggregation for both never-treated and not-yet-treated comparisons. Efficient tests
@@ -220,7 +233,7 @@ passing only after its tests have executed successfully in the recorded environm
 | Covariate-efficient DiD | Multiple moments, valid/invalid overlap and covariance systems | OOF alignment, equation (4.4) scores, equation (3.12) weights, exact refusal boundaries |
 | DiD inference | Entity and higher-level clustered sampling | HC1/cluster score identities, pointwise metadata, robust/cluster max-t band identities |
 | Partially linear DML | Binary/continuous treatment, native/custom nuisance, robust/clustered inference | DML2 score, OOF fold alignment, native ridge-GCV, fold tuning audit, direct GCV identity, influence/Jacobian identities, strict weak-signal refusal |
-| Honest R-learner design | Binary treatment, honest construction/evaluation roles, overlap, calibration, grouping | Contract only: leakage/refusal, R-loss, differential calibration, group bands, simulation and real-data gates before implementation |
+| Honest R-learner | Binary treatment, row/cluster honesty, native/custom learners, overlap, robust/clustered calibration | Leakage/refusals, exact R-objective, held-out loss/constant gain, HC1/CR1 differential calibration, tie-preserving group moments/influence/max-t bands, simulations, R/Stata fixed-evaluation parity, real-data comparator record |
 | Causal-ML performance | One hash-verified real dataset, one identically folded run per model | Estimate, standard error, OOF outcome/treatment RMSE, elapsed time, Python peak memory, versions, no runtime comparator dependency |
 
 ## Cross-software parity matrix
@@ -288,12 +301,16 @@ python benchmarks/benchmark_matching.py --scenario estimated_score_ate_inference
 python benchmarks/benchmark_did.py --scenario all --n-entities 20000
 python benchmarks/benchmark_ml.py --models all
 python benchmarks/benchmark_ml.py --dataset nsw_mixtape --models all
+python benchmarks/benchmark_rlearner.py --models all
+python benchmarks/benchmark_rlearner_hillstrom.py --data /path/to/reviewed/hillstrom.csv
 Rscript benchmarks/validate_dml_reference.R
 ```
 
-The two ML commands are separate one-run real-data records, not benchmark repetitions;
-their frozen results and interpretation limits are documented in
-[Causal-ML real-data performance](ML_BENCHMARK.md).
+The ML/R-learner commands are separate one-run real-data records, not benchmark
+repetitions. Their frozen results and interpretation limits are documented in
+[Causal-ML real-data performance](ML_BENCHMARK.md),
+[NSW honest R-learning](R_LEARNER_BENCHMARK.md), and
+[Hillstrom honest R-learning](R_LEARNER_HILLSTROM_BENCHMARK.md).
 
 Stata is manual: from the repository root run
 `do "benchmarks/validate_dml_stata.do"`. The harness persists

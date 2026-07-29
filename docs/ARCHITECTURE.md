@@ -248,13 +248,33 @@ The residual second stage reuses the one-column HC1/CR1 covariance kernel, for w
 linear score and influence-function formulas coincide exactly. Zero or numerically weak
 residual treatment variation refuses before inference rather than receiving ridge repair.
 
-The future honest R-learner reuses the same provider-neutral boundary without being
-exported prematurely. Its public `WeightedCATEEstimatorProtocol` requires genuine
+The public honest R-learner reuses the same provider-neutral boundary. Its
+`WeightedCATEEstimatorProtocol` requires genuine
 `sample_weight` support and a separate `CATEResultProtocol` prediction surface. Internal
 native prerequisites provide stratified training-only-CV penalized Logit probabilities
 and weighted ridge-GCV for the algebraically exact R-loss transformation. Both retain
-training indices and tuning diagnostics. Construction/evaluation role assignment, honest
-metrics, calibration inference, simultaneous bands, and graphing remain future layers.
+training indices and tuning diagnostics.
+
+`NativeSplineRidgeCATE` extends only the weighted-CATE stage. It builds bounded additive
+linear-spline candidates from construction-only quantiles and selects knot count plus
+ridge penalty by weighted GCV. The zero-knot candidate is always available by default,
+pairwise interactions require explicit opt-in, and a hard basis-size ceiling prevents
+quadratic feature growth from becoming an implicit runtime path. It remains a specialized
+R-learner component rather than a general regression API.
+
+The internal construction layer deterministically assigns treatment-stratified rows or
+whole clusters to construction and evaluation, and clustered outer folds never split a
+cluster. Role state is retained in immutable tuple storage and exposed only through copies.
+Only construction data enter cross-fitted nuisance and weighted-CATE fitting; fresh
+full-construction nuisance refits and the construction-fitted CATE model provide evaluation
+predictions. Direct and transformed weighted R-objectives are retained as an exact identity.
+`RLearner` then consumes the locked evaluation role once for R-loss, differential
+calibration, and tie-preserving overlap-weighted group moments. Calibration uses the
+shared HC1/CR1 OLS covariance kernel; group max-t draws use the corresponding observation-
+or cluster-summed influence matrix. `RLearnerResult` owns OutputHub tables, exact graph
+data, optional plotting, and future-data prediction through the construction-fitted CATE
+model. Unit-level intervals, repeated-split aggregation, RATE, and policy evaluation stay
+outside this alpha.
 
 The historical `limiteddepkit.TreatmentEffect` migration is complete. `IV2SLS` owns the
 replacement and a maintained numerical migration contract; the obsolete source snapshot

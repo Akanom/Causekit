@@ -58,6 +58,15 @@ residual-treatment diagnostics, and OutputHub metadata/tables. Optional public n
 factories remain available only when a design needs a different learner; they do not
 create a runtime dependency.
 
+The heterogeneous-effect surface adds `RLearner`. It creates immutable treatment-
+stratified construction/evaluation roles, or indivisible cluster roles when clustered
+inference is declared. Outcome and propensity nuisances are cross-fitted only inside
+construction, the CATE stage minimizes the exact weighted R-objective, and evaluation is
+used once for held-out R-loss, differential calibration, and tie-preserving overlap-
+weighted group effects. Pointwise HC1/CR1 inference and seeded max-t group bands are
+split-conditional. The result provides no unit-level CATE intervals, RATE, policy value,
+or repeated-split aggregation.
+
 ## Deliberate boundaries in this release
 
 The current alpha does not provide:
@@ -73,8 +82,8 @@ The current alpha does not provide:
 - multiway clustering, general-purpose bootstrap inference, sampling weights, or survey design;
 - nonlinear IV, GMM beyond linear 2SLS, or control-function estimators;
 - automatic discovery, selection, or validation of instruments;
-- heterogeneous treatment-effect learners, native causal forests, dose-response curves,
-  or policy learning; or
+- native causal forests, dose-response curves, or policy learning beyond the implemented
+  honest R-learner and opt-in adaptive spline CATE stage; or
 - repeated cross-fitting, multiway clustered DML, survey weights, or DML bootstrap
   inference.
 
@@ -125,6 +134,12 @@ small ridge-GCV learner is implemented in CauseKit, selected within each outer f
 subordinate to the DML score. This does not move sibling-package likelihood models into
 CauseKit or turn the package into a general-purpose prediction library.
 
+`RLearner` is the corresponding heterogeneous-effect exception. Its native penalized
+probability and weighted ridge-GCV components remain subordinate to the honest R-objective
+and evaluation contract. Custom factories replace only declared learner roles; CauseKit
+continues to own splitting, overlap, residualization, evaluation, covariance, and graph
+semantics.
+
 Matching inference uses a second, deliberately narrower protocol because the
 Abadie–Imbens first-step formula requires a regular full-sample parametric MLE rather than
 an arbitrary prediction learner. CauseKit validates the provider-neutral public fit
@@ -160,7 +175,7 @@ and validation gates:
 | --- | --- |
 | Matching promotion | Remaining publication-scale sensitivity/coverage evidence; fixed-score and supported estimated-Logit Python/R/Stata evidence is recorded where estimand-aligned comparators exist |
 | DiD promotion | Pre-trend/Hausman diagnostics, repeated cross-sections, publication-scale coverage, covariate performance, and broader parity |
-| Causal ML promotion | Implement the approved honest R-learner contract, including a native probability prerequisite, R-loss/calibration evidence, and graph-data parity; design the DR learner only afterward |
+| Causal ML promotion | Harden the implemented honest R-learner with repeated-split and publication-scale evidence; the Stata evaluation and native nonlinear real-data gates pass, while the DR learner requires its own contract |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
 | Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |
 
@@ -188,7 +203,7 @@ models, and limited-outcome likelihoods are also not added merely because they c
 inside a causal workflow. Nuisance models may eventually support an in-scope causal
 estimand, but their contract must be subordinate to that estimand and validated as part of
 the complete procedure. The native ridge-GCV implementation is therefore an internal
-component of `PartiallyLinearDML`, not a general regression API.
+component of `PartiallyLinearDML` and `RLearner`, not a general regression API.
 
 ## Promotion criteria
 

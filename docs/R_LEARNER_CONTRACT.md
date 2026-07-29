@@ -1,14 +1,37 @@
 # Honest R-learner contract
 
-Status: prerequisite learner boundary implemented; no public `RLearner` implementation or
-placeholder import exists yet. Honest role splitting, R-loss evaluation, calibration,
-group inference, graphs, simulations, parity, and real-data promotion remain open.
+Status: public alpha implemented. `RLearner` and `RLearnerResult` provide honest role
+splitting, cross-fitted construction, held-out R-loss, differential calibration,
+tie-preserving group inference, simultaneous bands, graph data/optional plotting,
+OutputHub integration, simulation evidence, base-R parity, and one real-data CATE
+comparison. RATE, policy value, unit-level intervals, deployment refitting, and
+repeated-split aggregation remain deliberately out of scope. The reviewed fixed-evaluation
+Stata/IC 17 harness passes at the declared `1e-8` tolerance.
 
-This contract defines what CauseKit must identify, fit, evaluate, expose, and refuse
-before adding heterogeneous-effect learning. It deliberately separates CATE prediction
+This contract defines what CauseKit identifies, fits, evaluates, exposes, and refuses for
+heterogeneous-effect learning. It deliberately separates CATE prediction
 from evidence that a learned ranking or calibration is useful. Training fit, ordinary
 prediction error, or a visually wide CATE distribution is not evidence of treatment-effect
 heterogeneity.
+
+## Differentiation without false novelty
+
+The R-loss itself is not a CauseKit invention; it follows Nie and Wager. Cross-fitted
+nuisances and configurable final learners are also available in
+[EconML's R-learner machinery](https://www.pywhy.org/EconML/_autosummary/econml.dml._rlearner.html),
+and honest-prediction calibration is available for causal forests through
+[`grf::test_calibration`](https://grf-labs.github.io/grf/reference/test_calibration.html).
+CauseKit therefore does not describe the estimator as a new statistical model or claim
+that no other package has any individual component.
+
+CauseKit's differentiation is the integrated public contract: a dependency-free native
+path; immutable row or cluster construction/evaluation roles; cluster-preserving outer
+folds; provider-neutral nuisance and weighted-CATE boundaries; copy-out tuning and
+leakage audit records; held-out R-loss against a construction-fitted constant; HC1 or CR1
+differential calibration; tie-preserving overlap-weighted groups; and seeded simultaneous
+group bands. This combination is a package engineering and validation contribution. Any
+stronger priority or uniqueness claim requires a versioned systematic comparison and is
+not made here.
 
 ## Target and identification
 
@@ -46,7 +69,7 @@ or X-learner as an R-learner merely because both produce unit-level predictions.
 ## Honest sample roles
 
 A single observation or cluster may not serve both model-selection and evaluation roles.
-The initial API must make these roles machine-readable:
+The public API makes these roles machine-readable:
 
 1. **Construction sample:** tunes and fits the outcome, propensity, and CATE learners.
    Nuisance predictions used to fit the CATE learner are cross-fitted within this sample.
@@ -66,6 +89,30 @@ labelled split-conditional. If repeated-split aggregation is later promoted, its
 and p-value aggregation must be separately contracted; the repeated-splitting approach in
 [Chernozhukov, Demirer, Duflo, and Fernández-Val](https://www.nber.org/papers/w24678)
 is the relevant benchmark, not an ad hoc average of CATE predictions.
+
+### Implemented role and construction boundary
+
+The internal construction layer now creates one deterministic randomized split for a
+recorded seed. Without clusters, it rounds the requested evaluation count separately
+within each exact `0/1` treatment arm. With clusters, a randomized greedy allocation
+balances treatment-arm counts and requested role sizes while assigning every cluster as
+one indivisible unit. The result retains both requested and realized evaluation fractions;
+they can differ under cluster splitting. Any allocation that cannot support both arms,
+the requested outer folds, native inner propensity tuning, or at least two evaluation
+clusters refuses instead of modifying the design.
+
+Row and cluster roles are stored as immutable tuples behind copy-out accessors. Clustered
+outer folds use the same whole-cluster rule, and every fold must retain both treatment
+arms. Outcome and propensity nuisances use the identical treatment-stratified
+`CrossFitter` plan inside the construction sample. Factory identity is audited across all
+outer-fold fits and the fresh full-construction refits used for evaluation prediction.
+
+Only construction outcomes and treatments enter nuisance or CATE fitting. The fresh
+full-construction nuisance refits and the construction-fitted weighted CATE model produce
+evaluation predictions without using evaluation outcomes or treatments as fit targets.
+The result retains `u`, `v`, `u/v`, `v^2`, the direct R-objective, and its algebraically
+identical weighted-transformation value. The construction audit is retained inside the
+public result and never recomputed from evaluation outcomes.
 
 ## Learner protocols
 
@@ -93,11 +140,33 @@ result must return one finite prediction per row and preserve labelled schema. C
 owns the objective, weights, split roles, evaluation, and refusal rules even when a custom
 prediction backend is supplied.
 
-A package-owned weighted ridge-GCV CATE learner is the intended first default. A native
-probability learner with a separately tested penalized-logit contract is a prerequisite
-before the full R-learner can claim an entirely native default. Reusing unconstrained
+A package-owned weighted ridge-GCV CATE learner is the first default. Its native
+probability learner has a separately tested penalized-logit contract, so the full path is
+independent of external ML packages. Reusing unconstrained
 linear ridge probabilities without refusal, silently clipping them, or importing another
 package's model as the default are not acceptable shortcuts.
+
+### Opt-in native nonlinear CATE stage
+
+`NativeSplineRidgeCATE` is CauseKit's first specialized nonlinear weighted-CATE stage. It
+standardizes the declared construction covariates, forms additive continuous linear-spline
+bases at construction-only empirical quantiles, and uses the same weighted R-objective GCV
+to select jointly among the requested knot counts and ridge penalties. The default
+candidate set `(0, 1, 3)` deliberately includes the zero-knot linear basis, so the learner
+can decline nonlinear complexity without consulting honest evaluation outcomes.
+
+The result exposes the exact prediction basis, selected knot count, basis dimension,
+penalty, weighted GCV, and complete candidate tuning path. Pairwise standardized linear
+interactions are explicit opt-in. Every requested basis must remain below
+`max_basis_features`; CauseKit refuses oversized bases rather than constructing an
+unbounded polynomial or pairwise expansion.
+
+This is a package-owned nonlinear implementation, but piecewise-linear splines and ridge
+GCV are established methods. CauseKit's contribution is their leakage-audited integration
+with the weighted R-objective and honest evaluation contract, not a claim that the basis
+family is mathematically novel. Seeded nonlinear recovery passes. On real data, the model
+is worse than linear ridge on the NSW split and safely matches it on the Hillstrom email
+RCT, so it remains opt-in.
 
 ### Implemented prerequisite boundary
 
@@ -118,10 +187,10 @@ sum_i [log(1 + exp(eta_i)) - W_i eta_i] + alpha ||beta||^2 / 2,
 with an unpenalized intercept. Selection uses mean held-out log loss from deterministic,
 stratified inner folds created only from the supplied training sample. Scaling is refitted
 inside each inner training fold. The selected model is then refitted on that supplied
-training sample and retains its training index and inner-fold assignments for the future
+training sample and retains its training index and inner-fold assignments for the
 honesty audit. It requires both exact `0/1` arms and enough observations in each arm for
 every inner fold. It returns mathematical Logit probabilities without clipping; the
-future R-learner remains responsible for enforcing its declared overlap interval.
+public R-learner enforces its declared overlap interval.
 
 The package-owned CATE prerequisite is weighted standardized ridge with an unpenalized
 weighted intercept and GCV-selected penalty. It fits the declared `u/v` pseudo-outcome
@@ -217,7 +286,7 @@ split-conditional.
 
 ## Result and audit surface
 
-The future result must expose, without recomputation:
+The result exposes, without recomputation:
 
 - construction, evaluation, and optional deployment indices/roles;
 - nuisance and CATE fold assignments and model names;
@@ -245,24 +314,26 @@ The implementation must refuse:
 - unit-level interval, policy-value, RATE, or ordinary-ATE claims not implemented by the
   declared moments.
 
-## Validation and promotion gates
+## Validation and promotion evidence
 
-Implementation starts with failing contracts and is not promoted until it has:
+Implementation started with observed-failing contracts. The public alpha now has:
 
 1. a hand-computed weighted R-objective and prediction fixture;
 2. deterministic role/fold alignment and explicit leakage sentinels;
 3. hand-computed honest R-loss, constant baseline, and calibration regression;
 4. robust and clustered covariance plus simultaneous group-band identities;
 5. all required refusal tests;
-6. simulations with known constant, linear, nonlinear, null, and weak-overlap CATEs,
-   reporting PEHE, ranking error, R-loss gain, calibration size/power, and band coverage;
-7. aligned external parity where the same objective, split, and weighting can be fixed;
-8. one real-data honest evaluation against a constant-effect baseline and appropriate CATE
+6. seeded linear and piecewise-nonlinear recovery plus null/power and simultaneous-band
+   coverage smoke tests; publication-scale Monte Carlo remains release hardening;
+7. independent base-R parity for fixed honest loss/calibration/group moments and reviewed
+   Stata/IC 17 HC1 parity; Python hand contracts cover the seeded max-t algorithm;
+8. NSW and Hillstrom real-data honest evaluations against constant-effect and aligned CATE
    comparators, while retaining the existing scalar-DML benchmark as historical evidence
    rather than rerunning it as if it were a CATE comparison;
-9. performance evidence without pairwise matrices or per-observation Python loops; and
+9. a 2,000-row/500-cluster performance smoke without pairwise matrices or observation
+   loops; and
 10. public documentation, OutputHub tables, graph-data parity, build, security, and package
-    quality gates.
+    quality gates. Exact executed status is recorded in the release handover.
 
 ## Pre-mortem
 
@@ -284,10 +355,24 @@ Completed prerequisite milestone:
 2. Added hand-computed weighted-objective/penalized-score, construction-only audit, and
    malformed-input/provider refusal tests.
 
-Remaining implementation and promotion order:
+Completed construction milestone:
 
-1. Implement construction/evaluation splitting and cross-fitted R-objective fitting.
-2. Implement honest R-loss and differential calibration.
-3. Add group effects, simultaneous bands, and calibration graph-data parity.
-4. Run simulations, aligned parity, performance, and one real-data comparison before
-   publication.
+1. Added deterministic treatment-stratified row roles and whole-cluster roles with
+   immutable copy-out accessors.
+2. Added cluster-preserving outer folds, fresh-factory auditing, cross-fitted construction
+   nuisances, exact R-objective construction, and construction-only evaluation predictions.
+
+Completed public evaluation milestone:
+
+1. Added honest R-loss, a construction-fitted constant baseline, and differential
+   calibration with HC1/CR1 inference.
+2. Added tie-preserving overlap-weighted group effects, influence records, seeded max-t
+   bands, graph-data parity, optional plots, OutputHub, and future-data prediction.
+3. Added seeded linear/nonlinear simulations, base-R and reviewed Stata parity,
+   performance evidence, and two hash-pinned real-data comparisons.
+
+Later enhancements require new contracts rather than changes to this result:
+
+1. repeated-split aggregation and its p-value/interval rules;
+2. RATE/DR-score ranking inference and policy evaluation; and
+3. unit-level CATE uncertainty only if a learner-specific valid method is implemented.

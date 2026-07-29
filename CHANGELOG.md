@@ -19,6 +19,23 @@ versions may refine APIs, but breaking changes must still be documented explicit
 - Public provider-neutral `WeightedCATEEstimatorProtocol` and `CATEResultProtocol`, plus
   internal native stratified-CV penalized Logit and weighted ridge-GCV prerequisites with
   training-index/tuning audit state and strict malformed-provider refusals.
+- `RLearner` and `RLearnerResult` with immutable treatment-stratified row or
+  whole-cluster roles, cluster-preserving outer folds, fresh-factory enforcement,
+  construction-only nuisance/CATE fitting, held-out R-loss and constant comparison,
+  differential calibration, tie-preserving group effects, HC1/CR1 covariance, seeded
+  max-t bands, graph data/optional plots, future-data prediction, and an exact identity
+  between direct and transformed weighted R-objectives.
+- R-learner OutputHub tables, linear/null/power/band-coverage simulation gates, independent
+  base-R evaluation parity, a reproducible manual Stata HC1 fixture, a 2,000-row/500-
+  cluster performance smoke, and a hash-pinned NSW CATE benchmark against aligned
+  weighted RidgeCV, histogram boosting, and random forest comparators.
+- Public opt-in `NativeSplineRidgeCATE` and `NativeSplineRidgeCATEResult`. Construction-
+  only weighted GCV selects a bounded zero/one/three-knot additive linear-spline basis and
+  ridge penalty; the result exposes the exact basis, tuning path, selected complexity, and
+  prediction schema. Pairwise interactions are explicit and basis growth is capped.
+- A hash-pinned 42,613-customer Hillstrom randomized-email benchmark comparing the native
+  linear and adaptive spline CATE stages on one identical honest split. Kaggle remains an
+  external download client, not a CauseKit dependency.
 
 ### Changed
 
@@ -33,15 +50,27 @@ versions may refine APIs, but breaking changes must still be documented explicit
   ridge-GCV had the lowest outcome OOF RMSE, runtime, and Python-managed peak memory;
   standardized scikit-learn RidgeCV had a 0.180% lower treatment OOF RMSE. The nonlinear
   configurations were worse on both nuisance targets, so the native default remains.
+- On the separate honest NSW CATE run, standardized scikit-learn RidgeCV had the lowest
+  R-loss but improved on the construction-fitted constant by only 0.0034%. Native
+  ridge-GCV was 0.99% worse than constant; boosting and random forest were materially
+  worse. No learner showed significant differential calibration. The earlier scalar-DML
+  benchmarks were not rerun or overwritten.
+- The adaptive spline row was added without rerunning the original NSW comparator rows; it
+  was 1.43% worse than the constant baseline and remains opt-in. On the separate Hillstrom
+  RCT it matched the native linear stage to displayed precision, consistent with safe
+  fallback to the zero-knot candidate.
+- The reviewed Stata/IC 17 fixed-evaluation R-learner artifact passes every loss,
+  calibration, covariance, and group assertion at `1e-8`; the maximum absolute difference
+  is `1.55e-15`.
 
 ### Known limitations
 
 - Weakly lower training-fold GCV under a denser supplied grid did not improve the recorded
   held-out errors and does not imply stronger causal identification.
-- The public R-learner remains contract-only. Its native probability learner, weighted
-  CATE learner, and prerequisite hand/leakage/refusal tests are now implemented. Honest
-  role splitting, cross-fitted CATE construction, calibration inference, bands, graphs,
-  and simulation/parity/real-data validation remain implementation gates.
+- R-learner inference is conditional on one recorded honest split. Repeated-split
+  aggregation, unit-level CATE intervals, RATE, targeting/policy value, and deployment
+  refitting are not provided. Native spline evidence covers one known nonlinear simulation
+  and two real-data splits, not universal superiority or publication-scale coverage.
 
 ## [0.7.0a1] - Unreleased
 

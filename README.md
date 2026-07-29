@@ -6,7 +6,7 @@ squares, randomized-experiment effects, reusable nuisance cross-fitting, IPW/AIP
 ATT, and ATC, scalar propensity-score matching with separate fixed- and estimated-score
 analytical inference paths, conventional staggered DiD, and cross-fitted covariate-adjusted
 Chen-Sant'Anna-Xie efficient DiD for short panels, and CauseKit-native partially linear
-double machine learning.
+double machine learning plus honest heterogeneous-effect R-learning.
 
 This is alpha research software. A successful fit is not evidence that an instrument is
 valid, and an IV coefficient is not automatically an average treatment effect. State the
@@ -88,7 +88,8 @@ att = AIPWATE(estimand="att").fit(
 
 Folds are stratified by treatment, predictions retain the original index, and each arm
 must contain at least `n_splits` observations. Fold assignment is deterministic when
-`random_state` is fixed.
+`random_state` is fixed. Supplying `clusters=` keeps every cluster wholly within one fold
+and refuses any allocation that cannot retain every treatment stratum in every fold.
 
 The same orchestrator exposes multiclass class-probability prediction and masked scalar
 regression tasks. Those operations let panel estimators request cohort-specific outcome
@@ -131,6 +132,64 @@ nuisance-rate/regularity conditions. See the [causal-ML contract](docs/ML_CONTRA
 The native learner reports one tuning row per task and outer fold, including its selected
 penalty, effective degrees of freedom, GCV score, training RMSE, numerical rank, grid size,
 and whether selection reached a grid boundary.
+
+`RLearner` estimates heterogeneous effects through the residualized R-objective while
+keeping construction and evaluation roles honest. Rows are split within treatment arms;
+with `covariance="clustered"`, whole clusters are assigned to roles and outer folds. Only
+construction data tune or fit the outcome, propensity, and weighted CATE learners.
+
+```python
+from causekit import RLearner
+
+rlearner = RLearner(
+    n_splits=5,
+    evaluation_fraction=0.5,
+    random_state=2026,
+    calibration_groups=5,
+    bootstrap_iterations=999,
+).fit(
+    outcome,
+    treatment=treated,
+    covariates=X,
+)
+
+print(rlearner.summary_frame())          # differential calibration
+print(rlearner.honest_r_loss)
+print(rlearner.honest_constant_r_loss)
+print(rlearner.calibration_plot_data())  # pointwise and simultaneous group bands
+```
+
+The R-loss gain compares the CATE learner with a constant effect fitted only on
+construction; it is not predictive R-squared. Calibration groups preserve score ties and
+report overlap-weighted residual-moment effects, not ordinary group ATEs. The first public
+contract provides no unit-level CATE interval, RATE, policy value, or repeated-split
+aggregation. `plot_calibration()` and `plot_cate_distribution()` are available through the
+optional `plot` extra; both use the exact retained honest tables.
+
+The R-loss is an established method, not a new CauseKit model. CauseKit's differentiation
+is its integrated honest-role, audit, refusal, cluster, calibration, and simultaneous-band
+contract; the [full contract](docs/R_LEARNER_CONTRACT.md) avoids unsupported claims of
+global algorithmic novelty.
+
+For nonlinear CATEs, `NativeSplineRidgeCATE` is an opt-in weighted final stage:
+
+```python
+from causekit import NativeSplineRidgeCATE
+
+nonlinear = RLearner(
+    cate_factory=NativeSplineRidgeCATE,
+    random_state=2026,
+).fit(outcome, treatment=treated, covariates=X)
+
+print(nonlinear.cate_diagnostics)  # selected knots, basis size, alpha, weighted GCV
+```
+
+It selects zero-, one-, or three-knot additive linear-spline bases and the ridge penalty
+using construction-only weighted GCV, then evaluates once on the honest role. Linear
+ridge-GCV remains the default: the nonlinear learner recovers a known piecewise effect in
+simulation, safely matches linear performance on the Hillstrom randomized-email data, and
+is worse on the separate NSW split. Pairwise interactions are explicit opt-in and a strict
+basis-size ceiling prevents accidental feature explosion.
 
 ### Nearest-neighbor matching
 
@@ -557,10 +616,10 @@ score inference smokes are implemented, with fixed-score parity against pinned R
 checked against `statsmodels` and a reviewed Stata/IC 17 `teffects psmatch` fixture. DiD
 promotion includes cross-fitted covariate nuisances and simultaneous
 event-study bands; pre-trend/Hausman diagnostics and repeated cross-sections remain.
-The causal-ML alpha starts with native partially linear DML. The
-[honest R-learner contract](docs/R_LEARNER_CONTRACT.md) now fixes its construction/evaluation
-split, R-loss, differential calibration, group-inference, and graphing requirements before
-implementation. The R- and later DR-learner remain absent rather than placeholder APIs.
+The causal-ML alpha includes native partially linear DML and the public
+[honest R-learner](docs/R_LEARNER_CONTRACT.md), with immutable construction/evaluation
+roles, held-out loss/calibration, group inference, and graph data. The DR learner remains
+absent rather than a placeholder API.
 Available aligned Python/R/Stata parity rows are recorded, while unavailable comparator
 cells remain explicit. Later releases may add regression discontinuity and panel IV. Each family
 must define its estimand, assumptions, failure behavior, diagnostics, and independent

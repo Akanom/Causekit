@@ -23,7 +23,14 @@ from .matching import (
     NearestNeighborMatchResult,
     PropensityScoreStatus,
 )
-from .ml import PartiallyLinearDML, PartiallyLinearDMLResult
+from .ml import (
+    NativeSplineRidgeCATE,
+    NativeSplineRidgeCATEResult,
+    PartiallyLinearDML,
+    PartiallyLinearDMLResult,
+    RLearner,
+    RLearnerResult,
+)
 from .observational import AIPWATE, IPWATE, ObservationalATEResult, OverlapDiagnostic
 from .postestimation import (
     confint,
@@ -60,9 +67,13 @@ __all__ = [
     "NuisanceDiagnosticsProtocol",
     "NearestNeighborMatch",
     "NearestNeighborMatchResult",
+    "NativeSplineRidgeCATE",
+    "NativeSplineRidgeCATEResult",
     "OutcomeResultProtocol",
     "PartiallyLinearDML",
     "PartiallyLinearDMLResult",
+    "RLearner",
+    "RLearnerResult",
     "PropensityResultProtocol",
     "PropensityScoreStatus",
     "WeightedCATEEstimatorProtocol",

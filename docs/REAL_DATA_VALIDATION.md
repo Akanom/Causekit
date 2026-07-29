@@ -8,8 +8,8 @@ preparation use the same registry in `causekit.datasets`.
 | Registry name | Real-data role | Source | SHA-256 |
 | --- | --- | --- | --- |
 | `hsng` | 1980 U.S. Census state housing IV example | `https://www.stata-press.com/data/r19/hsng.dta` | `d19cd25299af57569d93d8f16b4f72d5ffc7f897c9247d8a8e5fddddef43ad11` |
-| `nsw_mixtape` | National Supported Work randomized job-training experiment | `https://raw.githubusercontent.com/scunning1975/mixtape/master/nsw_mixtape.dta` | `fc424cfc9d7861f4b95a6612f27c7e842671fea5a8612edcfe0273ee62e6f0a4` |
-| `cattaneo2` | Maternal smoking, birthweight, supplied-nuisance effects, matching, and native partially linear DML | `https://www.stata-press.com/data/r19/cattaneo2.dta` | `631e926eb9981828ba2e542b32c16ae08f336b9efa10621651a8a185405e0577` |
+| `nsw_mixtape` | National Supported Work randomized job-training experiment and honest weighted-CATE comparison | `https://raw.githubusercontent.com/scunning1975/mixtape/master/nsw_mixtape.dta` | `fc424cfc9d7861f4b95a6612f27c7e842671fea5a8612edcfe0273ee62e6f0a4` |
+| `cattaneo2` | Maternal smoking, birthweight, supplied-nuisance effects, matching, native partially linear DML, and honest R-learner example | `https://www.stata-press.com/data/r19/cattaneo2.dta` | `631e926eb9981828ba2e542b32c16ae08f336b9efa10621651a8a185405e0577` |
 | `hospdd` | Hospital procedure-adoption conventional and efficient DiD | `https://www.stata-press.com/data/r19/hospdd.dta` | `e3ae6451e89cb915c546ab772410046726f280ad7d117611376beb4f46a521bb` |
 
 Stata Press lists `hsng` for `ivregress`, `cattaneo2` for the `teffects` family, and
@@ -31,8 +31,8 @@ The workflow fits:
 
 - robust `IV2SLS` on the housing data;
 - unadjusted and Lin-adjusted `RandomizedATE` on NSW;
-- five-fold supplied-nuisance IPW/AIPW, point matching, and CauseKit-native partially
-  linear DML on `cattaneo2`; and
+- five-fold supplied-nuisance IPW/AIPW, point matching, CauseKit-native partially linear
+  DML, and the honest R-learner on `cattaneo2`; and
 - conventional and PT-All efficient DiD on an equal-hospital-weight panel constructed
   from `hospdd`.
 
@@ -47,6 +47,19 @@ outcome/treatment fold fits selected interior penalties. This is a
 deterministic software smoke, not evidence that smoking is conditionally exchangeable or
 that a constant treatment effect is scientifically credible. The separate one-run
 performance record is [Causal-ML real-data performance](ML_BENCHMARK.md).
+
+The separate NSW honest CATE run keeps the native nuisance specification and immutable
+roles fixed while changing only the weighted CATE learner. No learner shows significant
+differential calibration; external RidgeCV has the smallest R-loss but improves on the
+constant comparator by only 0.0034%. See
+[Honest R-learner real-data benchmark](R_LEARNER_BENCHMARK.md).
+
+A separate hash-pinned Hillstrom randomized-email record compares only CauseKit's native
+linear and adaptive spline CATE stages on 42,613 Men's Email/control customers. Both have
+the same held-out metrics to displayed precision, consistent with construction-only
+fallback to the zero-knot basis. The data remain outside the repository and Kaggle is not a
+package dependency. See
+[Hillstrom randomized-email R-learner benchmark](R_LEARNER_HILLSTROM_BENCHMARK.md).
 
 ## Cross-language preparation
 

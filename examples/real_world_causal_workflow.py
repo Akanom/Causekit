@@ -31,6 +31,7 @@ from causekit import (
     NearestNeighborMatch,
     PartiallyLinearDML,
     RandomizedATE,
+    RLearner,
 )
 from causekit.datasets import REAL_DATASETS, load_real_dataset
 
@@ -157,6 +158,17 @@ def _observational_workflow(data: pd.DataFrame) -> None:
         treatment=treatment,
         covariates=covariates,
     )
+    rlearner = RLearner(
+        n_splits=5,
+        evaluation_fraction=0.5,
+        random_state=20_260_729,
+        calibration_groups=5,
+        bootstrap_iterations=999,
+    ).fit(
+        outcome,
+        treatment=treatment,
+        covariates=covariates,
+    )
     print("\nObservational effects — maternal smoking and birthweight")
     print(pd.concat([ipw.summary_frame(), aipw.summary_frame()], keys=["IPW", "AIPW"]))
     print(matched.summary_frame().rename(index={"att": "matching_att"}).to_string())
@@ -164,10 +176,26 @@ def _observational_workflow(data: pd.DataFrame) -> None:
     print(dml.summary_frame().to_string())
     print("\nFold-level native nuisance tuning")
     print(dml.nuisance_diagnostics.to_string(index=False))
+    print("\nCauseKit-native honest R-learner differential calibration")
+    print(rlearner.summary_frame().to_string())
+    print("\nHonest R-loss comparison")
+    print(
+        pd.Series(
+            {
+                "r_loss": rlearner.honest_r_loss,
+                "constant_r_loss": rlearner.honest_constant_r_loss,
+                "r_loss_gain": rlearner.r_loss_gain,
+            }
+        ).to_string()
+    )
+    print("\nTie-preserving honest calibration groups")
+    print(rlearner.calibration_plot_data().to_string())
     print("The DML coefficient is an ATE only under a constant-effect partially linear")
     print("model and the documented exchangeability, variation, and nuisance conditions.")
     print("Matching uncertainty is intentionally absent: cross-fitted scores do not satisfy")
     print("CauseKit's narrow full-sample Logit-MLE analytical-inference contract.")
+    print("R-learner evidence is split-conditional. Group effects are overlap-weighted")
+    print("residual moments; no unit-level CATE intervals or policy-value claim is made.")
 
 
 def _hospital_panel(data: pd.DataFrame) -> pd.DataFrame:
