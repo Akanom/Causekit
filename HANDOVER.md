@@ -154,14 +154,27 @@ future task can resume without reconstructing intent from chat history.
     The reviewed Stata/IC 17 fixed-evaluation artifact passes every field at `1e-8`; the
     maximum absolute difference is `4.44e-16`.
 
+18. `0.7.0a4` matching evidence promotion: the maintained known-score and regular
+    full-sample unpenalized Logit-MLE analytical paths are unchanged, but now carry a
+    preregistered publication-scale certificate. One thousand replications in each of
+    favorable and stressed overlap exercise ATT, ATC, and ATE for both contracts (12,000
+    fits); every cell passes with coverage `0.943–0.955`, maximum absolute bias `0.0073`,
+    analytical-SE/empirical-SD ratios `0.963–1.019`, zero refusals, and coverage Monte
+    Carlo SE at most `0.0073`. A separate 15-row, hash-verified Cattaneo grid compares no
+    support rule, intersection support, and `0.1`/`0.2`/`0.3` logit-score-SD calipers with
+    `inference="none"`. It retains every target relabel and attrition count; support removes
+    10 controls and the narrow caliper removes three more control focal units. Settled
+    R/Stata parity and 100,000-row performance artifacts were not rerun.
+
 ## Open promotion gates
 
 - Matching still defaults to `inference="none"`. Known-score reuse-aware inference and a
-  separately validated full-sample Logit-MLE correction are implemented. Generic,
-  cross-fitted, penalized, and unsupported-link scores still refuse. Fixed-score R/Stata
-  parity is recorded, including the estimated-score Stata decomposition; R `Matching`
-  is non-comparable because it conditions on the supplied score. Do not substitute a
-  generic sandwich, ordinary bootstrap, or cluster wrapper.
+  separately validated full-sample Logit-MLE correction now pass hand, parity,
+  publication-scale coverage, real-data sensitivity, and performance gates. Generic,
+  cross-fitted, penalized, unsupported-link, target-selected, tie-expanded, and clustered
+  paths still refuse. R `Matching` remains non-comparable for the first-step correction
+  because it conditions on the supplied score. Do not substitute a generic sandwich,
+  ordinary bootstrap, or cluster wrapper.
 - Efficient DiD owns no nuisance model classes. The implemented covariate path must keep
   consuming public cross-fitting factories; direct density-ratio regression remains a
   possible future stability enhancement over ratios of multiclass probabilities.
@@ -204,14 +217,12 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Continue matching promotion from `docs/MATCHING_CONTRACT.md`: extend publication-scale
-   sensitivity/coverage evidence without weakening either analytical refusal boundary.
-2. Return to DiD for pre-trend/Hausman diagnostics, repeated cross-sections,
+1. Return to DiD for pre-trend/Hausman diagnostics, repeated cross-sections,
    publication-scale coverage, direct-ratio nuisance support if justified, and broader
    reference evidence.
-3. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
+2. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
    manipulation checks, bias correction, and local estimand.
-4. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
+3. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
    effects, and clustered covariance contracts.
 
 Continue to preserve the matching tie/inference, target-population, and no-quadratic-

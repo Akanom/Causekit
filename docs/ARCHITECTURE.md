@@ -1,6 +1,6 @@
 # Architecture
 
-`causekit` is organized around small, auditable estimation paths. The `0.7.0a3`
+`causekit` is organized around small, auditable estimation paths. The `0.7.0a4`
 architecture keeps causal assumptions visible, separates numerical estimation from
 inference and diagnostics, and returns frozen labelled result containers suitable for
 reporting. The pandas objects stored inside a result should be treated as read-only; helper

@@ -98,4 +98,4 @@ __all__ = [
     "wald_test",
 ]
 
-__version__ = "0.7.0a3"
+__version__ = "0.7.0a4"

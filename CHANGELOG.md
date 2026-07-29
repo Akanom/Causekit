@@ -4,6 +4,36 @@ All notable changes to CauseKit are recorded here. The project follows
 [Semantic Versioning](https://semver.org/) once a public contract is released. Alpha
 versions may refine APIs, but breaking changes must still be documented explicitly.
 
+## [0.7.0a4] - Unreleased
+
+### Added
+
+- A preregistered publication-scale matching certificate covering ATT, ATC, and ATE for
+  both maintained analytical inference paths under favorable and stressed overlap. The
+  runner records bias, empirical sampling variation, mean analytical standard errors,
+  coverage with Monte Carlo uncertainty, interval width, arm counts, runtime, software
+  versions, seeds, configuration, and pass/fail gates without resampling the estimator.
+- A separate hash-verified Cattaneo design-sensitivity certificate for no support rule,
+  intersection support, and narrower/default/wider logit-score calipers. Every row retains
+  the realized target label, attrition, tie/reuse, and multivariate balance summaries.
+
+### Changed
+
+- The package version and public documentation now identify `0.7.0a4`. Matching
+  publication evidence is promoted without changing either analytical estimator or the
+  default `inference="none"` boundary.
+- Caliper/support sensitivity remains point-estimation-only. CauseKit does not attach the
+  maintained no-selection variance after a rule changes the retained target population.
+
+### Known limitations
+
+- Generic, cross-fitted, penalized, probit, trimmed-target, tied-boundary, clustered,
+  paired, survey, and multiway matching inference remain unsupported. Ordinary bootstrap
+  remains prohibited for fixed-neighbor matching.
+- The promotion certificate evaluates two declared one-dimensional data-generating
+  designs and one real observational dataset. It does not prove identification, universal
+  nominal coverage, or robustness to unmeasured confounding.
+
 ## [0.7.0a3] - Unreleased
 
 ### Added

@@ -61,6 +61,13 @@ fallback to the zero-knot basis. The data remain outside the repository and Kagg
 package dependency. See
 [Hillstrom randomized-email R-learner benchmark](R_LEARNER_HILLSTROM_BENCHMARK.md).
 
+The matching promotion uses the same hash-pinned 4,642-row `cattaneo2` source for a
+separate full-sample-Logit design-sensitivity grid. No-support, intersection-support, and
+`0.1`/`0.2`/`0.3` logit-score-SD calipers are reported for ATT, ATC, and ATE. All 15 rows
+use `inference="none"`: intersection support excludes 10 controls and therefore changes
+the ATC/ATE target, while the narrow caliper excludes three additional control focal
+units. See [Matching inference promotion evidence](MATCHING_PROMOTION_EVIDENCE.md).
+
 ## Cross-language preparation
 
 Generate deterministic, 17-digit CSVs and a JSON manifest outside the repository:

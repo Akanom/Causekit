@@ -115,6 +115,15 @@ the maximum absolute differences are `0` for estimates, `1.1102230246251565e-16`
 known-score variance, `2.601257653722655e-9` for the first-step adjustment, and
 `2.62713550913674e-9` for standard errors against a declared `1e-8` tolerance.
 
+Version `0.7.0a4` adds validation depth without changing those comparator moments. The
+saved `benchmarks/matching_promotion_evidence.json` certificate exercises ATT, ATC, and
+ATE for both maintained inference contracts across 1,000 replications in each of two
+overlap designs. All 12 cells pass; coverage is `0.943–0.955`, maximum absolute bias is
+`0.0073`, and the analytical-SE/empirical-SD ratio is `0.963–1.019`. Its separate
+hash-verified Cattaneo sensitivity grid is point-estimation-only because support/caliper
+selection can change the target. Settled R/Stata fixtures were not rerun for this
+simulation-only promotion.
+
 Both committed Stata script/output pairs were executed immediately before the CauseKit
 rename. Their old `CausalKit`/`causalkit` labels and generator hashes are retained
 unchanged as provenance; the executable Python parity tests now import `causekit` and

@@ -1,7 +1,7 @@
 # CauseKit
 
 CauseKit (installed and imported as `causekit`) is an identification-aware Python package for causal inference and
-instrumental-variable workflows. The `0.7.0a3` surface provides linear two-stage least
+instrumental-variable workflows. The `0.7.0a4` surface provides linear two-stage least
 squares, randomized-experiment effects, reusable nuisance cross-fitting, IPW/AIPW ATE,
 ATT, and ATC, scalar propensity-score matching with separate fixed- and estimated-score
 analytical inference paths, conventional staggered DiD, and cross-fitted covariate-adjusted
@@ -313,6 +313,14 @@ score status is separate. Ordinary bootstrap, matching without replacement, arbi
 selection, clustered uncertainty, and unimplemented bias correction also refuse. See the
 [matching contract](docs/MATCHING_CONTRACT.md) before publication-facing use.
 
+The `0.7.0a4` promotion certificate adds 1,000-replication favorable- and stressed-
+overlap coverage evidence for ATT/ATC/ATE under both maintained analytical contracts.
+All 12 cells passed their preregistered bias, coverage, and SE-calibration gates. A
+separate hash-verified Cattaneo grid compares no support restriction, intersection
+support, and `0.1`/`0.2`/`0.3` logit-score-SD calipers with `inference="none"`, retaining
+every changed target label and attrition count. See
+[matching inference promotion evidence](docs/MATCHING_PROMOTION_EVIDENCE.md).
+
 ### Conventional and efficient difference-in-differences
 
 The conventional estimator remains first-class. It reports cohort-time effects using a
@@ -422,7 +430,7 @@ attrition correction, or multi-arm experiments.
 From PyPI after publication:
 
 ```bash
-python -m pip install causekit==0.7.0a3
+python -m pip install causekit==0.7.0a4
 ```
 
 From a source checkout:
@@ -648,7 +656,9 @@ The matching alpha follows the
 inference, R reference parity, OutputHub adaptation, and 100,000-row fixed- and estimated-
 score inference smokes are implemented, with fixed-score parity against pinned R `Matching`
 4.10-15 and Stata/MP 17. Full-sample Logit-MLE first-step adjustment is independently
-checked against `statsmodels` and a reviewed Stata/IC 17 `teffects psmatch` fixture. DiD
+checked against `statsmodels` and a reviewed Stata/IC 17 `teffects psmatch` fixture. The
+publication-scale ATT/ATC/ATE coverage and real-data sensitivity certificate passes
+without widening either analytical boundary. DiD
 promotion includes cross-fitted covariate nuisances and simultaneous
 event-study bands; pre-trend/Hausman diagnostics and repeated cross-sections remain.
 The causal-ML alpha includes native partially linear DML and separately contracted public

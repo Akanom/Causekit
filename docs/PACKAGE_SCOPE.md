@@ -5,7 +5,7 @@ identification. Inclusion requires more than a method being common in applied ec
 the package must be able to state the estimand, identifying assumptions, supported data
 structure, inference target, diagnostics, and validation boundary.
 
-## Public `0.7.0a3` alpha surface
+## Public `0.7.0a4` alpha surface
 
 The surface is estimator-specific. Cross-sectional linear instrumental variables retain
 the following contract:
@@ -39,6 +39,9 @@ or expanded ties. A separately validated full-sample unpenalized Logit-MLE path 
 `FittedPropensityMLEProtocol` results and applies the Abadie–Imbens estimated-score
 correction. Arbitrary/cross-fitted/penalized scores, bootstrap, and clustered alternatives
 refuse rather than returning a methodologically incomplete standard error.
+The publication-scale certificate exercises ATT, ATC, and ATE for both analytical paths
+under favorable and stressed overlap, while a separate Cattaneo caliper/support grid keeps
+`inference="none"` and exposes every target change and exclusion.
 
 The DiD surface adds `DifferenceInDifferences` and `EfficientDiD` for balanced short
 panels. The conventional class retains never-treated/not-yet-treated comparison choices;
@@ -187,7 +190,7 @@ and validation gates:
 
 | Family | Required design questions before promotion |
 | --- | --- |
-| Matching promotion | Remaining publication-scale sensitivity/coverage evidence; fixed-score and supported estimated-Logit Python/R/Stata evidence is recorded where estimand-aligned comparators exist |
+| Matching extensions | Publication-scale sensitivity/coverage and available Python/R/Stata evidence pass; generic-score, selected-target, tie-expanded, clustered, survey, and bootstrap inference remain separately prohibited or deferred |
 | DiD promotion | Pre-trend/Hausman diagnostics, repeated cross-sections, publication-scale coverage, covariate performance, and broader parity |
 | Causal ML promotion | Harden the separately implemented honest R- and DR-learners with repeated-split and publication-scale evidence; unit-level intervals, RATE, and policy evaluation retain separate contracts |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
