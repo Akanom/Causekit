@@ -201,7 +201,7 @@ and validation gates:
 | Family | Required design questions before promotion |
 | --- | --- |
 | Matching extensions | Publication-scale sensitivity/coverage and available Python/R/Stata evidence pass; generic-score, selected-target, tie-expanded, clustered, survey, and bootstrap inference remain separately prohibited or deferred |
-| DiD promotion | Repeated-cross-section implementation, publication-scale coverage, covariate performance, and broader parity |
+| DiD promotion | Implement covariate-adjusted repeated-cross-section DiD with aligned conditional pre-trends; composition robustness, survey weights, and simultaneous bands retain separate contracts |
 | Causal ML promotion | Implement the frozen construction-cross-fitted native orthogonal-stack contract, then harden R-/DR-learners with repeated-split and publication-scale evidence; unit-level intervals, RATE, and policy evaluation retain separate contracts |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
 | Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |

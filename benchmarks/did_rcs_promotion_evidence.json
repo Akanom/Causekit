@@ -1,0 +1,1030 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-07-30T00:47:29.878554+00:00",
+  "generator": "benchmarks/validate_did_rcs_promotion.py",
+  "generator_sha256": "4ded7dcd7bbb15194349015a71c555dcd7cb2d111117ed1b169774e4b850d5cb",
+  "reproduction_command": "python benchmarks/validate_did_rcs_promotion.py --replications 1000 --workers 8",
+  "python_version": "3.14.6",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "causekit_version": "0.7.0a6",
+  "numpy_version": "2.4.6",
+  "pandas_version": "3.0.3",
+  "coverage_simulation": {
+    "seed": 20260730,
+    "replications_per_design": 1000,
+    "nominal_coverage": 0.95,
+    "population_cohort_probabilities": {
+      "treated_at_3": 0.3333333333333333,
+      "treated_at_4": 0.16666666666666666,
+      "never_treated": 0.5
+    },
+    "period_sample_sizes": {
+      "balanced": [
+        240,
+        240,
+        240,
+        240
+      ],
+      "unequal_period_sizes": [
+        600,
+        300,
+        144,
+        96
+      ]
+    },
+    "dgp": "Independent period samples; stationary cohort probabilities; common nonlinear time path; cohort levels; heterogeneous normal variance in unequal-size design; ATT(3,3)=1, ATT(3,4)=1.5, ATT(4,4)=2.",
+    "total_estimator_fits": 4000,
+    "elapsed_seconds": 29.774730000001,
+    "fits_per_second": 134.34210822398273,
+    "cells": [
+      {
+        "design": "balanced",
+        "control_group": "never_treated",
+        "target": "group_3_3",
+        "truth": 1.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.000129049919064,
+        "bias": 0.0001290499190640393,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.20302661800421648,
+        "mean_standard_error": 0.20394640923291213,
+        "standard_error_ratio": 1.0045303972343003,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.951,
+        "coverage_mcse": 0.006826346021115546,
+        "coverage_wilson_95": [
+          0.9358092984933898,
+          0.9627389653526394
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 18,
+        "status": "pass"
+      },
+      {
+        "design": "balanced",
+        "control_group": "never_treated",
+        "target": "group_3_4",
+        "truth": 1.5,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.5019127389172227,
+        "bias": 0.001912738917222656,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.21366102174661578,
+        "mean_standard_error": 0.20369922860428108,
+        "standard_error_ratio": 0.9533757113913433,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.939,
+        "coverage_mcse": 0.007568289106528638,
+        "coverage_wilson_95": [
+          0.9224198811757163,
+          0.9522202248739662
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 18,
+        "status": "pass"
+      },
+      {
+        "design": "balanced",
+        "control_group": "never_treated",
+        "target": "group_4_4",
+        "truth": 2.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.985669183695506,
+        "bias": -0.014330816304493954,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.2633234050249406,
+        "mean_standard_error": 0.2566554975761903,
+        "standard_error_ratio": 0.9746778777673835,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.936,
+        "coverage_mcse": 0.007739767438366605,
+        "coverage_wilson_95": [
+          0.9190992674988255,
+          0.9495637991017706
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 18,
+        "status": "pass"
+      },
+      {
+        "design": "balanced",
+        "control_group": "never_treated",
+        "target": "event_0",
+        "truth": 1.3333333333333333,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.3286200641076271,
+        "bias": -0.00471326922570614,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.1530158266107729,
+        "mean_standard_error": 0.15051096742010714,
+        "standard_error_ratio": 0.9836300646400625,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.947,
+        "coverage_mcse": 0.007084560677981384,
+        "coverage_wilson_95": [
+          0.9313253831625082,
+          0.9592534947514054
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 18,
+        "status": "pass"
+      },
+      {
+        "design": "balanced",
+        "control_group": "never_treated",
+        "target": "event_1",
+        "truth": 1.5,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.5019127389172227,
+        "bias": 0.001912738917222656,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.21366102174661578,
+        "mean_standard_error": 0.20369922860428108,
+        "standard_error_ratio": 0.9533757113913433,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.939,
+        "coverage_mcse": 0.007568289106528638,
+        "coverage_wilson_95": [
+          0.9224198811757163,
+          0.9522202248739662
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 18,
+        "status": "pass"
+      },
+      {
+        "design": "balanced",
+        "control_group": "never_treated",
+        "target": "calendar_3",
+        "truth": 1.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.000129049919064,
+        "bias": 0.0001290499190640393,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.20302661800421648,
+        "mean_standard_error": 0.20394640923291213,
+        "standard_error_ratio": 1.0045303972343003,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.951,
+        "coverage_mcse": 0.006826346021115546,
+        "coverage_wilson_95": [
+          0.9358092984933898,
+          0.9627389653526394
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 18,
+        "status": "pass"
+      },
+      {
+        "design": "balanced",
+        "control_group": "never_treated",
+        "target": "calendar_4",
+        "truth": 1.6666666666666667,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.6628824335333463,
+        "bias": -0.003784233133320436,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.18348504430707707,
+        "mean_standard_error": 0.1720990284049546,
+        "standard_error_ratio": 0.9379458094520933,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.928,
+        "coverage_mcse": 0.00817410545564467,
+        "coverage_wilson_95": [
+          0.9102882164172793,
+          0.9424360783190856
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 18,
+        "status": "pass"
+      },
+      {
+        "design": "balanced",
+        "control_group": "never_treated",
+        "target": "esavg",
+        "truth": 1.4166666666666667,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.4152664015124246,
+        "bias": -0.0014002651542421862,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.1645904733946145,
+        "mean_standard_error": 0.15601338840003792,
+        "standard_error_ratio": 0.9478883265982683,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.936,
+        "coverage_mcse": 0.007739767438366605,
+        "coverage_wilson_95": [
+          0.9190992674988255,
+          0.9495637991017706
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 18,
+        "status": "pass"
+      },
+      {
+        "design": "balanced",
+        "control_group": "not_yet_treated",
+        "target": "group_3_3",
+        "truth": 1.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 0.9977569193667271,
+        "bias": -0.0022430806332729425,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.19319482074304792,
+        "mean_standard_error": 0.1940964219775131,
+        "standard_error_ratio": 1.004666798162588,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.952,
+        "coverage_mcse": 0.006759881655768837,
+        "coverage_wilson_95": [
+          0.936933911349866,
+          0.963606698979192
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 18,
+        "status": "pass"
+      },
+      {
+        "design": "balanced",
+        "control_group": "not_yet_treated",
+        "target": "group_3_4",
+        "truth": 1.5,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.5019127389172227,
+        "bias": 0.001912738917222656,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.21366102174661578,
+        "mean_standard_error": 0.20369922860428108,
+        "standard_error_ratio": 0.9533757113913433,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.939,
+        "coverage_mcse": 0.007568289106528638,
+        "coverage_wilson_95": [
+          0.9224198811757163,
+          0.9522202248739662
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 18,
+        "status": "pass"
+      },
+      {
+        "design": "balanced",
+        "control_group": "not_yet_treated",
+        "target": "group_4_4",
+        "truth": 2.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.985669183695506,
+        "bias": -0.014330816304493954,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.2633234050249406,
+        "mean_standard_error": 0.2566554975761903,
+        "standard_error_ratio": 0.9746778777673835,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.936,
+        "coverage_mcse": 0.007739767438366605,
+        "coverage_wilson_95": [
+          0.9190992674988255,
+          0.9495637991017706
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 18,
+        "status": "pass"
+      },
+      {
+        "design": "balanced",
+        "control_group": "not_yet_treated",
+        "target": "event_0",
+        "truth": 1.3333333333333333,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.3271347506629028,
+        "bias": -0.006198582670430497,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.15822514554104214,
+        "mean_standard_error": 0.15662508450087784,
+        "standard_error_ratio": 0.9898874415018359,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.945,
+        "coverage_mcse": 0.007209368904418752,
+        "coverage_wilson_95": [
+          0.9290916123226243,
+          0.9575025726252315
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 18,
+        "status": "pass"
+      },
+      {
+        "design": "balanced",
+        "control_group": "not_yet_treated",
+        "target": "event_1",
+        "truth": 1.5,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.5019127389172227,
+        "bias": 0.001912738917222656,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.21366102174661578,
+        "mean_standard_error": 0.20369922860428108,
+        "standard_error_ratio": 0.9533757113913433,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.939,
+        "coverage_mcse": 0.007568289106528638,
+        "coverage_wilson_95": [
+          0.9224198811757163,
+          0.9522202248739662
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 18,
+        "status": "pass"
+      },
+      {
+        "design": "balanced",
+        "control_group": "not_yet_treated",
+        "target": "calendar_3",
+        "truth": 1.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 0.9977569193667271,
+        "bias": -0.0022430806332729425,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.19319482074304792,
+        "mean_standard_error": 0.1940964219775131,
+        "standard_error_ratio": 1.004666798162588,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.952,
+        "coverage_mcse": 0.006759881655768837,
+        "coverage_wilson_95": [
+          0.936933911349866,
+          0.963606698979192
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 18,
+        "status": "pass"
+      },
+      {
+        "design": "balanced",
+        "control_group": "not_yet_treated",
+        "target": "calendar_4",
+        "truth": 1.6666666666666667,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.6628824335333463,
+        "bias": -0.003784233133320436,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.18348504430707707,
+        "mean_standard_error": 0.1720990284049546,
+        "standard_error_ratio": 0.9379458094520933,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.928,
+        "coverage_mcse": 0.00817410545564467,
+        "coverage_wilson_95": [
+          0.9102882164172793,
+          0.9424360783190856
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 18,
+        "status": "pass"
+      },
+      {
+        "design": "balanced",
+        "control_group": "not_yet_treated",
+        "target": "esavg",
+        "truth": 1.4166666666666667,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.4145237447900627,
+        "bias": -0.0021429218766040314,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.16390557455789784,
+        "mean_standard_error": 0.15530332255200363,
+        "standard_error_ratio": 0.9475170260127086,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.936,
+        "coverage_mcse": 0.007739767438366605,
+        "coverage_wilson_95": [
+          0.9190992674988255,
+          0.9495637991017706
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 18,
+        "status": "pass"
+      },
+      {
+        "design": "unequal_period_sizes",
+        "control_group": "never_treated",
+        "target": "group_3_3",
+        "truth": 1.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.01356895814155,
+        "bias": 0.013568958141549903,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.21648036537107476,
+        "mean_standard_error": 0.21961280484577975,
+        "standard_error_ratio": 1.0144698548957805,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.952,
+        "coverage_mcse": 0.006759881655768837,
+        "coverage_wilson_95": [
+          0.936933911349866,
+          0.963606698979192
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 3,
+        "status": "pass"
+      },
+      {
+        "design": "unequal_period_sizes",
+        "control_group": "never_treated",
+        "target": "group_3_4",
+        "truth": 1.5,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.50348328134131,
+        "bias": 0.0034832813413099295,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.28558455531026766,
+        "mean_standard_error": 0.2800321720903935,
+        "standard_error_ratio": 0.9805578308888522,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.951,
+        "coverage_mcse": 0.006826346021115546,
+        "coverage_wilson_95": [
+          0.9358092984933898,
+          0.9627389653526394
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 3,
+        "status": "pass"
+      },
+      {
+        "design": "unequal_period_sizes",
+        "control_group": "never_treated",
+        "target": "group_4_4",
+        "truth": 2.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.9937483877511248,
+        "bias": -0.00625161224887516,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.4806676749643172,
+        "mean_standard_error": 0.46867710650400374,
+        "standard_error_ratio": 0.9750543481809888,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.936,
+        "coverage_mcse": 0.007739767438366605,
+        "coverage_wilson_95": [
+          0.9190992674988255,
+          0.9495637991017706
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 3,
+        "status": "pass"
+      },
+      {
+        "design": "unequal_period_sizes",
+        "control_group": "never_treated",
+        "target": "event_0",
+        "truth": 1.3333333333333333,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.339751353337866,
+        "bias": 0.006418020004532732,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.1993111275977312,
+        "mean_standard_error": 0.20050629558936417,
+        "standard_error_ratio": 1.0059964940544874,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.941,
+        "coverage_mcse": 0.007451107300260817,
+        "coverage_wilson_95": [
+          0.9246390972285408,
+          0.9539857017871995
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 3,
+        "status": "pass"
+      },
+      {
+        "design": "unequal_period_sizes",
+        "control_group": "never_treated",
+        "target": "event_1",
+        "truth": 1.5,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.50348328134131,
+        "bias": 0.0034832813413099295,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.28558455531026766,
+        "mean_standard_error": 0.2800321720903935,
+        "standard_error_ratio": 0.9805578308888522,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.951,
+        "coverage_mcse": 0.006826346021115546,
+        "coverage_wilson_95": [
+          0.9358092984933898,
+          0.9627389653526394
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 3,
+        "status": "pass"
+      },
+      {
+        "design": "unequal_period_sizes",
+        "control_group": "never_treated",
+        "target": "calendar_3",
+        "truth": 1.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.01356895814155,
+        "bias": 0.013568958141549903,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.21648036537107476,
+        "mean_standard_error": 0.21961280484577975,
+        "standard_error_ratio": 1.0144698548957805,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.952,
+        "coverage_mcse": 0.006759881655768837,
+        "coverage_wilson_95": [
+          0.936933911349866,
+          0.963606698979192
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 3,
+        "status": "pass"
+      },
+      {
+        "design": "unequal_period_sizes",
+        "control_group": "never_treated",
+        "target": "calendar_4",
+        "truth": 1.6666666666666667,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.6664010599325407,
+        "bias": -0.00026560673412601155,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.2689863470015421,
+        "mean_standard_error": 0.267373737187388,
+        "standard_error_ratio": 0.9940048636961307,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.949,
+        "coverage_mcse": 0.006956938982052382,
+        "coverage_wilson_95": [
+          0.9335645136552383,
+          0.9609990572247332
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 3,
+        "status": "pass"
+      },
+      {
+        "design": "unequal_period_sizes",
+        "control_group": "never_treated",
+        "target": "esavg",
+        "truth": 1.4166666666666667,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.4216173173395878,
+        "bias": 0.004950650672921109,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.19848318696235903,
+        "mean_standard_error": 0.19627089108250123,
+        "standard_error_ratio": 0.9888539885230816,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.953,
+        "coverage_mcse": 0.00669260786241059,
+        "coverage_wilson_95": [
+          0.9380600619184716,
+          0.9644728948936154
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 3,
+        "status": "pass"
+      },
+      {
+        "design": "unequal_period_sizes",
+        "control_group": "not_yet_treated",
+        "target": "group_3_3",
+        "truth": 1.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.0158509190080316,
+        "bias": 0.015850919008031594,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.20807213235260946,
+        "mean_standard_error": 0.214105977492381,
+        "standard_error_ratio": 1.0289988143609077,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.956,
+        "coverage_mcse": 0.006485676526007139,
+        "coverage_wilson_95": [
+          0.9414482108495923,
+          0.9670617854115815
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 3,
+        "status": "pass"
+      },
+      {
+        "design": "unequal_period_sizes",
+        "control_group": "not_yet_treated",
+        "target": "group_3_4",
+        "truth": 1.5,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.50348328134131,
+        "bias": 0.0034832813413099295,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.28558455531026766,
+        "mean_standard_error": 0.2800321720903935,
+        "standard_error_ratio": 0.9805578308888522,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.951,
+        "coverage_mcse": 0.006826346021115546,
+        "coverage_wilson_95": [
+          0.9358092984933898,
+          0.9627389653526394
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 3,
+        "status": "pass"
+      },
+      {
+        "design": "unequal_period_sizes",
+        "control_group": "not_yet_treated",
+        "target": "group_4_4",
+        "truth": 2.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.9937483877511248,
+        "bias": -0.00625161224887516,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.4806676749643172,
+        "mean_standard_error": 0.46867710650400374,
+        "standard_error_ratio": 0.9750543481809888,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.936,
+        "coverage_mcse": 0.007739767438366605,
+        "coverage_wilson_95": [
+          0.9190992674988255,
+          0.9495637991017706
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 3,
+        "status": "pass"
+      },
+      {
+        "design": "unequal_period_sizes",
+        "control_group": "not_yet_treated",
+        "target": "event_0",
+        "truth": 1.3333333333333333,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.3413083426959083,
+        "bias": 0.007975009362575003,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.2167689500110248,
+        "mean_standard_error": 0.21897622214239507,
+        "standard_error_ratio": 1.010182602864746,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.945,
+        "coverage_mcse": 0.007209368904418752,
+        "coverage_wilson_95": [
+          0.9290916123226243,
+          0.9575025726252315
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 3,
+        "status": "pass"
+      },
+      {
+        "design": "unequal_period_sizes",
+        "control_group": "not_yet_treated",
+        "target": "event_1",
+        "truth": 1.5,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.50348328134131,
+        "bias": 0.0034832813413099295,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.28558455531026766,
+        "mean_standard_error": 0.2800321720903935,
+        "standard_error_ratio": 0.9805578308888522,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.951,
+        "coverage_mcse": 0.006826346021115546,
+        "coverage_wilson_95": [
+          0.9358092984933898,
+          0.9627389653526394
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 3,
+        "status": "pass"
+      },
+      {
+        "design": "unequal_period_sizes",
+        "control_group": "not_yet_treated",
+        "target": "calendar_3",
+        "truth": 1.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.0158509190080316,
+        "bias": 0.015850919008031594,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.20807213235260946,
+        "mean_standard_error": 0.214105977492381,
+        "standard_error_ratio": 1.0289988143609077,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.956,
+        "coverage_mcse": 0.006485676526007139,
+        "coverage_wilson_95": [
+          0.9414482108495923,
+          0.9670617854115815
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 3,
+        "status": "pass"
+      },
+      {
+        "design": "unequal_period_sizes",
+        "control_group": "not_yet_treated",
+        "target": "calendar_4",
+        "truth": 1.6666666666666667,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.6664010599325407,
+        "bias": -0.00026560673412601155,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.2689863470015421,
+        "mean_standard_error": 0.267373737187388,
+        "standard_error_ratio": 0.9940048636961307,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.949,
+        "coverage_mcse": 0.006956938982052382,
+        "coverage_wilson_95": [
+          0.9335645136552383,
+          0.9609990572247332
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 3,
+        "status": "pass"
+      },
+      {
+        "design": "unequal_period_sizes",
+        "control_group": "not_yet_treated",
+        "target": "esavg",
+        "truth": 1.4166666666666667,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.422395812018609,
+        "bias": 0.005729145351942355,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.20166817153510308,
+        "mean_standard_error": 0.20008308604235153,
+        "standard_error_ratio": 0.9921401305883529,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.958,
+        "coverage_mcse": 0.006343185319695463,
+        "coverage_wilson_95": [
+          0.9437155747733968,
+          0.9687791144538346
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 3,
+        "status": "pass"
+      }
+    ],
+    "status": "pass"
+  },
+  "real_data_application": {
+    "dataset": "hospdd",
+    "source_url": "https://www.stata-press.com/data/r19/hospdd.dta",
+    "source_sha256": "e3ae6451e89cb915c546ab772410046726f280ad7d117611376beb4f46a521bb",
+    "source_label": "artificial hospital procedure data",
+    "interpretation": "execution and clustered-inference smoke, not substantive evidence",
+    "rows": {
+      "repeated_cross_section_clustered": {
+        "estimate": 0.867369404129359,
+        "standard_error": 0.04233682935122793,
+        "nobs": 7368,
+        "n_clusters": 46
+      },
+      "panel_conventional": {
+        "estimate": 0.8615139751207261,
+        "standard_error": 0.0468766018680398,
+        "nobs": 46
+      },
+      "panel_efficient_pt_all": {
+        "estimate": 0.8467225069953497,
+        "standard_error": 0.029364931259183824,
+        "nobs": 46
+      }
+    },
+    "status": "pass"
+  },
+  "overall_status": "pass"
+}

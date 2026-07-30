@@ -5,9 +5,11 @@
 This document freezes the identification, data, API, inference, and validation decisions
 for repeated-cross-section DiD. The no-covariate stationary-composition first slice is now
 implemented as `RepeatedCrossSectionDiD`; it was exported only after the hand identities
-and refusal tests had been written and observed failing. Publication-scale coverage,
-estimator-level external parity, covariate adjustment, composition-change robustness, and
-simultaneous bands remain promotion gates rather than implicit features.
+and refusal tests had been written and observed failing. Publication-scale coverage and
+available estimator-level R/Stata parity now pass. Stata aggregate standard errors remain
+non-comparable because their estimated-share influence differs. Covariate adjustment,
+composition-change robustness, and simultaneous bands remain promotion gates rather than
+implicit features.
 
 Repeated cross sections are not an option on the balanced-panel classes. The observations,
 influence functions, nuisance tasks, and composition assumptions differ materially from a
@@ -149,9 +151,8 @@ Current first-slice status is:
 2. Staggered never-treated/not-yet-treated group-time identities, unequal period-size and
    row-permutation invariance, anticipation/placebo identities, HC1/CR1 reconstruction,
    strict refusals, and event/calendar/ESavg share-influence identities pass.
-3. A small deterministic 2-by-2 bias/coverage smoke passes. The preregistered favorable
-   and stressed-overlap publication-scale coverage and SE-calibration certificate remains
-   open.
+3. The preregistered 1,000-replication balanced/unequal-period publication-scale coverage
+   and SE-calibration certificate passes all 32 maintained cells.
 4. The hash-pinned public `hospdd` workflow exercises patient-level repeated samples with
    hospital PSUs. Its Stata source label says the data are artificial, so this is an
    execution smoke rather than substantive empirical evidence.
@@ -160,8 +161,9 @@ Current first-slice status is:
    environment-specific and are reproduced by `benchmarks/benchmark_did_rcs.py`.
 6. OutputHub, namespace, documentation, package build, lint, type, and security checks are
    release gates for each candidate. Estimator-level parity with pinned R
-   `did::att_gt(panel = FALSE)` and, where moments align, reviewed Stata `csdid` remains
-   open; unavailable cells must stay explicit.
+   `did::att_gt(panel = FALSE)` passes for both control rules after the explicit HC0-to-HC1
+   mapping. Reviewed Stata `csdid` matches group-time estimates/SEs and aggregate points;
+   aggregate SEs remain explicitly non-comparable. Unavailable cells must stay explicit.
 
 ## Alternatives considered
 

@@ -22,23 +22,33 @@ versions may refine APIs, but breaking changes must still be documented explicit
   tests, base-R 4.5.1 and reviewed Stata 17 hand parity, OutputHub tables,
   a hash-verified public hospital-data execution smoke, and a 100,000-row fixed-period
   performance harness.
+- A preregistered 1,000-replication-per-design coverage certificate for balanced and
+  unequal period sizes, never-treated and not-yet-treated controls, and every maintained
+  group-time, event-time, calendar-time, and ES-average target. All 32 cells pass bias,
+  analytical-SE calibration, coverage, Monte Carlo uncertainty, and zero-refusal gates.
+- Estimator-level parity against pinned R `did` 2.5.0 at commit
+  `c449b8ce72029855d2de94b377f131be0e53e53a`. All point estimates and analytical standard
+  errors agree after the recorded `sqrt(n/(n-1))` HC0-to-HC1 mapping. The reviewed
+  Stata/IC 17 `csdid` artifact exactly matches all 16 point estimates and six group-time
+  analytical standard errors; aggregate SEs are recorded as non-comparable because
+  `csdid` propagates period-specific cell-share rather than pooled cohort-share influence.
 
 ### Changed
 
 - The package version and public documentation now identify `0.7.0a6`. Balanced-panel
   `DifferenceInDifferences` and `EfficientDiD` remain separate and unchanged; there is no
   `panel=False` alias or synthesized entity identifier.
-- The repeated-cross-section design contract now records the implemented first-slice
-  evidence and the still-open promotion gates.
+- The repeated-cross-section design contract now records the implemented first-slice and
+  completed no-covariate promotion evidence.
 
 ### Known limitations
 
 - Stationary composition is declared but not testable from the estimator. Covariate-
   adjusted doubly robust scores, compositional-change-robust estimation, sampling or
   survey weights, and simultaneous event-study bands remain unimplemented and refuse.
-- The small deterministic coverage smoke and base-R/reviewed-Stata hand reconstructions are not the
-  publication-scale coverage or estimator-level `did::att_gt(panel = FALSE)`/Stata
-  `csdid` promotion certificate.
+- Stata `csdid` aggregate standard errors are non-comparable to the maintained pooled-
+  cohort-share uncertainty contract. Observation/PSU simultaneous bands remain separately
+  unimplemented.
 
 ## [0.7.0a5] - Unreleased
 

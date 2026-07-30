@@ -26,8 +26,13 @@ Rscript benchmarks/validate_did_rcs_reference.R
 
 The reviewed local R 4.5.1 run returned estimate `4`, HC1 standard error
 `1.5118578920369088`, the exact eight-element influence vector above, and
-`parity_status=pass`. This checks the frozen arithmetic across languages; it is not a
-substitute for the still-open estimator-level `did::att_gt(panel = FALSE)` comparison.
+`parity_status=pass`. The separate estimator-level comparator pins R `did` 2.5.0 commit
+`c449b8ce72029855d2de94b377f131be0e53e53a`, expands the deterministic cells only to clear
+that package's five-observation-per-group guard, and calls
+`att_gt(panel = FALSE, est_method = "reg")` for both control rules. Every group-time,
+event, calendar, and ES-average point estimate agrees. Multiplying the R analytical
+standard errors by `sqrt(54/53)` maps its convention exactly to CauseKit observation HC1;
+the saved artifact and live comparator tests pass.
 
 Stata must be run manually from the repository root:
 
@@ -39,6 +44,35 @@ The do-file writes `benchmarks/validate_did_rcs_stata_output.txt` before asserti
 reviewed Stata 17 artifact returned estimate `4`, HC1 standard error
 `1.5118578920369088`, and `parity_status=pass`; its SHA-256 is
 `67cd686b409379a7dbcc58b8172d1defa6a132bb716458dfd0b0217d47288d95`.
+
+The estimator-level Stata comparator is separate:
+
+```stata
+do "benchmarks/validate_did_rcs_csdid.do"
+```
+
+It requests repeated cross sections by omitting `ivar()`, uses `method(reg) long2`, runs
+both control rules, and writes `benchmarks/validate_did_rcs_csdid_output.txt` before its
+assertions. The reviewed Stata/IC 17 artifact matches all 16 point estimates and all six
+group-time analytical standard errors exactly. Aggregate SEs are explicitly non-comparable:
+`csdid` propagates period-specific cell-share influence, whereas CauseKit and R `did` use
+pooled cohort-share influence. The saved artifact SHA-256 is
+`ad250fa9cdfd042e1989460ebcec6b1bac57ed301fae390f2c69331ccf47fd57`.
+
+## Publication-scale inference certificate
+
+Run:
+
+```bash
+python benchmarks/validate_did_rcs_promotion.py --replications 1000 --workers 8
+```
+
+The deterministic 2026-07-30 certificate made 4,000 estimator fits and passed all 32
+group-time, event-time, calendar-time, and ES-average cells across balanced and sharply
+unequal period sizes and both control rules. Coverage was `0.928–0.958`, mean analytical
+SE divided by empirical SD was `0.938–1.029`, maximum absolute bias was `0.0159`, and no
+fit refused. Coverage Monte Carlo SE was at most `0.0082`. The run took 29.77 seconds on
+the recorded Python 3.14.6 / Windows 11 environment; timing is descriptive.
 
 ## Public-data and performance smoke
 
@@ -56,6 +90,5 @@ python benchmarks/benchmark_did_rcs.py --n-observations 100000 --periods 6 --mea
 
 On Python 3.14.6 / Windows 11, the 2026-07-30 run completed in `0.2551` seconds with
 `34.656` MiB Python-managed peak memory, six group-time effects, and four event-time
-effects. These figures are descriptive and environment-specific. Publication-scale
-coverage, estimator-level R/Stata parity, covariate adjustment, compositional-change
-robustness, survey weights, and simultaneous bands remain open.
+effects. These figures are descriptive and environment-specific. Covariate adjustment,
+compositional-change robustness, survey weights, and simultaneous bands remain open.

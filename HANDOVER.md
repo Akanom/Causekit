@@ -191,10 +191,15 @@ future task can resume without reconstructing intent from chat history.
     tests were observed failing before implementation; staggered, permutation,
     anticipation, covariance, aggregation, base-R 4.5.1 hand parity, small coverage,
     public-data, and 100,000-row smokes pass. The reviewed Stata 17 hand artifact also
-    passes the estimate and HC1 standard error at `1e-12`. Estimator-level
-    `did::att_gt(panel = FALSE)`/`csdid` parity and
-    publication-scale coverage remain open, as do covariates, compositional-change
-    robustness, survey weights, and simultaneous bands.
+    passes the estimate and HC1 standard error at `1e-12`. A 1,000-replication-per-
+    design promotion certificate now passes all 32 group/event/calendar/ESavg cells for
+    both control rules, and pinned R `did` 2.5.0 estimator-level parity passes after the
+    explicit HC0-to-HC1 finite-sample mapping. The reviewed Stata/IC 17 `csdid` artifact
+    exactly matches all 16 point estimates and all six group-time analytical standard
+    errors. Its aggregate standard errors remain explicitly non-comparable because Stata
+    propagates period-specific cell-share influence while CauseKit/R use pooled cohort
+    shares. Covariates, compositional-change robustness, survey weights, and simultaneous
+    bands remain open.
 
 ## Open promotion gates
 
@@ -209,7 +214,8 @@ future task can resume without reconstructing intent from chat history.
   consuming public cross-fitting factories; direct density-ratio regression remains a
   possible future stability enhancement over ratios of multiclass probabilities.
 - Repeated-cross-section DiD's no-covariate stationary-composition implementation is
-  public. Publication-scale coverage, estimator-level R/Stata parity, observation/PSU
+  public. Publication-scale coverage and available estimator-level R `did`/Stata `csdid`
+  parity pass, with Stata aggregate SEs recorded as non-comparable. Observation/PSU
   multiplier bands, compositional-change robustness, and the covariate-adjusted path with
   an aligned conditional pre-trend diagnostic remain open. Covariate-efficient external
   parity was audited: the pinned public R implementation has no covariate path and reviewed

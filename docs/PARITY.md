@@ -35,7 +35,7 @@ uses different estimands or moments. Neither counts as a pass.
 | `NearestNeighborMatch` fixed-score ATT/ATC/ATE | hand/reuse/variance identities pass | CRAN `Matching` 4.10-15 fixture and real Cattaneo point estimates pass | Stata/MP 17 fixture and Stata/IC 17 real Cattaneo point harness pass | pass |
 | `NearestNeighborMatch` estimated-Logit ATT/ATC/ATE | hand formulas and independent `statsmodels.Logit` pass | `Matching` conditions on supplied scores: non-comparable | Stata/IC 17 `teffects psmatch` fixture passes | pass for available estimand-aligned comparators |
 | Conventional staggered DiD | hand/influence identities pass | real hospital group-time/influence contract passes | Stata/IC 17 same group-time/influence contract passes; `didregress` common-effect aggregation is non-comparable | pass for aligned contract |
-| Repeated-cross-section DiD, stationary composition | four-cell, aggregation, HC1/CR1, and coverage-smoke contracts pass | base R 4.5.1 exact hand estimate/influence/HC1 reconstruction passes; `did::att_gt(panel = FALSE)` pending | reviewed Stata 17 hand estimate/HC1 reconstruction passes; estimator-level `csdid` pending | cross-language hand pass; estimator-level R/Stata pending |
+| Repeated-cross-section DiD, stationary composition | hand, aggregation, HC1/CR1, and 32-cell publication coverage contracts pass | pinned `did` 2.5.0 `att_gt(panel = FALSE, est_method = "reg")` passes both control rules after explicit HC0-to-HC1 mapping | reviewed Stata/IC 17 `csdid` matches group-time estimates/SEs and aggregate points; aggregate SEs use non-comparable cell-share influence | pass for available aligned fields |
 | Efficient DiD, no covariates | native result checked on fixture and real data | pinned public `edid` commit passes fixture and real hospital data | unavailable: Stata heterogeneous DiD does not implement PT-All optimal weighting | pass for available aligned comparator |
 | Efficient DiD, covariate adjusted | deterministic equation, refusal, and simulation evidence pass | unavailable: pinned public `edid` explicitly excludes covariates | unavailable: no identified Chen–Sant'Anna–Xie PT-All implementation | internal validation; external unavailable |
 | `PartiallyLinearDML` residual stage | hand score plus independent Statsmodels HC1 pass | base R 4.5.1 matrix/HC1 contract passes | reviewed Stata/IC 17 no-intercept HC1 contract passes | pass |
@@ -94,8 +94,19 @@ all eight observation influence values, and HC1 standard error at `1e-12`. The m
 `benchmarks/validate_did_rcs_stata.do` writes its result before asserting. Its reviewed
 Stata 17 output passes the estimate and HC1 standard error at `1e-12`; artifact SHA-256 is
 `67cd686b409379a7dbcc58b8172d1defa6a132bb716458dfd0b0217d47288d95`.
-These hand references validate the frozen arithmetic, not the still-pending estimator-
-level `did::att_gt(panel = FALSE)` and aligned `csdid` options.
+The estimator-level R harness is `benchmarks/validate_did_rcs_did_reference.R`. It pins
+`did` 2.5.0 commit `c449b8ce72029855d2de94b377f131be0e53e53a`, requests
+`att_gt(panel = FALSE, est_method = "reg")`, and exercises never-treated and not-yet-
+treated comparisons. CauseKit and R agree on all group-time, event, calendar, and ES-
+average point estimates. R's analytical standard errors agree after multiplication by
+`sqrt(54/53)`, the explicit mapping to CauseKit observation HC1. The saved reference is
+`benchmarks/validate_did_rcs_did_output.txt`. The estimator-level Stata harness is
+`benchmarks/validate_did_rcs_csdid.do`. Its reviewed Stata/IC 17 artifact exactly matches
+all 16 point estimates and all six group-time analytical standard errors; maximum aligned
+difference is zero. Aggregate SEs are non-comparable because `csdid` propagates period-
+specific cell-share influence while CauseKit/R use pooled cohort-share influence. The
+saved output SHA-256 is
+`ad250fa9cdfd042e1989460ebcec6b1bac57ed301fae390f2c69331ccf47fd57`.
 
 The fixed-score matching R harness is `benchmarks/validate_matching_reference.R`. It
 pins CRAN `Matching` commit `1208eaa7bfa888b1fc903481dddfb8c0dffa40d5`

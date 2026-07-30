@@ -97,10 +97,16 @@ never/not-yet aggregation, unequal period sizes, row permutation, anticipation, 
 placebos, HC1, and cluster-summed CR1. Missing or undersized cells, entity/panel roles,
 unsupported composition, covariates, sampling weights, simultaneous inference, and
 malformed PSUs refuse. Base R 4.5.1 reproduces the hand estimate, influence vector, and
-HC1 standard error. A small deterministic coverage smoke and 100,000-row benchmark are
-maintained. A reviewed Stata 17 artifact independently reproduces the hand estimate and
-HC1 standard error at `1e-12`. Publication-scale coverage and estimator-level R/Stata
-parity remain explicitly open.
+HC1 standard error. The publication certificate runs 1,000 replications in balanced and
+unequal-period designs for both control rules; all 32 group/event/calendar/ESavg cells
+pass with coverage `0.928–0.958`, SE ratios `0.938–1.029`, maximum absolute bias `0.0159`,
+and zero refusals. Pinned R `did` 2.5.0 estimator-level parity passes every aligned point
+and SE after the declared HC0-to-HC1 mapping. A reviewed Stata 17 artifact independently
+reproduces the hand estimate and HC1 standard error at `1e-12`; the separate estimator-
+level `csdid` artifact passes all group-time estimates/analytical SEs and aggregate points
+with zero maximum aligned difference. Aggregate SEs remain explicitly non-comparable due
+to period-specific versus pooled estimated-share influence. The 100,000-row benchmark
+remains maintained.
 
 The covariate path additionally requires exact shared-fold alignment across multiclass
 cohort probabilities, masked outcome-change tasks, and residual-product second-moment
