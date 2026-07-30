@@ -35,7 +35,7 @@ uses different estimands or moments. Neither counts as a pass.
 | `NearestNeighborMatch` fixed-score ATT/ATC/ATE | hand/reuse/variance identities pass | CRAN `Matching` 4.10-15 fixture and real Cattaneo point estimates pass | Stata/MP 17 fixture and Stata/IC 17 real Cattaneo point harness pass | pass |
 | `NearestNeighborMatch` estimated-Logit ATT/ATC/ATE | hand formulas and independent `statsmodels.Logit` pass | `Matching` conditions on supplied scores: non-comparable | Stata/IC 17 `teffects psmatch` fixture passes | pass for available estimand-aligned comparators |
 | Conventional staggered DiD | hand/influence identities pass | real hospital group-time/influence contract passes | Stata/IC 17 same group-time/influence contract passes; `didregress` common-effect aggregation is non-comparable | pass for aligned contract |
-| Repeated-cross-section DiD, stationary composition | four-cell, aggregation, HC1/CR1, and coverage-smoke contracts pass | base R 4.5.1 exact hand estimate/influence/HC1 reconstruction passes; `did::att_gt(panel = FALSE)` pending | manual hand reconstruction written but not yet reviewed; estimator-level `csdid` pending | internal/cross-language hand pass; estimator-level R/Stata pending |
+| Repeated-cross-section DiD, stationary composition | four-cell, aggregation, HC1/CR1, and coverage-smoke contracts pass | base R 4.5.1 exact hand estimate/influence/HC1 reconstruction passes; `did::att_gt(panel = FALSE)` pending | reviewed Stata 17 hand estimate/HC1 reconstruction passes; estimator-level `csdid` pending | cross-language hand pass; estimator-level R/Stata pending |
 | Efficient DiD, no covariates | native result checked on fixture and real data | pinned public `edid` commit passes fixture and real hospital data | unavailable: Stata heterogeneous DiD does not implement PT-All optimal weighting | pass for available aligned comparator |
 | Efficient DiD, covariate adjusted | deterministic equation, refusal, and simulation evidence pass | unavailable: pinned public `edid` explicitly excludes covariates | unavailable: no identified Chen–Sant'Anna–Xie PT-All implementation | internal validation; external unavailable |
 | `PartiallyLinearDML` residual stage | hand score plus independent Statsmodels HC1 pass | base R 4.5.1 matrix/HC1 contract passes | reviewed Stata/IC 17 no-intercept HC1 contract passes | pass |
@@ -91,10 +91,11 @@ evidence for the covariate-adjusted path or for Stata.
 The repeated-cross-section hand harness is
 `benchmarks/validate_did_rcs_reference.R`; base R 4.5.1 reproduces the 2-by-2 estimate,
 all eight observation influence values, and HC1 standard error at `1e-12`. The manual
-`benchmarks/validate_did_rcs_stata.do` writes its result before asserting, but no Stata
-pass is recorded until its saved output is reviewed. These hand references validate the
-frozen arithmetic, not the still-pending estimator-level `did::att_gt(panel = FALSE)` and
-aligned `csdid` options.
+`benchmarks/validate_did_rcs_stata.do` writes its result before asserting. Its reviewed
+Stata 17 output passes the estimate and HC1 standard error at `1e-12`; artifact SHA-256 is
+`67cd686b409379a7dbcc58b8172d1defa6a132bb716458dfd0b0217d47288d95`.
+These hand references validate the frozen arithmetic, not the still-pending estimator-
+level `did::att_gt(panel = FALSE)` and aligned `csdid` options.
 
 The fixed-score matching R harness is `benchmarks/validate_matching_reference.R`. It
 pins CRAN `Matching` commit `1208eaa7bfa888b1fc903481dddfb8c0dffa40d5`

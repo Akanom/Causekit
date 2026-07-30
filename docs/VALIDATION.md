@@ -98,8 +98,9 @@ placebos, HC1, and cluster-summed CR1. Missing or undersized cells, entity/panel
 unsupported composition, covariates, sampling weights, simultaneous inference, and
 malformed PSUs refuse. Base R 4.5.1 reproduces the hand estimate, influence vector, and
 HC1 standard error. A small deterministic coverage smoke and 100,000-row benchmark are
-maintained, while publication-scale coverage and estimator-level R/Stata parity remain
-explicitly open.
+maintained. A reviewed Stata 17 artifact independently reproduces the hand estimate and
+HC1 standard error at `1e-12`. Publication-scale coverage and estimator-level R/Stata
+parity remain explicitly open.
 
 The covariate path additionally requires exact shared-fold alignment across multiclass
 cohort probabilities, masked outcome-change tasks, and residual-product second-moment

@@ -1,0 +1,7 @@
+contract=repeated_cross_section_2x2_observation_hc1
+stata_version=17
+estimate=                    4
+standard_error_hc1=   1.5118578920369088
+estimate_status=pass
+standard_error_status=pass
+parity_status=pass

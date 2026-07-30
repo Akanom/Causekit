@@ -35,8 +35,10 @@ Stata must be run manually from the repository root:
 do "benchmarks/validate_did_rcs_stata.do"
 ```
 
-The do-file writes `benchmarks/validate_did_rcs_stata_output.txt` before asserting. No
-Stata pass is claimed until that saved artifact has been reviewed.
+The do-file writes `benchmarks/validate_did_rcs_stata_output.txt` before asserting. The
+reviewed Stata 17 artifact returned estimate `4`, HC1 standard error
+`1.5118578920369088`, and `parity_status=pass`; its SHA-256 is
+`67cd686b409379a7dbcc58b8172d1defa6a132bb716458dfd0b0217d47288d95`.
 
 ## Public-data and performance smoke
 

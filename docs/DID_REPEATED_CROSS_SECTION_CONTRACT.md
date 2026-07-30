@@ -144,8 +144,8 @@ The validation sequence started with tests that failed before estimator code exi
 Current first-slice status is:
 
 1. The hand-computed two-period 2-by-2 ATT, full observation influence, and HC1 identity
-   pass in Python and an independent base-R 4.5.1 reconstruction. A manual Stata 17
-   reconstruction is maintained but is not yet reviewed as passed.
+   pass in Python, an independent base-R 4.5.1 reconstruction, and a reviewed Stata 17
+   reconstruction.
 2. Staggered never-treated/not-yet-treated group-time identities, unequal period-size and
    row-permutation invariance, anticipation/placebo identities, HC1/CR1 reconstruction,
    strict refusals, and event/calendar/ESavg share-influence identities pass.

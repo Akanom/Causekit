@@ -190,8 +190,9 @@ future task can resume without reconstructing intent from chat history.
     independent-cell placebos, cell audits, and OutputHub are integrated. Hand/refusal
     tests were observed failing before implementation; staggered, permutation,
     anticipation, covariance, aggregation, base-R 4.5.1 hand parity, small coverage,
-    public-data, and 100,000-row smokes pass. The manual Stata hand script is written but
-    not yet reviewed. Estimator-level `did::att_gt(panel = FALSE)`/`csdid` parity and
+    public-data, and 100,000-row smokes pass. The reviewed Stata 17 hand artifact also
+    passes the estimate and HC1 standard error at `1e-12`. Estimator-level
+    `did::att_gt(panel = FALSE)`/`csdid` parity and
     publication-scale coverage remain open, as do covariates, compositional-change
     robustness, survey weights, and simultaneous bands.
 

@@ -727,9 +727,9 @@ promotion includes cross-fitted covariate nuisances, simultaneous event-study ba
 uncontaminated pre-trend placebos, and a PT-All/PT-Post Hausman diagnostic. The separate
 [repeated-cross-section contract](docs/DID_REPEATED_CROSS_SECTION_CONTRACT.md) now has an
 implemented no-covariate stationary-composition first slice with observation/PSU scores,
-cell audits, pre-trend placebos, OutputHub, base-R hand parity, a public-data workflow, and
-a 100,000-row smoke. Publication-scale coverage and estimator-level R/Stata parity remain
-open promotion gates.
+cell audits, pre-trend placebos, OutputHub, base-R and reviewed-Stata hand parity, a
+public-data workflow, and a 100,000-row smoke. Publication-scale coverage and estimator-
+level R/Stata parity remain open promotion gates.
 The causal-ML alpha includes native partially linear DML and separately contracted public
 [honest R-learner](docs/R_LEARNER_CONTRACT.md) and
 [honest DR-learner](docs/DR_LEARNER_CONTRACT.md) paths, with immutable

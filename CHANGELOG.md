@@ -19,7 +19,7 @@ versions may refine APIs, but breaking changes must still be documented explicit
   ridge or pseudoinverse repair.
 - Hand-computed 2-by-2 estimate/influence/HC1 tests observed failing before the public
   estimator existed, staggered aggregation and anticipation identities, strict refusal
-  tests, base-R 4.5.1 hand parity, a manual Stata 17 hand-parity script, OutputHub tables,
+  tests, base-R 4.5.1 and reviewed Stata 17 hand parity, OutputHub tables,
   a hash-verified public hospital-data execution smoke, and a 100,000-row fixed-period
   performance harness.
 
@@ -36,9 +36,9 @@ versions may refine APIs, but breaking changes must still be documented explicit
 - Stationary composition is declared but not testable from the estimator. Covariate-
   adjusted doubly robust scores, compositional-change-robust estimation, sampling or
   survey weights, and simultaneous event-study bands remain unimplemented and refuse.
-- The small deterministic coverage smoke and base-R hand reconstruction are not the
+- The small deterministic coverage smoke and base-R/reviewed-Stata hand reconstructions are not the
   publication-scale coverage or estimator-level `did::att_gt(panel = FALSE)`/Stata
-  `csdid` promotion certificate. The Stata hand script requires manual execution.
+  `csdid` promotion certificate.
 
 ## [0.7.0a5] - Unreleased
 
