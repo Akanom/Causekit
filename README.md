@@ -955,9 +955,16 @@ drop-in interchangeability across estimators.
 
 The packages remain separated by estimand:
 
-- `causekit` owns identification-aware causal and cross-sectional IV workflows;
+- `causekit` owns identification-aware causal workflows, including cross-sectional
+  `IV2SLS` and the explicitly contracted fixed-effects `PanelIV2SLS`;
 - `limiteddepkit` owns limited-outcome and observation-rule models; and
-- `systemgmmkit` owns panel-data and dynamic-panel GMM workflows.
+- `systemgmmkit` owns its general static/dynamic panel suite, including the established
+  `PanelIVSpec`/`run_panel_2sls` orchestration API and dynamic-panel GMM.
+
+This is an API ownership boundary, not two names for one implementation. CauseKit does
+not import, wrap, or re-export SystemGMMKit's Panel IV API, and it does not expose
+`PanelIVSpec` or `run_panel_2sls`. SystemGMMKit does not own CauseKit's causal
+identification, refusal, diagnostic, or promotion contract.
 
 Applicable validation, indexing, covariance, diagnostics, and reporting conventions are
 reused conceptually without importing private source or coupling the packages at runtime.

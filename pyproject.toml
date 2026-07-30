@@ -56,6 +56,9 @@ validation = [
 ]
 test = [
   "linearmodels>=5,<8",
+  "mypy>=1.10,<2",
+  # NumPy 2.5 stubs use Python 3.12 syntax; mypy targets CauseKit's Python 3.10 floor.
+  "numpy<2.5",
   "pytest>=8,<10",
   "rdrobust==2.0.0",
   "ruff>=0.6,<1",

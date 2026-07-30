@@ -80,6 +80,8 @@ def test_initial_stable_namespace_exports_iv_and_postestimation_contract() -> No
     assert "TreatmentEffect" not in causekit.__all__
     assert not hasattr(causekit, "TreatmentEffect")
     assert not hasattr(causekit, "NativeOrthogonalStackedCATE")
+    assert not hasattr(causekit, "PanelIVSpec")
+    assert not hasattr(causekit, "run_panel_2sls")
 
 
 def test_causekit_has_no_sibling_runtime_dependency_or_import() -> None:

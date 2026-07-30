@@ -341,9 +341,12 @@ future task can resume without reconstructing intent from chat history.
     `1ac883346889ff0d9c651864b8fdf17570cb663d392fc56e883d832961f70704`.
     A sibling ownership audit found no active CauseKit estimator under
     `limiteddepkit/src`; its stale `_out_of_scope/treatment_effect.py` snapshot and test
-    were deleted and LimitedDepKit's ownership documentation was updated. SystemGMMKit's
-    broader panel-IV implementation remains owned by its panel suite, while this
-    implementation has no sibling runtime dependency.
+    were deleted and LimitedDepKit's ownership documentation was updated. Panel IV
+    ownership is separated by public contract: CauseKit owns `PanelIV2SLS` and its causal
+    identification/refusal/diagnostic boundary; SystemGMMKit owns the established
+    `PanelIVSpec`/`run_panel_2sls` orchestration API within its broader panel suite.
+    CauseKit neither imports nor mirrors those sibling symbols, enforced by API-surface
+    tests, and has no sibling runtime dependency.
 
 ## Open promotion gates
 

@@ -171,9 +171,13 @@ The three packages are separated by their main estimand and data structure:
   choice, or another limited observation rule; and
 - `systemgmmkit` owns the broader static/dynamic panel-model suite and GMM workflows.
 
-The Panel IV overlap is purpose-specific rather than a copied general panel API: CauseKit
-owns the instrument-identification and causal-interpretation boundary, while SystemGMMKit
-retains broader panel-model orchestration. Shared conventions are intentional: labelled pandas results, explicit covariance metadata,
+The Panel IV overlap is purpose-specific rather than a copied general panel API. CauseKit
+owns `PanelIV2SLS` and its instrument-identification, causal-interpretation, refusal,
+diagnostic, and promotion contract. SystemGMMKit owns its established
+`PanelIVSpec`/`run_panel_2sls` API as part of broader panel-model orchestration. CauseKit
+must not import, wrap, re-export, or mirror that sibling API; SystemGMMKit's compatibility
+surface does not govern CauseKit's estimator. Shared conventions are intentional:
+labelled pandas results, explicit covariance metadata,
 strict alignment, diagnostic objects, post-estimation tables, and optional OutputHub
 adaptation. Where future work overlaps panel validation, entity/time indexing, fixed
 effects, clustered covariance, post-estimation, plotting, or reporting, the design should
@@ -185,10 +189,11 @@ The July 2026 ownership audit found no active treatment-effect, matching, DiD, R
 estimator in LimitedDepKit's installed `src/limiteddepkit` surface. Its stale
 `_out_of_scope/treatment_effect.py` snapshot and test were deleted after migration; the
 remaining CauseKit mentions are ecosystem documentation, not executable duplicates.
-SystemGMMKit's existing Panel IV remains
-there because it is an integrated member of that package's general static/dynamic panel
-suite; CauseKit does not import, wrap, or re-export it. Deleting that implementation would
-break a sibling package without strengthening CauseKit's independent causal contract.
+SystemGMMKit's existing Panel IV remains there because it is an integrated member of that
+package's general static/dynamic panel suite. Its public symbol names are deliberately
+absent from CauseKit, and CauseKit's API-surface tests enforce that boundary. Deleting the
+released sibling implementation would break compatibility without strengthening
+CauseKit's independently validated causal contract.
 
 Binary logit/probit, count, censoring/truncation, duration, ordinal, and related
 limited-outcome likelihoods do not move into `causekit` merely to obtain nuisance
