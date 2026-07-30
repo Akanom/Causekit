@@ -100,9 +100,10 @@ covariate must be numeric, finite, and constant within entity. `EfficientDiD` su
 targets and group masks to the orchestrator; it never instantiates a regression or
 classifier itself.
 
-The first nuisance stage cross-fits one multiclass cohort model and group-specific
-conditional outcome-change regressions. For candidate `(g', t_pre)`, equation (4.4) is
-implemented as
+The first nuisance stage cross-fits either one multiclass cohort model or the exact
+ordered cohort-odds pairs needed by the candidate graph, plus group-specific conditional
+outcome-change regressions. Exactly one weighting route is required. For candidate
+`(g', t_pre)`, equation (4.4) is implemented as
 
 ```text
 Gg/pi_g * (Yt-Y1 - m_inf,t,tpre(X) - m_g',tpre,1(X))
@@ -110,14 +111,14 @@ Gg/pi_g * (Yt-Y1 - m_inf,t,tpre(X) - m_g',tpre,1(X))
 - [p_g(X)/p_g'(X)] * Gg'/pi_g * (Ytpre-Y1 - m_g',tpre,1(X)).
 ```
 
-The density ratios are formed from aligned out-of-fold multiclass probabilities. This is
-a supported implementation route in the paper, although direct ratio regression may be
-more stable near weak overlap. Every probability used in a ratio must exceed
-`nuisance_probability_floor`; the implementation refuses instead of clipping.
-The alternative is frozen, but not implemented, in the
-[direct cohort-ratio nuisance contract](DID_DIRECT_RATIO_CONTRACT.md). It requires
-calibrated pairwise cohort odds and an algebraically equivalent conditional-covariance
-refactor; scale-free density ratios cannot be substituted directly into the PT-All score.
+The ratios may be formed from aligned out-of-fold multiclass probabilities or supplied by
+`CohortOddsRatioResultProtocol.predict_odds_ratio(X)`. The direct result must be the
+calibrated posterior odds `P(G=g|X)/P(G=h|X)` in the declared orientation. A scale-free
+group-conditional density ratio is not interchangeable because the PT-All score is not
+Hájek-normalized. The multiclass route enforces `nuisance_probability_floor`; the direct
+route enforces the public ratio floor/ceiling, denominator importance effective-size and
+maximum-share, and pair PSU-support thresholds. Neither route clips or falls back. See
+the [direct cohort-ratio nuisance contract](DID_DIRECT_RATIO_CONTRACT.md).
 
 For equation (3.12), conditional covariances are estimated as cross-fitted regressions of
 products of out-of-fold outcome-change residuals. A dedicated
@@ -126,7 +127,10 @@ is reused. For every entity and group-time cell, the resulting symmetric conditi
 covariance matrix must be finite and positive definite under `singularity_tolerance`.
 No ridge, diagonal clipping, eigenvalue repair, or pseudoinverse is applied.
 
-The observation-specific weights are
+For direct odds, CauseKit constructs `Omega_tilde_i = p_g(X) Omega_i` from treated
+conditional variance plus `rho_g:never`- and `rho_g:g'`-weighted comparison covariances.
+The common positive factor cancels in the normalized solve, so no fabricated multiclass
+probability matrix is needed. The observation-specific weights are
 
 ```text
 w_i = solve(Omega_i, 1) / (1' solve(Omega_i, 1)).
@@ -134,7 +138,9 @@ w_i = solve(Omega_i, 1) / (1' solve(Omega_i, 1)).
 
 `conditional_efficiency_weights` exposes every `w_i`; `efficiency_weights` reports its
 sample mean, minimum, maximum, and standard deviation by candidate. The result also
-exposes the shared nuisance fold and cohort-probability matrix. The semiparametric
+exposes the immutable shared nuisance fold, `nuisance_weighting`, and either the cohort-
+probability matrix or the ordered cohort-ratio matrix plus pair and candidate-use audits.
+The unused matrix is empty rather than fabricated. The semiparametric
 efficiency label is justified only when PT-All and the second-moment, proper-weighting,
 overlap, nuisance consistency, and product-rate conditions in the paper's Assumption C.1
 hold. Cross-fitting prevents own-observation training leakage; it does not prove those

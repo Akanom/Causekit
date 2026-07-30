@@ -88,7 +88,11 @@ class DiDResult:
     candidate_influence_functions: pd.DataFrame
     simultaneous_event_study: pd.DataFrame
     nuisance_fold: pd.Series
+    nuisance_weighting: str
     cohort_probabilities: pd.DataFrame
+    cohort_ratios: pd.DataFrame
+    cohort_ratio_diagnostics: pd.DataFrame
+    cohort_ratio_candidate_uses: pd.DataFrame
     cohort_sizes: pd.Series
     n_entities: int
     n_periods: int
@@ -927,7 +931,11 @@ def _assemble_result(
     bootstrap_random_state: int | None,
     simultaneous_level: float,
     nuisance_fold: pd.Series,
+    nuisance_weighting: str,
     cohort_probabilities: pd.DataFrame,
+    cohort_ratios: pd.DataFrame,
+    cohort_ratio_diagnostics: pd.DataFrame,
+    cohort_ratio_candidate_uses: pd.DataFrame,
     covariates: tuple[str, ...],
     cross_fitted: bool,
     pretrend_control_group: ControlGroup | None,
@@ -1065,7 +1073,11 @@ def _assemble_result(
         candidate_influence_functions=candidate_influence,
         simultaneous_event_study=simultaneous_event_study,
         nuisance_fold=nuisance_fold,
+        nuisance_weighting=nuisance_weighting,
         cohort_probabilities=cohort_probabilities,
+        cohort_ratios=cohort_ratios,
+        cohort_ratio_diagnostics=cohort_ratio_diagnostics,
+        cohort_ratio_candidate_uses=cohort_ratio_candidate_uses,
         cohort_sizes=cohort_sizes,
         n_entities=len(panel.entities),
         n_periods=len(panel.times),
@@ -1259,7 +1271,11 @@ class DifferenceInDifferences:
             bootstrap_random_state=self.random_state,
             simultaneous_level=self.simultaneous_level,
             nuisance_fold=pd.Series(dtype="int64", name="fold"),
+            nuisance_weighting="none",
             cohort_probabilities=pd.DataFrame(index=panel.entities.copy()),
+            cohort_ratios=pd.DataFrame(index=panel.entities.copy()),
+            cohort_ratio_diagnostics=pd.DataFrame(),
+            cohort_ratio_candidate_uses=pd.DataFrame(),
             covariates=(),
             cross_fitted=False,
             pretrend_control_group=self.control_group,
@@ -1453,9 +1469,22 @@ def _fit_covariate_efficient(
     simultaneous_level: float,
     singularity_tolerance: float,
     nuisance_probability_floor: float,
+    nuisance_ratio_floor: float,
+    nuisance_ratio_ceiling: float,
+    nuisance_ratio_min_effective_n: float,
+    nuisance_ratio_max_share: float,
+    nuisance_ratio_min_psus: int,
 ) -> DiDResult:
     if cross_fitter.outcome_factory is None:
         raise ValueError("cross_fitter must provide an outcome_factory for DiD nuisances.")
+    weighting_routes = int(cross_fitter.propensity_factory is not None) + int(
+        cross_fitter.cohort_ratio_factory is not None
+    )
+    if weighting_routes != 1:
+        raise ValueError(
+            "Covariate-adjusted EfficientDiD requires exactly one cohort-weighting route: "
+            "propensity_factory or cohort_ratio_factory."
+        )
     X, covariate_names = _prepare_covariates(
         data,
         panel,
@@ -1468,13 +1497,6 @@ def _fit_covariate_efficient(
         index=panel.entities.copy(),
         name="treatment_cohort",
     )
-    class_result = cross_fitter.fit_predict_class_probabilities(X, classes=strata)
-    probabilities = class_result.probabilities
-    if float(probabilities.to_numpy().min()) <= nuisance_probability_floor:
-        raise ValueError(
-            "Cross-fitted cohort probabilities violate nuisance_probability_floor; "
-            "no clipping was applied."
-        )
 
     cell_definitions: list[tuple[float, int, int, list[_CandidateSpec]]] = []
     changes: dict[_Change, None] = {}
@@ -1507,6 +1529,162 @@ def _fit_covariate_efficient(
                 changes[spec.never_change] = None
                 changes[spec.auxiliary_change] = None
 
+    probability: dict[float, np.ndarray] = {}
+    probabilities = pd.DataFrame(index=panel.entities.copy())
+    ratio_frame = pd.DataFrame(index=panel.entities.copy())
+    ratio_diagnostics = pd.DataFrame()
+    ratio_use_rows: list[dict[str, Any]] = []
+    if cross_fitter.propensity_factory is not None:
+        class_result = cross_fitter.fit_predict_class_probabilities(
+            X,
+            classes=strata,
+            clusters=panel.clusters,
+        )
+        probabilities = class_result.probabilities
+        if float(probabilities.to_numpy().min()) <= nuisance_probability_floor:
+            raise ValueError(
+                "Cross-fitted cohort probabilities violate nuisance_probability_floor; "
+                "no clipping was applied."
+            )
+        nuisance_fold = class_result.fold
+        nuisance_weighting = "multiclass_probabilities"
+        probability = {
+            float(label): probabilities[label].to_numpy(dtype=float)
+            for label in probabilities.columns
+        }
+    else:
+        pair_use_count: dict[tuple[float, float], int] = {}
+        ordered_pairs: list[tuple[float, float]] = []
+        identity_pairs: list[tuple[float, float]] = []
+        for cohort, _, target_position, specs in cell_definitions:
+            public_time = float(panel.times[target_position])
+            for spec in specs:
+                for role, pair in (
+                    ("never", (cohort, float(never_treated))),
+                    ("auxiliary", (cohort, spec.auxiliary_cohort)),
+                ):
+                    pair_use_count[pair] = pair_use_count.get(pair, 0) + 1
+                    if pair[0] == pair[1]:
+                        if pair not in identity_pairs:
+                            identity_pairs.append(pair)
+                    elif pair not in ordered_pairs:
+                        ordered_pairs.append(pair)
+                    ratio_use_rows.append(
+                        {
+                            "cohort": cohort,
+                            "time": public_time,
+                            "auxiliary_cohort": spec.auxiliary_cohort,
+                            "bridge_period": float(panel.times[spec.bridge_position]),
+                            "role": role,
+                            "numerator": pair[0],
+                            "denominator": pair[1],
+                            "source": "identity" if pair[0] == pair[1] else "fitted",
+                        }
+                    )
+        ratio_result = cross_fitter.fit_predict_cohort_odds_ratios(
+            X,
+            cohorts=strata,
+            pairs=ordered_pairs,
+            clusters=panel.clusters,
+        )
+        ratio_frame = ratio_result.ratios.copy()
+        for pair in identity_pairs:
+            ratio_frame[pair] = 1.0
+        ratio_frame = ratio_frame.loc[
+            :,
+            pd.MultiIndex.from_tuples(
+                ordered_pairs + identity_pairs,
+                names=["numerator", "denominator"],
+            ),
+        ]
+        ratio_diagnostics = ratio_result.pair_diagnostics.copy()
+        ratio_diagnostics["source"] = "fitted"
+        ratio_diagnostics["candidate_use_count"] = [
+            pair_use_count[(float(row.numerator), float(row.denominator))]
+            for row in ratio_diagnostics.itertuples(index=False)
+        ]
+        identity_rows: list[dict[str, Any]] = []
+        for numerator, denominator in identity_pairs:
+            cohort_mask = panel.original_cohorts == numerator
+            psus = (
+                int(cohort_mask.sum())
+                if panel.clusters is None
+                else len(pd.unique(panel.clusters[cohort_mask]))
+            )
+            identity_rows.append(
+                {
+                    "numerator": numerator,
+                    "denominator": denominator,
+                    "fold": -1,
+                    "ratio_min": 1.0,
+                    "ratio_median": 1.0,
+                    "ratio_p90": 1.0,
+                    "ratio_p95": 1.0,
+                    "ratio_p99": 1.0,
+                    "ratio_max": 1.0,
+                    "log_ratio_min": 0.0,
+                    "log_ratio_p01": 0.0,
+                    "log_ratio_p05": 0.0,
+                    "log_ratio_median": 0.0,
+                    "log_ratio_p95": 0.0,
+                    "log_ratio_p99": 0.0,
+                    "log_ratio_max": 0.0,
+                    "train_numerator_nobs": int(cohort_mask.sum()),
+                    "train_denominator_nobs": int(cohort_mask.sum()),
+                    "train_numerator_psus": psus,
+                    "train_denominator_psus": psus,
+                    "holdout_numerator_nobs": int(cohort_mask.sum()),
+                    "holdout_denominator_nobs": int(cohort_mask.sum()),
+                    "holdout_numerator_psus": psus,
+                    "holdout_denominator_psus": psus,
+                    "denominator_importance_effective_n": float(cohort_mask.sum()),
+                    "denominator_importance_max_share": float(1.0 / cohort_mask.sum()),
+                    "train_index_hash": "identity",
+                    "holdout_index_hash": "identity",
+                    "source": "identity",
+                    "candidate_use_count": pair_use_count[(numerator, denominator)],
+                }
+            )
+        if identity_rows:
+            ratio_diagnostics = pd.concat(
+                [ratio_diagnostics, pd.DataFrame(identity_rows)],
+                ignore_index=True,
+                sort=False,
+            )
+        fitted_diagnostics = ratio_diagnostics.loc[ratio_diagnostics["source"].eq("fitted")]
+        if float(fitted_diagnostics["ratio_min"].min()) < nuisance_ratio_floor:
+            raise ValueError(
+                "Cross-fitted cohort odds violate nuisance_ratio_floor; no clipping was applied."
+            )
+        if float(fitted_diagnostics["ratio_max"].max()) > nuisance_ratio_ceiling:
+            raise ValueError(
+                "Cross-fitted cohort odds violate nuisance_ratio_ceiling; no clipping was applied."
+            )
+        if (
+            fitted_diagnostics["denominator_importance_effective_n"]
+            < nuisance_ratio_min_effective_n
+        ).any():
+            raise ValueError(
+                "Direct cohort-odds denominator importance violates nuisance_ratio_min_effective_n."
+            )
+        if (
+            fitted_diagnostics["denominator_importance_max_share"] > nuisance_ratio_max_share
+        ).any():
+            raise ValueError(
+                "Direct cohort-odds denominator importance violates nuisance_ratio_max_share."
+            )
+        if (
+            (
+                fitted_diagnostics[["train_numerator_psus", "train_denominator_psus"]]
+                < nuisance_ratio_min_psus
+            )
+            .any()
+            .any()
+        ):
+            raise ValueError("Direct cohort-odds pair support violates nuisance_ratio_min_psus.")
+        nuisance_fold = ratio_result.fold
+        nuisance_weighting = "direct_cohort_odds"
+
     nonzero_changes = [change for change in changes if not change.is_zero]
     mean_task_names = {
         change: f"conditional_mean_{position}" for position, change in enumerate(nonzero_changes)
@@ -1525,8 +1703,14 @@ def _fit_covariate_efficient(
         )
         for change in nonzero_changes
     ]
-    mean_result = cross_fitter.fit_predict_tasks(X, tasks=mean_tasks, strata=strata)
-    if not class_result.fold.equals(mean_result.fold):
+    mean_result = cross_fitter.fit_predict_tasks(
+        X,
+        tasks=mean_tasks,
+        strata=strata,
+        clusters=panel.clusters,
+        folds=nuisance_fold,
+    )
+    if not nuisance_fold.equals(mean_result.fold):
         raise RuntimeError("CrossFitter returned inconsistent folds across DiD nuisance tasks.")
 
     def conditional_mean(change: _Change) -> np.ndarray:
@@ -1580,8 +1764,14 @@ def _fit_covariate_efficient(
             )
             for pair in nonzero_pairs
         ]
-        covariance_result = cross_fitter.fit_predict_tasks(X, tasks=covariance_tasks, strata=strata)
-        if not class_result.fold.equals(covariance_result.fold):
+        covariance_result = cross_fitter.fit_predict_tasks(
+            X,
+            tasks=covariance_tasks,
+            strata=strata,
+            clusters=panel.clusters,
+            folds=nuisance_fold,
+        )
+        if not nuisance_fold.equals(covariance_result.fold):
             raise RuntimeError("CrossFitter returned inconsistent conditional-covariance folds.")
         covariance_predictions = covariance_result.predictions
 
@@ -1599,9 +1789,19 @@ def _fit_covariate_efficient(
     candidate_arrays: list[np.ndarray] = []
     candidate_keys: list[tuple[float, float, float, float]] = []
     conditional_weight_arrays: list[np.ndarray] = []
-    probability = {
-        float(label): probabilities[label].to_numpy(dtype=float) for label in probabilities.columns
-    }
+
+    def odds_ratio(numerator: float, denominator: float) -> np.ndarray:
+        if numerator == denominator:
+            return np.ones(n)
+        if nuisance_weighting == "multiclass_probabilities":
+            return probability[numerator] / probability[denominator]
+        try:
+            return ratio_frame[(numerator, denominator)].to_numpy(dtype=float)
+        except KeyError as error:
+            raise RuntimeError(
+                "A required ordered direct cohort-odds nuisance is missing."
+            ) from error
+
     for cohort, baseline_position, target_position, specs in cell_definitions:
         treated_mask = panel.original_cohorts == cohort
         n_treated = int(treated_mask.sum())
@@ -1615,17 +1815,17 @@ def _fit_covariate_efficient(
             auxiliary_change_values = _change_values(panel, spec.auxiliary_change)
             mean_never = conditional_mean(spec.never_change)
             mean_auxiliary = conditional_mean(spec.auxiliary_change)
+            rho_never = odds_ratio(cohort, float(never_treated))
+            rho_auxiliary = odds_ratio(cohort, spec.auxiliary_cohort)
             score = (
                 treated_mask.astype(float)
                 / pi_treated
                 * (treated_change_values - mean_never - mean_auxiliary)
-                - probability[cohort]
-                / probability[float(never_treated)]
+                - rho_never
                 * panel.never_mask.astype(float)
                 / pi_treated
                 * (never_change_values - mean_never)
-                - probability[cohort]
-                / probability[spec.auxiliary_cohort]
+                - rho_auxiliary
                 * auxiliary_mask.astype(float)
                 / pi_treated
                 * (auxiliary_change_values - mean_auxiliary)
@@ -1643,29 +1843,42 @@ def _fit_covariate_efficient(
             treated_variance = conditional_covariance(treated_change, treated_change)
             for left_position, left in enumerate(specs):
                 for right_position, right in enumerate(specs):
-                    value = treated_variance / probability[cohort]
-                    value = (
-                        value
-                        + conditional_covariance(left.never_change, right.never_change)
-                        / probability[float(never_treated)]
-                    )
-                    if left.auxiliary_cohort == cohort:
+                    if nuisance_weighting == "multiclass_probabilities":
+                        value = treated_variance / probability[cohort]
                         value = (
                             value
-                            - conditional_covariance(treated_change, left.auxiliary_change)
-                            / probability[cohort]
+                            + conditional_covariance(left.never_change, right.never_change)
+                            / probability[float(never_treated)]
+                        )
+                    else:
+                        # Omega_tilde = p_g(X) * Omega. The common positive factor
+                        # cancels from the normalized inverse-covariance solve.
+                        value = treated_variance + odds_ratio(
+                            cohort, float(never_treated)
+                        ) * conditional_covariance(left.never_change, right.never_change)
+                    if left.auxiliary_cohort == cohort:
+                        cross_value = conditional_covariance(treated_change, left.auxiliary_change)
+                        value = (
+                            value - cross_value / probability[cohort]
+                            if nuisance_weighting == "multiclass_probabilities"
+                            else value - cross_value
                         )
                     if right.auxiliary_cohort == cohort:
+                        cross_value = conditional_covariance(treated_change, right.auxiliary_change)
                         value = (
-                            value
-                            - conditional_covariance(treated_change, right.auxiliary_change)
-                            / probability[cohort]
+                            value - cross_value / probability[cohort]
+                            if nuisance_weighting == "multiclass_probabilities"
+                            else value - cross_value
                         )
                     if left.auxiliary_cohort == right.auxiliary_cohort:
+                        covariance_value = conditional_covariance(
+                            left.auxiliary_change, right.auxiliary_change
+                        )
                         value = (
-                            value
-                            + conditional_covariance(left.auxiliary_change, right.auxiliary_change)
-                            / probability[left.auxiliary_cohort]
+                            value + covariance_value / probability[left.auxiliary_cohort]
+                            if nuisance_weighting == "multiclass_probabilities"
+                            else value
+                            + odds_ratio(cohort, left.auxiliary_cohort) * covariance_value
                         )
                     omega[:, left_position, right_position] = value
             omega = 0.5 * (omega + np.swapaxes(omega, 1, 2))
@@ -1775,8 +1988,12 @@ def _fit_covariate_efficient(
         bootstrap_iterations=bootstrap_iterations,
         bootstrap_random_state=bootstrap_random_state,
         simultaneous_level=simultaneous_level,
-        nuisance_fold=class_result.fold,
+        nuisance_fold=nuisance_fold,
+        nuisance_weighting=nuisance_weighting,
         cohort_probabilities=probabilities,
+        cohort_ratios=ratio_frame,
+        cohort_ratio_diagnostics=ratio_diagnostics,
+        cohort_ratio_candidate_uses=pd.DataFrame(ratio_use_rows),
         covariates=covariate_names,
         cross_fitted=True,
         pretrend_control_group=None,
@@ -1786,8 +2003,12 @@ def _fit_covariate_efficient(
             "different restriction."
         ),
         notes=(
-            "All reported outcome, cohort-probability, and conditional-covariance nuisance predictions are out of fold.",
-            "Cohort density ratios are formed from cross-fitted multiclass probabilities and are refused below the declared floor rather than clipped.",
+            "All reported outcome, cohort-weighting, and conditional-covariance nuisance predictions are out of fold.",
+            (
+                "Cohort odds are formed from cross-fitted multiclass probabilities and are refused below the declared probability floor rather than clipped."
+                if nuisance_weighting == "multiclass_probabilities"
+                else "Cohort odds are fitted directly as calibrated ordered posterior odds; support failures refuse without clipping, trimming, rescaling, or multiclass fallback."
+            ),
             "The conditional covariance follows Chen-Sant'Anna-Xie equation (3.12), estimated by cross-fitted residual-product regressions.",
             "Semiparametric efficiency requires PT-All and the nuisance consistency, overlap, weighting, and product-rate conditions in the paper's Assumption C.1.",
             "Higher-level clustered covariance does not claim the independent-entity semiparametric efficiency bound.",
@@ -1815,6 +2036,11 @@ class EfficientDiD:
         simultaneous_level: float = 0.95,
         singularity_tolerance: float = 1e-12,
         nuisance_probability_floor: float = 1e-6,
+        nuisance_ratio_floor: float = 1e-6,
+        nuisance_ratio_ceiling: float = 1e6,
+        nuisance_ratio_min_effective_n: float = 2.0,
+        nuisance_ratio_max_share: float = 0.8,
+        nuisance_ratio_min_psus: int = 2,
     ) -> None:
         if pre_periods != "all" and (
             isinstance(pre_periods, bool)
@@ -1831,6 +2057,25 @@ class EfficientDiD:
             raise ValueError(
                 "nuisance_probability_floor must be finite and strictly between zero and 0.5."
             )
+        if not np.isfinite(nuisance_ratio_floor) or nuisance_ratio_floor <= 0.0:
+            raise ValueError("nuisance_ratio_floor must be finite and strictly positive.")
+        if (
+            not np.isfinite(nuisance_ratio_ceiling)
+            or nuisance_ratio_ceiling <= nuisance_ratio_floor
+        ):
+            raise ValueError(
+                "nuisance_ratio_ceiling must be finite and exceed nuisance_ratio_floor."
+            )
+        if not np.isfinite(nuisance_ratio_min_effective_n) or nuisance_ratio_min_effective_n < 1.0:
+            raise ValueError("nuisance_ratio_min_effective_n must be finite and at least one.")
+        if not np.isfinite(nuisance_ratio_max_share) or not 0.0 < nuisance_ratio_max_share <= 1.0:
+            raise ValueError("nuisance_ratio_max_share must be finite and in (0, 1].")
+        if (
+            isinstance(nuisance_ratio_min_psus, bool)
+            or not isinstance(nuisance_ratio_min_psus, Integral)
+            or int(nuisance_ratio_min_psus) < 2
+        ):
+            raise ValueError("nuisance_ratio_min_psus must be an integer of at least two.")
         (
             anticipation,
             covariance,
@@ -1847,14 +2092,19 @@ class EfficientDiD:
             simultaneous_level=simultaneous_level,
         )
         self.pre_periods: PrePeriods = "all" if pre_periods == "all" else int(pre_periods)
-        self.anticipation = anticipation
-        self.covariance = covariance
-        self.inference = inference
-        self.bootstrap_iterations = bootstrap_iterations
-        self.random_state = random_state
-        self.simultaneous_level = simultaneous_level
-        self.singularity_tolerance = float(singularity_tolerance)
-        self.nuisance_probability_floor = float(nuisance_probability_floor)
+        self.anticipation: int = anticipation
+        self.covariance: DiDCovariance = covariance
+        self.inference: DiDInference = inference
+        self.bootstrap_iterations: int = bootstrap_iterations
+        self.random_state: int | None = random_state
+        self.simultaneous_level: float = simultaneous_level
+        self.singularity_tolerance: float = float(singularity_tolerance)
+        self.nuisance_probability_floor: float = float(nuisance_probability_floor)
+        self.nuisance_ratio_floor: float = float(nuisance_ratio_floor)
+        self.nuisance_ratio_ceiling: float = float(nuisance_ratio_ceiling)
+        self.nuisance_ratio_min_effective_n: float = float(nuisance_ratio_min_effective_n)
+        self.nuisance_ratio_max_share: float = float(nuisance_ratio_max_share)
+        self.nuisance_ratio_min_psus: int = int(nuisance_ratio_min_psus)
 
     def fit(
         self,
@@ -1911,6 +2161,11 @@ class EfficientDiD:
                 simultaneous_level=self.simultaneous_level,
                 singularity_tolerance=self.singularity_tolerance,
                 nuisance_probability_floor=self.nuisance_probability_floor,
+                nuisance_ratio_floor=self.nuisance_ratio_floor,
+                nuisance_ratio_ceiling=self.nuisance_ratio_ceiling,
+                nuisance_ratio_min_effective_n=self.nuisance_ratio_min_effective_n,
+                nuisance_ratio_max_share=self.nuisance_ratio_max_share,
+                nuisance_ratio_min_psus=self.nuisance_ratio_min_psus,
             )
         n = len(panel.entities)
         pi_never = float(panel.never_mask.mean())
@@ -2092,7 +2347,11 @@ class EfficientDiD:
             bootstrap_random_state=self.random_state,
             simultaneous_level=self.simultaneous_level,
             nuisance_fold=pd.Series(dtype="int64", name="fold"),
+            nuisance_weighting="none",
             cohort_probabilities=pd.DataFrame(index=panel.entities.copy()),
+            cohort_ratios=pd.DataFrame(index=panel.entities.copy()),
+            cohort_ratio_diagnostics=pd.DataFrame(),
+            cohort_ratio_candidate_uses=pd.DataFrame(),
             covariates=(),
             cross_fitted=False,
             pretrend_control_group="never_treated",

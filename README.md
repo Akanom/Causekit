@@ -371,6 +371,17 @@ cross_fitter = CrossFitter(
     random_state=2026,
 )
 
+# Alternative nuisance route: each fresh pairwise model receives y=1 for the
+# numerator cohort and y=0 for the denominator cohort, and its fitted result exposes
+# predict_odds_ratio(X) for calibrated posterior cohort odds.
+direct_ratio_cross_fitter = CrossFitter(
+    cohort_ratio_factory=make_pairwise_cohort_odds_model,
+    outcome_factory=make_outcome_model,
+    second_moment_factory=make_second_moment_model,
+    n_splits=5,
+    random_state=2026,
+)
+
 efficient = EfficientDiD(
     pre_periods="all",
     inference="multiplier_bootstrap",
@@ -394,6 +405,18 @@ print(hausman.event_study)
 print(hausman.pvalue)
 print(efficient.efficiency_weights)
 print(efficient.simultaneous_event_study)
+
+direct_sensitivity = EfficientDiD(pre_periods="all").fit(
+    panel,
+    outcome="outcome",
+    entity="unit",
+    time="period",
+    treatment_time="first_treated",
+    covariates=["baseline_outcome", "age"],
+    cross_fitter=direct_ratio_cross_fitter,
+)
+print(direct_sensitivity.nuisance_weighting)
+print(direct_sensitivity.cohort_ratio_diagnostics)
 ```
 
 The data must be a balanced long panel with one row per entity-period, an absorbing first
@@ -409,16 +432,24 @@ post-treatment event-study path under aligned no-covariate PT-Post and PT-All re
 it refuses mismatched samples and singular difference covariance rather than changing
 rank or applying a pseudoinverse.
 
-The covariate-efficient path forms cohort-density ratios from cross-fitted multiclass
-probabilities, estimates group-specific conditional outcome changes and residual-product
-conditional covariances through `CrossFitter`, and solves the observation-specific
-covariance systems without hidden regularization. Probabilities below
-`nuisance_probability_floor` and singular systems refuse rather than clip or repair.
+The covariate-efficient path accepts exactly one cohort-weighting route. It either forms
+cohort odds from cross-fitted multiclass probabilities or consumes directly fitted,
+ordered posterior cohort odds through the public `CohortOddsRatioResultProtocol`.
+Direct ratios are not raw group-conditional density ratios: they retain the numerator-to-
+denominator cohort prior odds. `CrossFitter` fits each requested pair only on its two
+outer-training cohorts, predicts every held-out entity, and records pair/fold tail,
+effective-size, concentration, PSU-support, and row-role audits. `EfficientDiD` exposes
+the selected `nuisance_weighting`, either `cohort_probabilities` or `cohort_ratios`, and
+the mapping from ordered ratios to PT-All candidates. Ambiguous routes, support-threshold
+failures, and singular systems refuse rather than clip, trim, rescale, fall back, or
+repair.
 The efficiency claim is conditional on PT-All and the paper's nuisance regularity
 conditions. These two panel classes do not accept repeated cross sections or sampling
 weights. See the
 [DiD contract](docs/DID_CONTRACT.md) for formulas, assumptions, target populations, and
-promotion gates.
+promotion gates, and the
+[direct cohort-odds evidence](docs/DID_DIRECT_RATIO_PROMOTION_EVIDENCE.md) for calibration,
+parity, real-data, performance, and publication-scale results.
 
 ### Repeated-cross-section difference-in-differences
 

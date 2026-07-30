@@ -90,6 +90,22 @@ event-study difference influence function and covariance, hashes the complete es
 design, and refuses not-yet-treated, covariate-adjusted, mismatched, reduced-moment, and
 singular comparisons without pseudoinverse rank selection.
 
+The covariate-adjusted direct cohort-odds route separately reconstructs posterior-odds
+calibration (including unequal cohort priors), pair orientation, the scale-sensitive
+candidate score, `Omega_tilde = p_g Omega`, conditional weights, candidate/aggregate
+influence, HC1, shared entity/whole-cluster folds, and every overlap/refusal threshold.
+The promotion harness compares direct, binary-multiclass, and oracle odds on identical
+folds in nonlinear favorable- and weak-overlap designs, including pointwise and max-t
+coverage. A frozen three-class underflow case demonstrates the direct route's stability
+benefit: an irrelevant dominant class can make two score-relevant multiclass
+probabilities numerically zero even though their restricted binary odds remain finite.
+The hash-pinned hospital sensitivity holds the sample, folds, candidates, outcome and
+second-moment nuisances, and seeds fixed across routes; it is sensitivity evidence and
+does not validate conditional PT-All. Base R 4.5.1 independently reproduces the fixed-
+fold score and full influence vector. Stata estimator parity is unavailable for the same
+moment. Reproduction commands are documented in
+`docs/DID_DIRECT_RATIO_PROMOTION_EVIDENCE.md`.
+
 Repeated-cross-section DiD has a separate validation path. Tests reconstruct all four
 independent group-period mean scores, require the comparison cohort rule to be identical
 at target and baseline, include pooled estimated-cohort-share terms, and verify staggered

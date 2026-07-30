@@ -40,6 +40,7 @@ uses different estimands or moments. Neither counts as a pass.
 | Repeated-cross-section DiD, composition robust | pairwise and longer hand influence/target-share/band identities, hash-pinned real data, 120,000-row performance, and observation/PSU pointwise/joint/diagnostic promotion pass | official `compdid` 0.1.0 pairwise point/IF and fixed-influence stationarity diagnostic pass; aligned longer estimator unavailable | no reviewed estimator targeting the same treated-target-period influence moment: unavailable | pairwise and longer/staggered internal promotion pass; survey combinations remain open |
 | Efficient DiD, no covariates | native result checked on fixture and real data | pinned public `edid` commit passes fixture and real hospital data | unavailable: Stata heterogeneous DiD does not implement PT-All optimal weighting | pass for available aligned comparator |
 | Efficient DiD, covariate adjusted | deterministic equation, refusal, and simulation evidence pass | unavailable: pinned public `edid` explicitly excludes covariates | unavailable: no identified Chen–Sant'Anna–Xie PT-All implementation | internal validation; external unavailable |
+| Efficient DiD, direct cohort odds | hand score/`Omega_tilde`, nonlinear/weak-overlap publication, hash-pinned hospital, and 100,000-entity performance gates pass | base R 4.5.1 independently reproduces the fixed-OOF ordered-odds score, full influence, and HC1 SE; maintained estimator-level implementation unavailable | unavailable: no reviewed command accepts the same direct pairwise odds nuisances and PT-All moment | internal promotion and independent score parity pass; estimator-level external unavailable |
 | `PartiallyLinearDML` residual stage | hand score plus independent Statsmodels HC1 pass | base R 4.5.1 matrix/HC1 contract passes | reviewed Stata/IC 17 no-intercept HC1 contract passes | pass |
 | `RLearner` fixed honest evaluation | hand loss/calibration/group/max-t identities pass | base R 4.5.1 loss, HC1 calibration, and group covariance pass | reviewed Stata/IC 17 loss/calibration/group HC1 fixture passes | pass |
 | `DRLearner` fixed honest evaluation | hand pseudo-outcome/loss/calibration/group/max-t identities pass | base R 4.5.1 loss, HC1 calibration, and group covariance pass | reviewed Stata/IC 17 loss/calibration/group HC1 fixture passes | pass |
@@ -89,6 +90,14 @@ The no-covariate efficient-DiD R harness is
 `benchmarks/validate_edid_reference.R`; its maintained fixture compares every candidate
 effect, the inverse-covariance weights, combined ATT, and HC1 standard error. This is not
 evidence for the covariate-adjusted path or for Stata.
+
+The direct-ratio score harness is
+`benchmarks/validate_did_direct_ratio_reference.R`. Base R 4.5.1 independently rebuilds
+the fixed-fold calibrated posterior odds, candidate score, every influence coordinate,
+and HC1 standard error. This validates the scale-sensitive ordered-odds PT-All score, not
+another ecosystem's nuisance learner. The reviewed R/Stata surfaces expose no maintained
+estimator accepting the same pairwise odds nuisances and PT-All moment, so estimator-level
+cells remain unavailable rather than being approximated with a different DiD command.
 
 The repeated-cross-section hand harness is
 `benchmarks/validate_did_rcs_reference.R`; base R 4.5.1 reproduces the 2-by-2 estimate,

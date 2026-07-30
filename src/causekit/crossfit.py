@@ -41,6 +41,18 @@ class OutcomeResultProtocol(Protocol):
 
 
 @runtime_checkable
+class CohortOddsRatioResultProtocol(Protocol):
+    """Prediction contract for calibrated posterior cohort odds.
+
+    For pairwise training labels supplied by :class:`CrossFitter`, ``y=1`` is the
+    numerator cohort and ``y=0`` is the denominator cohort. Implementations must return
+    ``P(y=1 | X) / P(y=0 | X)`` rather than an uncalibrated covariate-density ratio.
+    """
+
+    def predict_odds_ratio(self, X: Any) -> Any: ...
+
+
+@runtime_checkable
 class WeightedCATEEstimatorProtocol(Protocol):
     """Fit contract for a CATE learner receiving the exact R-loss weights."""
 
@@ -158,6 +170,21 @@ class ClassProbabilityTaskCrossFitResult:
     random_state: int | None
     model_names: dict[str, str]
     class_labels: dict[str, tuple[Any, ...]]
+    model_diagnostics: pd.DataFrame = field(default_factory=pd.DataFrame)
+
+
+@dataclass(frozen=True)
+class CohortOddsRatioCrossFitResult:
+    """Pair-labelled out-of-fold posterior cohort-odds predictions and audit data."""
+
+    ratios: pd.DataFrame
+    fold: pd.Series
+    n_splits: int
+    random_state: int | None
+    model_names: dict[tuple[Any, Any], str]
+    cohorts: pd.Series
+    clusters: pd.Series = field(default_factory=lambda: pd.Series(dtype="object"))
+    pair_diagnostics: pd.DataFrame = field(default_factory=pd.DataFrame)
     model_diagnostics: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
@@ -506,6 +533,47 @@ def _fold_assignments(
     return folds
 
 
+def _validated_fold_assignments(
+    value: Any,
+    *,
+    index: pd.Index,
+    n_splits: int,
+    strata: pd.Series | None,
+    clusters: pd.Series | None,
+) -> np.ndarray:
+    """Validate and retain a previously generated immutable global fold plan."""
+
+    if isinstance(value, pd.Series):
+        if not value.index.equals(index):
+            raise ValueError("Provided fold indices must match X exactly and in order.")
+        raw = value.to_numpy()
+    else:
+        raw = np.asarray(value)
+        if raw.ndim != 1 or len(raw) != len(index):
+            raise ValueError("Provided folds must contain exactly one value per row of X.")
+    if np.iscomplexobj(raw):
+        raise ValueError("Provided folds must be real integer labels.")
+    try:
+        numeric = np.asarray(raw, dtype=float)
+    except (TypeError, ValueError) as error:
+        raise ValueError("Provided folds must be real integer labels.") from error
+    if not np.isfinite(numeric).all() or not np.equal(numeric, np.floor(numeric)).all():
+        raise ValueError("Provided folds must be finite integer labels.")
+    folds = numeric.astype(int)
+    if set(np.unique(folds)) != set(range(n_splits)):
+        raise ValueError("Provided folds must contain every label from zero to n_splits - 1.")
+    if (
+        clusters is not None
+        and pd.Series(folds, index=index).groupby(clusters).nunique().gt(1).any()
+    ):
+        raise ValueError("Provided folds must keep every cluster wholly within one fold.")
+    if strata is not None:
+        support = pd.crosstab(pd.Series(folds, index=index), strata)
+        if support.shape != (n_splits, strata.nunique()) or np.any(support.to_numpy() == 0):
+            raise ValueError("Provided folds must retain every stratum in every fold.")
+    return folds
+
+
 def _class_probability_prediction(
     result: Any,
     X: Any,
@@ -577,6 +645,70 @@ def _class_probability_prediction(
     return values
 
 
+def _cohort_odds_ratio_prediction(
+    result: Any,
+    X: pd.DataFrame,
+    *,
+    adapter: PredictionAdapter | None,
+) -> np.ndarray:
+    """Return one aligned, finite, strictly positive posterior-odds vector."""
+
+    declared_kind = getattr(result, "odds_ratio_kind_", "posterior_cohort_odds")
+    if declared_kind != "posterior_cohort_odds":
+        raise ValueError(
+            "A direct cohort-ratio provider must return calibrated posterior cohort odds; "
+            "a group-conditional density ratio requires prior-odds calibration."
+        )
+    numerator_class = getattr(result, "numerator_class_", 1)
+    denominator_class = getattr(result, "denominator_class_", 0)
+    if numerator_class != 1 or denominator_class != 0:
+        raise ValueError(
+            "The fitted cohort-odds orientation must retain y=1 as numerator and y=0 "
+            "as denominator."
+        )
+    if adapter is None:
+        if not isinstance(result, CohortOddsRatioResultProtocol):
+            raise TypeError(
+                "The fitted cohort-ratio result must provide predict_odds_ratio(X), or "
+                "supply cohort_ratio_predict=."
+            )
+        raw = result.predict_odds_ratio(X)
+    else:
+        raw = adapter(result, X)
+    if isinstance(raw, (pd.Series, pd.DataFrame)) and not raw.index.equals(X.index):
+        raise ValueError("Cohort-odds prediction index must match the held-out covariate index.")
+    raw_array = raw.to_numpy() if isinstance(raw, (pd.Series, pd.DataFrame)) else np.asarray(raw)
+    if np.iscomplexobj(raw_array):
+        raise ValueError("Cohort-odds predictions must contain only real numeric values.")
+    try:
+        values = np.asarray(raw_array, dtype=float)
+    except (TypeError, ValueError) as error:
+        raise ValueError(
+            "Cohort-odds predictions must contain only real numeric values."
+        ) from error
+    if values.ndim == 2 and values.shape[1] == 1:
+        values = values[:, 0]
+    if values.ndim != 1 or len(values) != len(X):
+        raise ValueError("A cohort-odds prediction must provide one value per held-out row.")
+    if not np.isfinite(values).all():
+        raise ValueError("Cohort-odds predictions must contain only finite values.")
+    if np.any(values <= 0.0):
+        raise ValueError("Cohort-odds predictions must be strictly positive.")
+    return values
+
+
+def _index_hash(index: pd.Index) -> str:
+    """Stable audit hash for one ordered row role."""
+
+    digest = hashlib.sha256()
+    digest.update(
+        pd.util.hash_pandas_object(pd.Series(index, dtype="object"), index=False)
+        .to_numpy(dtype=np.uint64)
+        .tobytes()
+    )
+    return digest.hexdigest()
+
+
 class CrossFitter:
     """Generate out-of-fold propensity and arm-specific outcome predictions.
 
@@ -589,11 +721,13 @@ class CrossFitter:
         self,
         *,
         propensity_factory: NuisanceFactory | None = None,
+        cohort_ratio_factory: NuisanceFactory | None = None,
         outcome_factory: NuisanceFactory | None = None,
         second_moment_factory: NuisanceFactory | None = None,
         n_splits: int = 5,
         random_state: int | None = None,
         propensity_predict: PredictionAdapter | None = None,
+        cohort_ratio_predict: PredictionAdapter | None = None,
         outcome_predict: PredictionAdapter | None = None,
     ) -> None:
         if isinstance(n_splits, bool) or not isinstance(n_splits, int) or n_splits < 2:
@@ -601,11 +735,13 @@ class CrossFitter:
         if random_state is not None and not isinstance(random_state, int):
             raise TypeError("random_state must be an integer or None.")
         self.propensity_factory = propensity_factory
+        self.cohort_ratio_factory = cohort_ratio_factory
         self.outcome_factory = outcome_factory
         self.second_moment_factory = second_moment_factory or outcome_factory
         self.n_splits = n_splits
         self.random_state = random_state
         self.propensity_predict = propensity_predict
+        self.cohort_ratio_predict = cohort_ratio_predict
         self.outcome_predict = outcome_predict
 
     def fit_predict(
@@ -797,6 +933,175 @@ class CrossFitter:
             model_diagnostics=pd.DataFrame(diagnostic_rows),
         )
 
+    def fit_predict_cohort_odds_ratios(
+        self,
+        X: Any,
+        *,
+        cohorts: Any,
+        pairs: Sequence[tuple[Any, Any]],
+        clusters: Any | None = None,
+    ) -> CohortOddsRatioCrossFitResult:
+        """Cross-fit calibrated posterior odds for ordered cohort pairs.
+
+        Each pair/fold receives a fresh model trained only on that pair outside the
+        holdout. The binary training label is one for the numerator and zero for the
+        denominator. Predictions cover every held-out row because PT-All conditional
+        efficient weights use the ratios observation by observation.
+        """
+
+        if self.cohort_ratio_factory is None:
+            raise ValueError("fit_predict_cohort_odds_ratios requires cohort_ratio_factory.")
+        frame, index = _frame(X)
+        labels = _labels(cohorts, name="cohorts", index=index)
+        cluster_values = (
+            None if clusters is None else _labels(clusters, name="clusters", index=index)
+        )
+        observed = pd.Index(pd.unique(labels), name="cohort")
+        pair_list = list(pairs)
+        if not pair_list:
+            raise ValueError("pairs must contain at least one ordered cohort pair.")
+        normalized_pairs: list[tuple[Any, Any]] = []
+        for pair in pair_list:
+            if not isinstance(pair, tuple) or len(pair) != 2:
+                raise TypeError("Each cohort pair must be a (numerator, denominator) tuple.")
+            numerator, denominator = pair
+            if pd.isna(numerator) or pd.isna(denominator):
+                raise ValueError("Cohort pair labels must not be missing.")
+            if numerator == denominator:
+                raise ValueError("Numerator and denominator cohorts must be distinct.")
+            missing = [label for label in pair if label not in observed]
+            if missing:
+                raise ValueError(f"Every pair label must be an observed cohort; missing={missing}.")
+            normalized_pairs.append((numerator, denominator))
+        if len(set(normalized_pairs)) != len(normalized_pairs):
+            raise ValueError("Ordered cohort pairs must be unique.")
+        counts = labels.value_counts(dropna=False)
+        if int(counts.min()) < self.n_splits:
+            raise ValueError("Each cohort must contain at least n_splits observations.")
+
+        folds = _fold_assignments(
+            len(frame),
+            n_splits=self.n_splits,
+            random_state=self.random_state,
+            strata=labels,
+            clusters=cluster_values,
+        )
+        ratio_values = np.empty((len(frame), len(normalized_pairs)), dtype=float)
+        model_names: dict[tuple[Any, Any], str] = {}
+        pair_rows: list[dict[str, Any]] = []
+        diagnostic_rows: list[dict[str, Any]] = []
+        seen_estimators: list[Any] = []
+        label_values = labels.to_numpy()
+        cluster_array = None if cluster_values is None else cluster_values.to_numpy()
+        for pair_position, (numerator, denominator) in enumerate(normalized_pairs):
+            pair_mask = (label_values == numerator) | (label_values == denominator)
+            for fold in range(self.n_splits):
+                test = folds == fold
+                train = (~test) & pair_mask
+                numerator_train = train & (label_values == numerator)
+                denominator_train = train & (label_values == denominator)
+                if not numerator_train.any() or not denominator_train.any():
+                    raise ValueError(
+                        "Every direct-ratio training fold must retain both ordered-pair cohorts."
+                    )
+                binary_target = pd.Series(
+                    (label_values[train] == numerator).astype(float),
+                    index=index[train],
+                    name="numerator_indicator",
+                )
+                result = _fit(
+                    self.cohort_ratio_factory,
+                    frame.iloc[train],
+                    binary_target,
+                    seen_estimators=seen_estimators,
+                )
+                model_names[(numerator, denominator)] = type(result).__name__
+                predicted = _cohort_odds_ratio_prediction(
+                    result,
+                    frame.iloc[test],
+                    adapter=self.cohort_ratio_predict,
+                )
+                ratio_values[test, pair_position] = predicted
+                task_name = f"cohort_odds[{numerator!r},{denominator!r}]"
+                diagnostic_rows.append(
+                    _model_diagnostic_row(
+                        result,
+                        task=task_name,
+                        fold=fold,
+                        train_nobs=int(train.sum()),
+                        holdout_nobs=int(test.sum()),
+                    )
+                )
+                denominator_holdout = test & (label_values == denominator)
+                numerator_holdout = test & (label_values == numerator)
+                importance = ratio_values[denominator_holdout, pair_position]
+                importance_sum = float(importance.sum())
+                importance_effective_n = float(importance_sum**2 / float(importance @ importance))
+                importance_max_share = float(importance.max() / importance_sum)
+                quantiles = np.quantile(predicted, [0.5, 0.9, 0.95, 0.99])
+                log_quantiles = np.quantile(np.log(predicted), [0.01, 0.05, 0.5, 0.95, 0.99])
+                if cluster_array is None:
+                    numerator_psus = int(numerator_train.sum())
+                    denominator_psus = int(denominator_train.sum())
+                    holdout_numerator_psus = int(numerator_holdout.sum())
+                    holdout_denominator_psus = int(denominator_holdout.sum())
+                else:
+                    numerator_psus = len(pd.unique(cluster_array[numerator_train]))
+                    denominator_psus = len(pd.unique(cluster_array[denominator_train]))
+                    holdout_numerator_psus = len(pd.unique(cluster_array[numerator_holdout]))
+                    holdout_denominator_psus = len(pd.unique(cluster_array[denominator_holdout]))
+                pair_rows.append(
+                    {
+                        "numerator": numerator,
+                        "denominator": denominator,
+                        "fold": fold,
+                        "ratio_min": float(predicted.min()),
+                        "ratio_median": float(quantiles[0]),
+                        "ratio_p90": float(quantiles[1]),
+                        "ratio_p95": float(quantiles[2]),
+                        "ratio_p99": float(quantiles[3]),
+                        "ratio_max": float(predicted.max()),
+                        "log_ratio_min": float(np.log(predicted).min()),
+                        "log_ratio_p01": float(log_quantiles[0]),
+                        "log_ratio_p05": float(log_quantiles[1]),
+                        "log_ratio_median": float(log_quantiles[2]),
+                        "log_ratio_p95": float(log_quantiles[3]),
+                        "log_ratio_p99": float(log_quantiles[4]),
+                        "log_ratio_max": float(np.log(predicted).max()),
+                        "train_numerator_nobs": int(numerator_train.sum()),
+                        "train_denominator_nobs": int(denominator_train.sum()),
+                        "train_numerator_psus": int(numerator_psus),
+                        "train_denominator_psus": int(denominator_psus),
+                        "holdout_numerator_nobs": int(numerator_holdout.sum()),
+                        "holdout_denominator_nobs": int(denominator_holdout.sum()),
+                        "holdout_numerator_psus": int(holdout_numerator_psus),
+                        "holdout_denominator_psus": int(holdout_denominator_psus),
+                        "denominator_importance_effective_n": importance_effective_n,
+                        "denominator_importance_max_share": importance_max_share,
+                        "train_index_hash": _index_hash(index[train]),
+                        "holdout_index_hash": _index_hash(index[test]),
+                    }
+                )
+        columns = pd.MultiIndex.from_tuples(
+            normalized_pairs,
+            names=["numerator", "denominator"],
+        )
+        return CohortOddsRatioCrossFitResult(
+            ratios=pd.DataFrame(ratio_values, index=index.copy(), columns=columns),
+            fold=pd.Series(folds, index=index.copy(), name="fold"),
+            n_splits=self.n_splits,
+            random_state=self.random_state,
+            model_names=model_names,
+            cohorts=labels.rename("cohort").copy(),
+            clusters=(
+                pd.Series(dtype="object", name="cluster")
+                if cluster_values is None
+                else cluster_values.rename("cluster").copy()
+            ),
+            pair_diagnostics=pd.DataFrame(pair_rows),
+            model_diagnostics=pd.DataFrame(diagnostic_rows),
+        )
+
     def fit_predict_tasks(
         self,
         X: Any,
@@ -804,6 +1109,7 @@ class CrossFitter:
         tasks: Sequence[CrossFitTask],
         strata: Any | None = None,
         clusters: Any | None = None,
+        folds: Any | None = None,
     ) -> CrossFitTaskResult:
         """Cross-fit arbitrary scalar regressions on shared deterministic folds.
 
@@ -825,12 +1131,22 @@ class CrossFitter:
         cluster_values = (
             None if clusters is None else _labels(clusters, name="clusters", index=index)
         )
-        folds = _fold_assignments(
-            len(frame),
-            n_splits=self.n_splits,
-            random_state=self.random_state,
-            strata=strata_series,
-            clusters=cluster_values,
+        fold_values = (
+            _fold_assignments(
+                len(frame),
+                n_splits=self.n_splits,
+                random_state=self.random_state,
+                strata=strata_series,
+                clusters=cluster_values,
+            )
+            if folds is None
+            else _validated_fold_assignments(
+                folds,
+                index=index,
+                n_splits=self.n_splits,
+                strata=strata_series,
+                clusters=cluster_values,
+            )
         )
         predictions = np.empty((len(frame), len(task_list)), dtype=float)
         model_names: dict[str, str] = {}
@@ -856,7 +1172,7 @@ class CrossFitter:
             if factory is None:
                 raise ValueError(f"Task {task.name!r} requires a task factory or outcome_factory.")
             for fold in range(self.n_splits):
-                test = folds == fold
+                test = fold_values == fold
                 train = (~test) & train_mask.to_numpy()
                 if not train.any():
                     raise ValueError(
@@ -899,7 +1215,7 @@ class CrossFitter:
                 )
         return CrossFitTaskResult(
             predictions=pd.DataFrame(predictions, index=index.copy(), columns=names),
-            fold=pd.Series(folds, index=index.copy(), name="fold"),
+            fold=pd.Series(fold_values, index=index.copy(), name="fold"),
             n_splits=self.n_splits,
             random_state=self.random_state,
             model_names=model_names,
@@ -1068,6 +1384,8 @@ __all__ = [
     "CATEEstimatorProtocol",
     "CATEFactory",
     "CATEResultProtocol",
+    "CohortOddsRatioCrossFitResult",
+    "CohortOddsRatioResultProtocol",
     "ClassProbabilityCrossFitTask",
     "ClassProbabilityCrossFitResult",
     "ClassProbabilityTaskCrossFitResult",

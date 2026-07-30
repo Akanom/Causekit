@@ -268,10 +268,12 @@ assembly; marginal covariance subtraction, pair-local resplitting, numerical ran
 and diagnostic-driven estimator selection are prohibited.
 
 Survey support remains outside the runtime architecture and requires an explicit design
-object, weighted nuisance protocol, and design-based variance. A separate balanced-panel extension replaces
-`EfficientDiD` multiclass probability ratios with calibrated pairwise cohort odds and
-refactors its conditional covariance only by a scale that cancels in normalized efficient
-weights. Their contracts prohibit placeholder exports and cross-score reuse.
+object, weighted nuisance protocol, and design-based variance. The balanced-panel direct-
+ratio route replaces `EfficientDiD` multiclass probability ratios with calibrated ordered
+pairwise cohort odds and refactors its conditional covariance only by a scale that cancels
+in normalized efficient weights. `CrossFitter` owns fresh pair/fold fitting, all-holdout
+prediction, immutable fold reuse, alignment, and support audits; `did.py` owns the PT-All
+candidate graph, score, `Omega_tilde` assembly, thresholds, and cross-score refusals.
 
 No nuisance learner lives in `did.py`. The covariate-adjusted efficient path expresses
 cohort classification, group-specific outcome changes, and conditional residual products

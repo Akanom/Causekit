@@ -2,11 +2,12 @@
 
 ## Status and boundary
 
-This is a design-only contract. It freezes the estimand, nuisance semantics,
-`CrossFitter` operations, diagnostics, refusals, and promotion evidence required before
-code is added. CauseKit does not currently export a direct-ratio protocol or accept direct
-ratio predictions in `EfficientDiD`. The implemented covariate-adjusted PT-All path
-continues to construct cohort ratios from one out-of-fold multiclass probability matrix.
+This contract is implemented for balanced-panel covariate-adjusted `EfficientDiD`.
+CauseKit exports `CohortOddsRatioResultProtocol`,
+`CohortOddsRatioCrossFitResult`, and
+`CrossFitter.fit_predict_cohort_odds_ratios`. The original multiclass-probability route
+remains supported; a fit must select exactly one route. This document continues to govern
+promotion evidence and unsupported cross-score reuse.
 
 The first target is the covariate-adjusted `EfficientDiD` score of Chen, Sant'Anna, and
 Xie. Direct ratios are an alternative nuisance route, not a new estimator. They do not
@@ -79,8 +80,8 @@ meaning numerator cohort `g` and `y=0` denominator cohort `h`. The prediction mu
 held-out posterior odds for that exact orientation. A factory, not a fitted singleton, is
 supplied so every pair and outer fold receives a fresh object.
 
-The planned `CrossFitter` extension is an optional `cohort_ratio_factory` and, if needed,
-an explicit `cohort_ratio_predict` adapter. Exactly one cohort-weighting route is active:
+The `CrossFitter` extension provides optional `cohort_ratio_factory` and
+`cohort_ratio_predict` inputs. Exactly one cohort-weighting route is active:
 the existing `propensity_factory` for a multiclass probability matrix or the new pairwise
 ratio factory. There is no data-dependent fallback. `outcome_factory` and
 `second_moment_factory` retain their current meanings.
@@ -122,7 +123,13 @@ auxiliary cohort.
 Direct estimation does not solve overlap. Scale-sensitive ratio and scale-invariant
 concentration gates are both required: calibrated ratio bounds diagnose conditional odds,
 while normalized shares and effective sample size diagnose dominance. Public threshold
-names and defaults must be preregistered in failing tests and publication simulations.
+names and defaults are `nuisance_ratio_floor=1e-6`,
+`nuisance_ratio_ceiling=1e6`, `nuisance_ratio_min_effective_n=2.0`,
+`nuisance_ratio_max_share=0.8`, and `nuisance_ratio_min_psus=2`. The first two apply to
+every fitted pair/fold prediction, the concentration measures apply to the denominator-
+row importance weights in every pair/fold, and PSU support applies separately to both
+training cohorts. Identity odds `rho_g:g=1` are audited but not fit. Threshold failures
+are errors, not warnings.
 CauseKit will not clip, winsorize, trim, renormalize, or replace a failed direct ratio with
 multiclass probabilities.
 
@@ -150,7 +157,8 @@ No numerical repair or fallback may turn these conditions into warnings.
 
 ## Failing-first implementation gates
 
-Before runtime code is written, tests must fail for:
+The following tests were observed failing before runtime support was added and remain
+mandatory regression gates:
 
 1. a hand-computed PT-All candidate in which direct cohort odds reproduce the existing
    multiclass-ratio point score, candidate influence, and target effect;
@@ -177,6 +185,11 @@ route after inspecting the target estimate. Independent base-R reconstruction is
 required. R/Stata package parity is reported only when a maintained command accepts the
 same direct pairwise cohort-odds nuisances and PT-All moment; otherwise the cell is
 explicitly unavailable.
+
+All promotion gates above are complete. Exact design parameters, the initial failed
+stressed slice, 1,000-replication results, real-data hashes, base-R mapping, performance,
+and reproduction commands are recorded in
+[direct cohort-odds promotion evidence](DID_DIRECT_RATIO_PROMOTION_EVIDENCE.md).
 
 ## Not covered by this contract
 

@@ -46,7 +46,9 @@ under favorable and stressed overlap, while a separate Cattaneo caliper/support 
 The DiD surface adds `DifferenceInDifferences` and `EfficientDiD` for balanced short
 panels. The conventional class retains never-treated/not-yet-treated comparison choices;
 the efficient class implements both no-covariate and cross-fitted covariate-adjusted
-Chen-Sant'Anna-Xie PT-All generated-outcome weighting. Both expose cohort-time,
+Chen-Sant'Anna-Xie PT-All generated-outcome weighting. Covariate weighting may use one
+multiclass cohort-probability model or directly fitted calibrated ordered cohort odds
+through the provider-neutral `CrossFitter` protocol, never both. Both expose cohort-time,
 event-time, calendar-time, and ESavg effects, entity influence functions, robust/one-way-
 clustered pointwise inference, optional multiplier-bootstrap simultaneous event-study
 bands, uncontaminated pre-trend placebos, and OutputHub tables. The public Hausman
@@ -243,12 +245,12 @@ is not a claim that arbitrary estimated or machine-learning scores have supporte
 The conventional/efficient distinction, timing rules, formulas, covariate nuisance path,
 and inference boundaries are recorded in [Difference-in-differences contract](DID_CONTRACT.md).
 
-The balanced-panel PT-All [direct cohort-ratio](DID_DIRECT_RATIO_CONTRACT.md) nuisance and
-the repeated-section [survey-design](DID_RCS_SURVEY_DESIGN_CONTRACT.md) path remain
-design-only. The independent [composition-change](DID_RCS_COMPOSITION_CHANGE_CONTRACT.md)
-contract is implemented through longer/staggered target-share aggregation and its aligned
-diagnostic. Survey and direct-ratio components cannot be reused or composed until their
-score-specific gates pass.
+The balanced-panel PT-All [direct cohort-ratio](DID_DIRECT_RATIO_CONTRACT.md) nuisance is
+implemented and promoted only for covariate-adjusted `EfficientDiD`. The independent
+[composition-change](DID_RCS_COMPOSITION_CHANGE_CONTRACT.md) contract is implemented
+through longer/staggered target-share aggregation and its aligned diagnostic. Survey,
+composition, and direct-ratio components remain score-specific and cannot be reused or
+composed without a separately derived contract.
 
 ## Out of current scope
 

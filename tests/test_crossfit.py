@@ -341,6 +341,39 @@ def test_clustered_task_cross_fitting_keeps_clusters_wholly_within_folds() -> No
     assert (pd.crosstab(result.fold, treatment) > 0).all().all()
 
 
+def test_task_cross_fitting_reuses_and_validates_an_immutable_fold_plan() -> None:
+    index = pd.Index([f"row-{value}" for value in range(12)])
+    X = pd.DataFrame({"x": np.arange(12.0)}, index=index)
+    strata = pd.Series(np.tile([0, 1], 6), index=index)
+    target = pd.Series(1.0 + X["x"], index=index)
+    folds = pd.Series(np.tile([0, 1, 2], 4), index=index, name="fold")
+    result = CrossFitter(outcome_factory=_LinearOutcome, n_splits=3).fit_predict_tasks(
+        X,
+        tasks=[CrossFitTask(name="mean", target=target)],
+        strata=strata,
+        folds=folds,
+    )
+
+    pd.testing.assert_series_equal(result.fold, folds)
+    with pytest.raises(ValueError, match="indices must match"):
+        CrossFitter(outcome_factory=_LinearOutcome, n_splits=3).fit_predict_tasks(
+            X,
+            tasks=[CrossFitTask(name="mean", target=target)],
+            strata=strata,
+            folds=folds.sample(frac=1.0, random_state=3),
+        )
+    clusters = pd.Series(np.repeat(np.arange(6), 2), index=index)
+    split_clusters = pd.Series(np.tile([0, 1, 2], 4), index=index)
+    with pytest.raises(ValueError, match="cluster wholly"):
+        CrossFitter(outcome_factory=_LinearOutcome, n_splits=3).fit_predict_tasks(
+            X,
+            tasks=[CrossFitTask(name="mean", target=target)],
+            strata=strata,
+            clusters=clusters,
+            folds=split_clusters,
+        )
+
+
 def test_task_cross_fitting_exposes_provider_neutral_fold_diagnostics() -> None:
     X = pd.DataFrame({"x": np.arange(12, dtype=float)})
     target = pd.Series(1.0 + 0.5 * X["x"], index=X.index)

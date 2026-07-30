@@ -322,9 +322,12 @@ future task can resume without reconstructing intent from chat history.
   because it conditions on the supplied score. Do not substitute a generic sandwich,
   ordinary bootstrap, or cluster wrapper.
 - Efficient DiD owns no nuisance model classes. The implemented covariate path must keep
-  consuming public cross-fitting factories. Its direct cohort-ratio replacement for
-  multiclass probability ratios is now frozen in `docs/DID_DIRECT_RATIO_CONTRACT.md`; it
-  remains design-only and must preserve calibrated pair orientation and the PT-All score.
+  consuming public cross-fitting factories. Its direct cohort-odds alternative to
+  multiclass probability ratios now passes hand/refusal, non-identity `Omega_tilde`,
+  HC1/CR1, base-R, hash-pinned hospital, 100,000-entity performance, and 1,000-replication
+  nonlinear/weak-overlap pointwise/max-t gates. Preserve calibrated pair orientation,
+  immutable folds, no fallback, and the PT-All score. It is not reusable in repeated-
+  section, survey, matching, or causal-ML scores.
 - Repeated-cross-section DiD's no-covariate and explicit CrossFitter covariate-adjusted
   stationary-composition paths are public. Publication-scale no-covariate and covariate
   pointwise coverage and
@@ -378,18 +381,15 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. The stationary repeated-section
-   [survey-design](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md) base, weighted nuisance boundary,
-   parity, real-data, performance, and observation/PSU pointwise coverage gates are
-   complete. Raw survey weights, composition combinations, FPCs, replicate weights, and
-   survey-valid simultaneous bands continue to refuse. Begin the balanced-panel
-   [direct-ratio](docs/DID_DIRECT_RATIO_CONTRACT.md) PT-All nuisance only through its own
-   failing-first ratio-calibration and `Omega_tilde` gates. Do not rerun settled composition
-   or survey certificates for unrelated work.
-2. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
+1. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
    manipulation checks, bias correction, and local estimand.
-3. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
+2. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
    effects, and clustered covariance contracts.
+
+The stationary repeated-section survey and balanced-panel direct-ratio gates are
+complete. Raw survey weights, composition combinations, FPCs, replicate weights, and
+survey-valid simultaneous bands continue to refuse. Do not rerun settled composition,
+survey, or direct-ratio publication certificates for unrelated work.
 
 Continue to preserve the matching tie/inference, target-population, and no-quadratic-
 matrix decisions. For DiD, preserve the conventional/efficient separation, PT-All label,

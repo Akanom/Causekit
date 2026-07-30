@@ -8,6 +8,32 @@ versions may refine APIs, but breaking changes must still be documented explicit
 
 ### Added
 
+- Public `CohortOddsRatioResultProtocol`, pair-labelled
+  `CohortOddsRatioCrossFitResult`, and
+  `CrossFitter.fit_predict_cohort_odds_ratios()` for calibrated ordered posterior cohort
+  odds. Every pair/fold receives a fresh provider trained only on its two outer-training
+  cohorts; predictions cover every held-out entity and retain pair orientation, model,
+  row-role hashes, raw/log tails, cohort/PSU support, denominator importance effective
+  size, and maximum normalized share.
+- An alternative direct-ratio nuisance route for covariate-adjusted `EfficientDiD`.
+  Exactly one multiclass-probability or direct-odds route is permitted. The direct score
+  uses scale-sensitive `rho_g:h(X)` terms and assembles the algebraically equivalent
+  `Omega_tilde = p_g Omega` covariance before the normalized solve, leaving
+  `cohort_probabilities` empty rather than fabricating a matrix. Results and OutputHub
+  expose the selected route, ordered ratios, support diagnostics, and candidate-use map.
+  Failing-first hand score/influence/HC1, `Omega_tilde`, prior-odds calibration,
+  reciprocal orientation, immutable fold/cluster, freshness, alignment, overlap, and
+  unsupported-combination contracts pass without clipping, trimming, rescaling,
+  numerical repair, or fallback.
+- A 1,000-replication-per-design nonlinear/weak-overlap direct-versus-multiclass-versus-
+  oracle promotion certificate with identical folds, pointwise/max-t coverage, zero
+  refusals, maximum absolute direct-route bias `0.00241`, SE ratios `1.006` and `1.014`,
+  and coverage `0.943–0.951`. A frozen irrelevant-class underflow design records the
+  direct pair's numerical-stability benefit. Hash-pinned hospital sensitivity agrees
+  across routes within `1.55e-15`; independent base R 4.5.1 reproduces the fixed-fold
+  direct score/influence/HC1 contract; and a 100,000-entity performance gate completes in
+  `8.474` seconds with `42.09 MiB` Python peak. Aligned estimator-level R/Stata parity is
+  explicitly unavailable.
 - Public `RepeatedCrossSectionDiD`, `RepeatedCrossSectionDiDResult`, and
   `RepeatedCrossSectionPretrendDiagnostic` for no-covariate conventional cohort-time DiD
   under an explicit stationary-composition restriction. The estimator uses four
@@ -124,9 +150,8 @@ versions may refine APIs, but breaking changes must still be documented explicit
   row performance gate completes in `0.168` seconds with `22.23` MiB Python peak. The
   YRBS public processed file omits PSU identifiers, so its standard error is explicitly an
   independent-observation-within-stratum sensitivity rather than paper-inference parity.
-- A design-only contract remains for calibrated direct pairwise cohort odds in balanced-
-  panel PT-All. Survey finite-population corrections, replicate weights, composition-
-  robust combinations, singleton adjustment, and design-valid simultaneous bands remain
+- Survey finite-population corrections, replicate weights, composition-robust
+  combinations, singleton adjustment, and design-valid simultaneous bands remain
   unavailable rather than silently approximated.
 
 ### Changed
@@ -150,9 +175,10 @@ versions may refine APIs, but breaking changes must still be documented explicit
   of survey transport with composition robustness remain unsupported; the separately
   declared stationary-composition survey design does not protect against unmeasured
   composition changes.
-  Direct cohort-ratio nuisances are also design-only; the implemented PT-All path
-  continues to use multiclass probabilities. Covariate estimator-level parity is
-  unavailable where reviewed R/Stata public paths target different moments.
+  Direct cohort-odds nuisances are limited to balanced-panel covariate-adjusted PT-All;
+  they cannot be reused in repeated-section, survey, matching, or causal-ML scores.
+  Covariate estimator-level parity remains unavailable where reviewed R/Stata public
+  paths target different moments.
 - Stata `csdid` aggregate standard errors are non-comparable to the maintained pooled-
   cohort-share uncertainty contract. Observation/PSU band mechanics pass hand identities
   and the internal publication-scale joint-coverage certificate. Exact seeded resampling

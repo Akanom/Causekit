@@ -282,6 +282,7 @@ def to_outputhub_model(
                 "n_clusters": result.n_clusters,
                 "covariates": list(result.covariates),
                 "nuisance_cross_fitted": result.cross_fitted,
+                "nuisance_weighting": result.nuisance_weighting,
                 "pretrend_available": result.pretrend.available,
                 "pretrend_unavailable_reason": result.pretrend.reason,
                 "causal_interpretation_requires_assumptions": True,
@@ -988,6 +989,51 @@ def add_to_outputhub(
                     "Realized PT-All generated-outcome weights; negative values are "
                     "permitted by the homogeneous-moment contract."
                 ),
+                metadata=table_metadata,
+            )
+        if not result.cohort_ratios.empty:
+            ratio_rows = pd.concat(
+                [
+                    pd.DataFrame(
+                        {
+                            result.entity_name: result.cohort_ratios.index,
+                            "numerator": numerator,
+                            "denominator": denominator,
+                            "odds_ratio": result.cohort_ratios[(numerator, denominator)].to_numpy(
+                                dtype=float
+                            ),
+                        }
+                    )
+                    for numerator, denominator in result.cohort_ratios.columns
+                ],
+                ignore_index=True,
+            )
+            hub.add_table(
+                f"{model_name} cohort odds",
+                ratio_rows,
+                caption=(
+                    "Ordered out-of-fold posterior cohort odds. Numerator and denominator "
+                    "orientation is part of the estimand contract."
+                ),
+                metadata={
+                    **table_metadata,
+                    "nuisance_weighting": result.nuisance_weighting,
+                },
+            )
+        if not result.cohort_ratio_diagnostics.empty:
+            hub.add_table(
+                f"{model_name} cohort-odds diagnostics",
+                result.cohort_ratio_diagnostics.copy(),
+                caption=(
+                    "Fold/pair support, tail, PSU, effective-size, concentration, and row-role audits."
+                ),
+                metadata=table_metadata,
+            )
+        if not result.cohort_ratio_candidate_uses.empty:
+            hub.add_table(
+                f"{model_name} cohort-odds candidate uses",
+                result.cohort_ratio_candidate_uses.copy(),
+                caption="Ordered cohort-odds nuisances mapped to each PT-All candidate score.",
                 metadata=table_metadata,
             )
     return model

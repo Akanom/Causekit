@@ -160,6 +160,11 @@ def test_estimator_signatures_keep_identification_inputs_explicit() -> None:
     assert efficient_did.parameters["covariance"].default == "robust"
     assert efficient_did.parameters["inference"].default == "analytic"
     assert efficient_did.parameters["nuisance_probability_floor"].default == 1e-6
+    assert efficient_did.parameters["nuisance_ratio_floor"].default == 1e-6
+    assert efficient_did.parameters["nuisance_ratio_ceiling"].default == 1e6
+    assert efficient_did.parameters["nuisance_ratio_min_effective_n"].default == 2.0
+    assert efficient_did.parameters["nuisance_ratio_max_share"].default == 0.8
+    assert efficient_did.parameters["nuisance_ratio_min_psus"].default == 2
 
     repeated_cross_section_did = inspect.signature(causekit.RepeatedCrossSectionDiD)
     assert repeated_cross_section_did.parameters["control_group"].default == "never_treated"
