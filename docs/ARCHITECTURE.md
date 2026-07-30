@@ -261,6 +261,15 @@ The reusable class-probability boundary accepts labelled column permutations and
 realigns them to the observed class order, but refuses missing, extra, duplicate, or
 unlabelled array schemas before a causal score can consume them.
 
+The contracted longer composition-robust layer preserves the pairwise score instead of
+building one design-wide multinomial. It plans every `(cohort, baseline, target)` pair on
+one immutable global row/PSU fold vector, trains pair-masked probability/outcome tasks,
+and zero-pads each pair influence onto the complete sample index. Event and calendar
+aggregation use target-period treated-cell shares plus their estimated-share influence.
+The future equality diagnostic subtracts aligned robust and stationary influence matrices
+before covariance assembly; marginal covariance subtraction and pair-local resplitting
+are prohibited. No part of this layer is public yet.
+
 Survey support remains outside the runtime architecture and requires an explicit design
 object, weighted nuisance protocol, and design-based variance. A separate balanced-panel extension replaces
 `EfficientDiD` multiclass probability ratios with calibrated pairwise cohort odds and

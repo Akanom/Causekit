@@ -92,9 +92,12 @@ versions may refine APIs, but breaking changes must still be documented explicit
   separately quantifies stationary efficiency and stationary-score target bias under
   shift.
 - Design-only contracts remain for calibrated direct pairwise cohort odds in balanced-
-  panel PT-All, the composition diagnostic and staggered composition-robust extension,
-  and repeated-section survey-design/population targets. Unsupported combinations keep
-  refusing; the narrow robust path does not imply that those separate gates are promoted.
+  panel PT-All and repeated-section survey-design/population targets. A separate
+  composition diagnostic and longer-design alignment contract now freezes the global
+  row/PSU fold plan, pair-specific four-cell task lattice, zero-padded full-sample
+  influences, target-period aggregation shares, Hausman difference covariance, refusals,
+  and ordered failing-first gates. Unsupported combinations keep refusing; no diagnostic
+  or staggered placeholder is exported.
 
 ### Changed
 

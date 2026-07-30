@@ -8,9 +8,12 @@ comparison population, non-empty covariates, and an explicit `CrossFitter`. It t
 treated target-period population, retains its four normalized cell weights, and supports
 the existing observation/PSU analytical and optional multiplier-inference machinery.
 
-Staggered group-time aggregation, conditional pre-trends with additional periods, the
-stationary-versus-robust composition diagnostic, survey designs, external estimator
-parity, publication-scale coverage, and promotion beyond this first slice remain open.
+Pairwise external parity, real-data sensitivity, performance, and publication-scale
+pointwise coverage pass. Staggered group-time aggregation, conditional pre-trends with
+additional periods, the stationary-versus-robust composition diagnostic implementation,
+longer robust bands, and survey combinations remain open. Their next-stage design is
+frozen separately in the
+[diagnostic and influence-alignment contract](DID_RCS_COMPOSITION_DIAGNOSTIC_ALIGNMENT_CONTRACT.md).
 No placeholder diagnostic or staggered wrapper is exported.
 
 Composition robustness is not a weighting option on the stationary score. It changes the
@@ -110,33 +113,24 @@ may use only an outer training partition. All four probabilities must be aligned
 strictly inside the declared floor, and sum to one within tolerance; CauseKit does not
 clip or renormalize them.
 
-Only after the pairwise score and inference are promoted may the staggered wrapper reuse
-the current comparison-set, anticipation, aggregation, and max-t infrastructure. It must
-retain target-period treated-population cohort shares and their full estimated-share
-influence. Stationary pooled cohort shares are not reusable.
+The longer-design extension may reuse the current comparison-set, anticipation, and
+max-t mechanics only through the separately frozen global-fold, pair-ledger, zero-padded
+influence, and target-period share contract. Stationary pooled cohort shares are not
+reusable.
 
 ## Composition diagnostic
 
-A future `RepeatedCrossSectionCompositionDiagnostic` compares aligned robust and
-stationary estimates using the empirical second moment of their difference influence:
+The detailed
+[diagnostic and influence-alignment contract](DID_RCS_COMPOSITION_DIAGNOSTIC_ALIGNMENT_CONTRACT.md)
+freezes a robust-minus-stationary Hausman-type equality comparison. It computes covariance
+from the aligned difference influence, not by subtracting marginal variances, and uses
+the existing HC1 or PSU-CR1 finite-sample convention. Singular systems and every sample,
+role, pair, fold, covariance, or cluster mismatch refuse without numerical repair.
 
-```text
-delta = ATT_cc - ATT_stationary
-psi_delta = psi_cc - psi_stationary
-V_delta = E[psi_delta^2]
-W = n * delta^2 / V_delta.
-```
-
-For a vector, CauseKit uses the full covariance of `psi_delta` and a rank-preserving
-linear solve. Singular systems refuse without ridge, pseudoinverse, dropped coordinates,
-or changed rank. Both inputs must share the analysis rows, target, comparison rule,
-covariates, baseline/target periods, anticipation, stabilization convention, fold plan,
-and observation/PSU inference role.
-
-The diagnostic is model validation, not model selection. CauseKit will never select the
-stationary estimator after a failure to reject and then report ordinary post-selection
-inference. Users concerned about composition change should report the robust result and
-the aligned sensitivity comparison.
+The diagnostic is model validation, not model selection. CauseKit never selects the
+stationary estimator after failure to reject and then reports ordinary post-selection
+inference. Users concerned about composition change report both estimates and the aligned
+sensitivity comparison.
 
 ## Required refusals
 
@@ -225,9 +219,10 @@ reviewed command targets the same post-period treated ATT and influence moment. 
 pinned real-data sensitivity example reports robust and stationary estimates together
 without pretest-based selection.
 
-Staggered group-time aggregation becomes a later promotion gate after the pairwise score
-passes. It requires both control rules, anticipation, target-period treated shares and
-share influence, conditional placebos, event/calendar/ESavg aggregation, observation/PSU
+Staggered group-time aggregation remains a later promotion gate after the pairwise score.
+It begins only after the diagnostic and global influence-alignment gates pass, and it
+requires both control rules, anticipation, target-period treated shares and share
+influence, conditional placebos, event/calendar/ESavg aggregation, observation/PSU
 inference, simultaneous bands, publication-scale coverage, OutputHub, and graph-data
 parity.
 

@@ -268,7 +268,9 @@ future task can resume without reconstructing intent from chat history.
     pass. The certificate records 8,000 estimator fits, 72,000 fold-level nuisance fits,
     zero refusals, stationary efficiency costs, and the analytical shift bias. Staggered
     aggregation, longer-design conditional pre-trends/bands, the composition diagnostic,
-    and survey combinations remain open.
+    and survey combinations remain open. The diagnostic and longer-design fold/pair/
+    influence/share contract is now frozen in
+    `docs/DID_RCS_COMPOSITION_DIAGNOSTIC_ALIGNMENT_CONTRACT.md`; no placeholder is public.
     The repaired project-scoped `python -m pip_audit .` now completes and reports no
     known vulnerabilities; the broader host environment separately flags Pillow and
     Starlette versions that are not CauseKit project dependencies.
@@ -297,8 +299,9 @@ future task can resume without reconstructing intent from chat history.
   robust score passes its hand/refusal contracts, official R `compdid` point/influence
   parity, hash-pinned real-data sensitivity, fixed-size performance, and pairwise
   publication-scale pointwise coverage. Its staggered, diagnostic, and longer-design
-  simultaneous gates remain open. Survey designs remain a separate design-only contract
-  and continue to refuse.
+  simultaneous gates remain open, with their global-fold and full-sample influence
+  alignment now contracted. Survey designs remain a separate design-only contract and
+  continue to refuse.
 - The R-learner alpha is public with honest evaluation, calibration, groups, bands, graph
   data, simulations, base-R/Stata parity, performance, native nonlinear support, and two
   real-data CATE records. The next native nonlinear stage is frozen as a separate
@@ -336,8 +339,13 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Extend the promoted pairwise [composition-change](docs/DID_RCS_COMPOSITION_CHANGE_CONTRACT.md)
-   score only through separately contracted diagnostics and longer/staggered designs.
+1. Implement Gate A in the
+   [composition diagnostic and alignment contract](docs/DID_RCS_COMPOSITION_DIAGNOSTIC_ALIGNMENT_CONTRACT.md):
+   failing hand-computed scalar/cluster equality diagnostics and official R parity come
+   before the longer pair lattice. Then implement Gates B–D in order; do not jump directly
+   to staggered aggregation.
+   Extend the promoted pairwise [composition-change](docs/DID_RCS_COMPOSITION_CHANGE_CONTRACT.md)
+   score only through those contracted diagnostics and longer/staggered designs.
    Official `compdid` parity, real-data sensitivity, performance, and pairwise
    publication-scale coverage now pass; do not rerun them for an unrelated extension.
    Keep the separate

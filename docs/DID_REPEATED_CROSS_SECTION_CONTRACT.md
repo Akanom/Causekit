@@ -10,7 +10,8 @@ had been written and observed failing. The covariate path implements the locally
 doubly robust repeated-cross-section score of Sant'Anna and Zhao (2020), not the balanced-
 panel PT-All machinery. Observation/PSU simultaneous bands are promoted. A narrow
 two-group, two-period composition-change-robust covariate score is implemented under an
-explicit opt-in; its staggered extension and diagnostic remain separate promotion gates.
+explicit opt-in; its staggered extension and diagnostic remain separate promotion gates
+with a frozen [influence-alignment contract](DID_RCS_COMPOSITION_DIAGNOSTIC_ALIGNMENT_CONTRACT.md).
 Survey designs remain design-only.
 
 Repeated cross sections are not an option on the balanced-panel classes. The observations,
@@ -74,7 +75,8 @@ Sant'Anna-Xu two-group, two-period estimand for treated observations in the targ
 population. It requires covariates, a four-cell generalized propensity, three outcome
 regressions, and its own influence function; it is not approximated by adding time
 controls to the stationary estimator. Staggered effects and a composition diagnostic
-remain unavailable.
+remain unavailable; the next-stage document contracts them without exporting a
+placeholder.
 
 ## Data contract
 

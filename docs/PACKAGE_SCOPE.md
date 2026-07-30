@@ -68,6 +68,10 @@ the treated target-period population. Longer or staggered robust designs still r
 Its pairwise real-data sensitivity, fixed-size performance, and publication-scale
 observation/PSU pointwise-inference gates pass; this does not promote a diagnostic or
 longer robust event-study surface.
+The next design is frozen in
+[the diagnostic and influence-alignment contract](DID_RCS_COMPOSITION_DIAGNOSTIC_ALIGNMENT_CONTRACT.md),
+but its public diagnostic, global pair lattice, target-share aggregation, and longer bands
+remain absent until their ordered failing-first gates pass.
 Its opt-in multiplier path draws once per observation or indivisible PSU and supplies
 studentized max-t simultaneous event-study bands without nuisance refitting. Separate
 1,000-replication publication certificates cover the

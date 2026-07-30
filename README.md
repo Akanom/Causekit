@@ -523,6 +523,11 @@ The separate [promotion evidence](docs/DID_RCS_COMPOSITION_PROMOTION_EVIDENCE.md
 the hash-pinned Sequeira robust/stationary sensitivity, a 100,000-row performance gate,
 and eight passing publication-scale pointwise-coverage cells across observation and PSU
 inference. These runs do not select between targets after inspecting the data.
+The next diagnostic and longer-design layer is frozen in the
+[composition diagnostic and influence-alignment contract](docs/DID_RCS_COMPOSITION_DIAGNOSTIC_ALIGNMENT_CONTRACT.md):
+one global row/PSU fold plan, pair-specific four-cell tasks, zero-padded full-sample
+influences, target-period aggregation shares, and difference-influence covariance. It
+adds no placeholder API.
 
 There is intentionally no `entity=` role and no `panel=False` switch. Every result records
 that stationary composition is an identifying assumption rather than a verified
@@ -833,8 +838,8 @@ contracts for [composition-change robustness](docs/DID_RCS_COMPOSITION_CHANGE_CO
 and [survey designs](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md). The balanced-panel PT-All
 path separately freezes [direct cohort-ratio nuisances](docs/DID_DIRECT_RATIO_CONTRACT.md).
 The composition contract now has a promoted pairwise pointwise-inference slice; its
-staggered, longer-design simultaneous, and diagnostic gates remain open. The direct-ratio
-and survey contracts add no placeholder API,
+staggered, longer-design simultaneous, and diagnostic gates are designed but remain
+unimplemented. The direct-ratio and survey contracts add no placeholder API,
 and raw survey weights still refuse.
 The causal-ML alpha includes native partially linear DML and separately contracted public
 [honest R-learner](docs/R_LEARNER_CONTRACT.md) and
