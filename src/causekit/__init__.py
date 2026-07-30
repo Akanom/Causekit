@@ -4,6 +4,8 @@ from .crossfit import (
     CATEEstimatorProtocol,
     CATEResultProtocol,
     ClassProbabilityCrossFitResult,
+    ClassProbabilityCrossFitTask,
+    ClassProbabilityTaskCrossFitResult,
     CrossFitResult,
     CrossFitTask,
     CrossFitTaskResult,
@@ -24,9 +26,11 @@ from .did import (
     did_hausman_test,
 )
 from .did_rcs import (
+    RepeatedCrossSectionCompositionDiagnostic,
     RepeatedCrossSectionDiD,
     RepeatedCrossSectionDiDResult,
     RepeatedCrossSectionPretrendDiagnostic,
+    did_rcs_composition_test,
 )
 from .integrations import add_to_outputhub, to_outputhub_model
 from .iv import IV2SLS, IV2SLSResult
@@ -65,6 +69,8 @@ __all__ = [
     "FirstStageDiagnostic",
     "CovariateBalance",
     "ClassProbabilityCrossFitResult",
+    "ClassProbabilityCrossFitTask",
+    "ClassProbabilityTaskCrossFitResult",
     "CrossFitResult",
     "CrossFitTask",
     "CrossFitTaskResult",
@@ -95,6 +101,7 @@ __all__ = [
     "RLearner",
     "RLearnerResult",
     "RepeatedCrossSectionDiD",
+    "RepeatedCrossSectionCompositionDiagnostic",
     "RepeatedCrossSectionDiDResult",
     "RepeatedCrossSectionPretrendDiagnostic",
     "PropensityResultProtocol",
@@ -114,6 +121,7 @@ __all__ = [
     "vcov",
     "wald_test",
     "did_hausman_test",
+    "did_rcs_composition_test",
 ]
 
 __version__ = "0.7.0a6"

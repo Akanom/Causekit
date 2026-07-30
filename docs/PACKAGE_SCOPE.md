@@ -62,16 +62,13 @@ doubly robust repeated-cross-section score, and aligns conditional pre-trend pla
 that score. Both paths retain fixed comparison membership, pooled cohort-share
 aggregation, cell-count audits, and HC1 observation or one-way CR1 PSU inference. It has
 no entity role and still refuses sampling weights. A separate
-`composition="robust"` first slice supports exactly one treated cohort and two periods,
-cross-fits a four-cell generalized propensity plus three outcome regressions, and targets
-the treated target-period population. Longer or staggered robust designs still refuse.
-Its pairwise real-data sensitivity, fixed-size performance, and publication-scale
-observation/PSU pointwise-inference gates pass; this does not promote a diagnostic or
-longer robust event-study surface.
-The next design is frozen in
-[the diagnostic and influence-alignment contract](DID_RCS_COMPOSITION_DIAGNOSTIC_ALIGNMENT_CONTRACT.md),
-but its public diagnostic, global pair lattice, target-share aggregation, and longer bands
-remain absent until their ordered failing-first gates pass.
+`composition="robust"` path supports pairwise, longer, and staggered target-period
+effects. It cross-fits pair-specific four-cell generalized propensities plus three outcome
+regressions on one global fold plan, embeds full-sample influences, aggregates with target-
+period shares, and exposes conditional placebos and simultaneous event-study bands. The
+aligned public diagnostic compares robust and stationary influences without selecting an
+estimator. Pairwise and longer real-data, performance, external-boundary, and publication-
+scale observation/PSU gates pass.
 Its opt-in multiplier path draws once per observation or indivisible PSU and supplies
 studentized max-t simultaneous event-study bands without nuisance refitting. Separate
 1,000-replication publication certificates cover the
@@ -219,7 +216,7 @@ and validation gates:
 | Family | Required design questions before promotion |
 | --- | --- |
 | Matching extensions | Publication-scale sensitivity/coverage and available Python/R/Stata evidence pass; generic-score, selected-target, tie-expanded, clustered, survey, and bootstrap inference remain separately prohibited or deferred |
-| DiD promotion | Covariate-adjusted balanced-panel PT-All and stationary repeated-section paths are implemented; pairwise composition robustness passes pointwise promotion, while its staggered/diagnostic/longer-band extensions, direct PT-All cohort ratios, and survey designs retain separate gates |
+| DiD promotion | Covariate-adjusted balanced-panel PT-All and stationary repeated-section paths are implemented; composition robustness passes pairwise and longer/staggered diagnostic, pointwise, and simultaneous promotion, while direct PT-All cohort ratios and survey designs retain separate gates |
 | Causal ML promotion | Implement the frozen construction-cross-fitted native orthogonal-stack contract, then harden R-/DR-learners with repeated-split and publication-scale evidence; unit-level intervals, RATE, and policy evaluation retain separate contracts |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
 | Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |
@@ -239,8 +236,9 @@ and inference boundaries are recorded in [Difference-in-differences contract](DI
 The balanced-panel PT-All [direct cohort-ratio](DID_DIRECT_RATIO_CONTRACT.md) nuisance and
 the repeated-section [survey-design](DID_RCS_SURVEY_DESIGN_CONTRACT.md) path remain
 design-only. The independent [composition-change](DID_RCS_COMPOSITION_CHANGE_CONTRACT.md)
-contract has a public pairwise score but retains separate staggered and diagnostic gates.
-None can be reused or composed until its score-specific gates pass.
+contract is implemented through longer/staggered target-share aggregation and its aligned
+diagnostic. Survey and direct-ratio components cannot be reused or composed until their
+score-specific gates pass.
 
 ## Out of current scope
 

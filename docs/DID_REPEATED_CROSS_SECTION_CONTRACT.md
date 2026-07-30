@@ -251,14 +251,15 @@ Current promotion status is:
     480,000 nuisance fold fits complete, the narrowest realized PSU cell spans 31
     clusters, and the refusal ledger is empty. Seeds and indivisible PSU roles are audited.
 
-## Separately contracted next stages
+## Composition promotion and the remaining survey stage
 
 Two repeated-section capabilities have independent contracts:
 
-- [Composition-change robustness](DID_RCS_COMPOSITION_CHANGE_CONTRACT.md) now has its
-  pairwise score, influence, weights, strict refusals, and OutputHub transport. Staggered
-  aggregation, its diagnostic, parity, simulation, and publication evidence remain open;
-  the diagnostic cannot be used for pretest-based estimator selection.
+- [Composition-change robustness](DID_RCS_COMPOSITION_CHANGE_CONTRACT.md) now has pairwise
+  and longer/staggered scores, full-sample influences, target-period aggregation shares,
+  strict refusals, conditional placebos, simultaneous bands, the aligned diagnostic,
+  OutputHub transport, and publication evidence. The diagnostic cannot be used for
+  pretest-based estimator selection.
 - [Survey designs](DID_RCS_SURVEY_DESIGN_CONTRACT.md) change the population measure and
   design-based uncertainty. Bare `sampling_weights` remain insufficient; a validated
   design, explicit population target, weighted nuisance protocol, and survey-specific

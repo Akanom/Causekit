@@ -266,7 +266,8 @@ future task can resume without reconstructing intent from chat history.
     Hash-pinned Sequeira robust/stationary sensitivity, the 100,000-row eight-task
     performance gate, and eight observation/PSU publication-scale coverage cells now
     pass. The certificate records 8,000 estimator fits, 72,000 fold-level nuisance fits,
-    zero refusals, stationary efficiency costs, and the analytical shift bias. Staggered
+    zero refusals, stationary efficiency costs, and the analytical shift bias. At that
+    checkpoint, staggered
     aggregation, longer-design conditional pre-trends/bands, the composition diagnostic,
     and survey combinations remain open. The diagnostic and longer-design fold/pair/
     influence/share contract is now frozen in
@@ -274,6 +275,22 @@ future task can resume without reconstructing intent from chat history.
     The repaired project-scoped `python -m pip_audit .` now completes and reports no
     known vulnerabilities; the broader host environment separately flags Pillow and
     Starlette versions that are not CauseKit project dependencies.
+
+26. `0.7.0a6` composition diagnostic and longer/staggered promotion: public
+    `did_rcs_composition_test` now compares aligned robust-minus-stationary influence
+    records under HC1/PSU-CR1 and never selects an estimator. Official R 4.5.1
+    `drdid_stationarity_test()` mapping passes at the pinned `compdid` commit. Reusable
+    masked multiclass `CrossFitter` tasks drive one global row/whole-PSU fold plan across
+    pair-specific four-class and three-outcome nuisances. Longer robust effects use fixed
+    comparison membership, full-sample zero-padded/scaled pair influences, target-period
+    treated-cell aggregation shares with share influence, conditional placebos, and
+    fixed-seed simultaneous bands. Both control rules, multiple cohorts, row/PSU
+    permutations, overlap/refusal gates, and OutputHub audits pass. Hash-pinned hospital
+    sensitivity, a 120,000-row/64-fit performance certificate, and a four-cell 4,000-fit/
+    108,000-nuisance-fit publication certificate pass with zero refusals. Diagnostic size
+    is `0.060–0.068` under stationarity and power is `1.000` under composition shift;
+    simultaneous coverage is `0.930–0.950`. Official longer `compdid` and Stata comparator
+    cells remain unavailable rather than being manufactured.
 
 ## Open promotion gates
 
@@ -295,12 +312,11 @@ future task can resume without reconstructing intent from chat history.
   recorded as non-comparable. The covariate score has independent fixed-OOF base-R parity;
   pinned R/Stata estimator-level cells remain unavailable because their maintained public
   paths do not implement the same score. Observation/PSU multiplier mechanics and the
-  16-cell publication-scale joint-band certificate pass. The narrow pairwise composition-
-  robust score passes its hand/refusal contracts, official R `compdid` point/influence
-  parity, hash-pinned real-data sensitivity, fixed-size performance, and pairwise
-  publication-scale pointwise coverage. Its staggered, diagnostic, and longer-design
-  simultaneous gates remain open, with their global-fold and full-sample influence
-  alignment now contracted. Survey designs remain a separate design-only contract and
+  16-cell publication-scale joint-band certificate pass. The composition-robust score now
+  passes pairwise and longer/staggered hand/refusal contracts, official R `compdid`
+  point/influence and diagnostic mapping, hash-pinned real-data sensitivity, fixed-size
+  performance, target-share aggregation, conditional-placebo, pointwise, and simultaneous
+  publication coverage. Survey designs remain a separate design-only contract and
   continue to refuse.
 - The R-learner alpha is public with honest evaluation, calibration, groups, bands, graph
   data, simulations, base-R/Stata parity, performance, native nonlinear support, and two
@@ -339,20 +355,13 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Implement Gate A in the
-   [composition diagnostic and alignment contract](docs/DID_RCS_COMPOSITION_DIAGNOSTIC_ALIGNMENT_CONTRACT.md):
-   failing hand-computed scalar/cluster equality diagnostics and official R parity come
-   before the longer pair lattice. Then implement Gates B–D in order; do not jump directly
-   to staggered aggregation.
-   Extend the promoted pairwise [composition-change](docs/DID_RCS_COMPOSITION_CHANGE_CONTRACT.md)
-   score only through those contracted diagnostics and longer/staggered designs.
-   Official `compdid` parity, real-data sensitivity, performance, and pairwise
-   publication-scale coverage now pass; do not rerun them for an unrelated extension.
-   Keep the separate
-   [survey-design](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md) contract design-only until that
-   base evidence is complete. The balanced-panel
-   [direct-ratio](docs/DID_DIRECT_RATIO_CONTRACT.md) nuisance is a separate PT-All option;
-   do not combine or reuse these paths before their base gates pass.
+1. Composition diagnostic/alignment Gates A–D are complete. Begin the separate
+   [survey-design](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md) contract only with its own
+   weighted-target theorem, hand score, nuisance protocol, and observation/PSU coverage;
+   raw survey weights continue to refuse. The balanced-panel
+   [direct-ratio](docs/DID_DIRECT_RATIO_CONTRACT.md) nuisance remains a separate PT-All
+   option; do not combine either path with composition robustness before its base gates
+   pass. Do not rerun settled composition certificates for unrelated work.
 2. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
    manipulation checks, bias correction, and local estimand.
 3. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed

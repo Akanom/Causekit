@@ -2,19 +2,16 @@
 
 ## Status and boundary
 
-The first `composition="robust"` slice is implemented through
-`RepeatedCrossSectionDiD`: exactly two periods, one treated cohort, a fixed never-treated
-comparison population, non-empty covariates, and an explicit `CrossFitter`. It targets the
-treated target-period population, retains its four normalized cell weights, and supports
-the existing observation/PSU analytical and optional multiplier-inference machinery.
+`composition="robust"` is implemented through `RepeatedCrossSectionDiD` for pairwise,
+longer, and staggered repeated-section designs with non-empty covariates and an explicit
+`CrossFitter`. Every pair targets its treated target-period population, retains four
+normalized cell weights and a full-sample influence, and supports observation/PSU
+analytical and optional multiplier inference.
 
-Pairwise external parity, real-data sensitivity, performance, and publication-scale
-pointwise coverage pass. Staggered group-time aggregation, conditional pre-trends with
-additional periods, the stationary-versus-robust composition diagnostic implementation,
-longer robust bands, and survey combinations remain open. Their next-stage design is
-frozen separately in the
-[diagnostic and influence-alignment contract](DID_RCS_COMPOSITION_DIAGNOSTIC_ALIGNMENT_CONTRACT.md).
-No placeholder diagnostic or staggered wrapper is exported.
+Pairwise and longer external-boundary, real-data, performance, pointwise, diagnostic, and
+simultaneous-coverage gates pass. The public aligned equality diagnostic is implemented;
+it reports both estimators and does not select between them. Survey-population combinations
+remain open under their separate contract.
 
 Composition robustness is not a weighting option on the stationary score. It changes the
 target population, generalized propensity nuisance, efficient influence function,
@@ -99,8 +96,8 @@ unmeasured composition changes.
 
 ## CrossFitter execution
 
-The implemented first phase is the pairwise two-group, two-period score. It reuses the
-public `CrossFitter` rather than owning learners. One four-class probability task predicts
+The implementation reuses the public `CrossFitter` rather than owning learners. Each pair
+uses one four-class probability task predicting
 the ordered cells `(0,0)`, `(0,1)`, `(1,0)`, `(1,1)`. Three masked scalar outcome tasks
 predict `m_10`, `m_01`, and `m_00`; `m_11` is not a nuisance in the efficient score and
 must not be fitted as unused work. An external comparator's optional fourth column may be
@@ -113,10 +110,9 @@ may use only an outer training partition. All four probabilities must be aligned
 strictly inside the declared floor, and sum to one within tolerance; CauseKit does not
 clip or renormalize them.
 
-The longer-design extension may reuse the current comparison-set, anticipation, and
-max-t mechanics only through the separately frozen global-fold, pair-ledger, zero-padded
-influence, and target-period share contract. Stationary pooled cohort shares are not
-reusable.
+The longer-design path uses the comparison-set, anticipation, and max-t mechanics through
+the promoted global-fold, pair-ledger, zero-padded influence, and target-period share
+contract. Stationary pooled cohort shares are not reused.
 
 ## Composition diagnostic
 
@@ -160,11 +156,12 @@ stationary score, or variance repair is permitted.
 public refusal before runtime code changed. The retained tests now reconstruct the exact
 two-by-two estimate, all four normalized weights, the complete efficient influence
 vector, and HC1 standard error. They also verify the target and nuisance schema, absence
-of an unused `m_11` fit, non-empty-covariate and pairwise-scope refusals, hard four-cell
-overlap refusal without clipping, and immutable row/whole-PSU cross-fitting. Existing
+of an unused `m_11` fit, non-empty-covariate refusals, hard four-cell
+overlap refusal without clipping, unsupported pair/fold refusal, and immutable
+row/whole-PSU cross-fitting. Existing
 stationary tests remain unchanged apart from allowing the now-supported robust label.
 
-The next deterministic gate uses 32 observations with binary `X` and exact four-cell
+The retained deterministic gate uses 32 observations with binary `X` and exact four-cell
 probabilities. Treated baseline composition has `E[X]=0.25`, while treated target-period
 composition has `E[X]=0.75`; the heterogeneous effect is `2+4X`. The robust score exactly
 recovers target-period ATT `5`, whereas the stationary score equals its distinct pooled-
@@ -194,37 +191,29 @@ publication certificate completes 8,000 estimator fits and 72,000 fold-level nui
 fits with zero refusals; all eight bias, SE-calibration, and pointwise-coverage cells pass.
 See [the full promotion evidence](DID_RCS_COMPOSITION_PROMOTION_EVIDENCE.md).
 
-## Remaining extension sequence
+## Completed extension sequence
 
-The base pairwise pointwise-inference gates are complete. Extensions still require:
-
-1. hand-computed scalar and vector composition diagnostics, including singular and
-   misaligned-input refusals;
-2. conditional pre-trends for longer designs and fixed-seed max-t identities using robust
-   influence records without nuisance refitting; and
-3. staggered group-time aggregation only after the diagnostic and longer-design score
-   have independent hand and coverage contracts.
-
-The completed base simulations cover favorable stationarity and composition change,
+Hand-computed scalar/vector diagnostics and alignment refusals, conditional pre-trends,
+fixed-seed max-t identities, target-share staggered aggregation, and publication-scale
+coverage now pass. The completed simulations cover favorable stationarity and composition change,
 nonlinear fitted nuisances, unequal cell probabilities, observation/PSU inference, bias,
 SE calibration, pointwise coverage, overlap, audit counts, zero fallbacks, runtime, and
-peak memory. They report the efficiency loss under true stationarity. Simultaneous robust
-event-study coverage and diagnostic size/power remain longer-design extension gates.
+peak memory. They report diagnostic size under stationarity, power under composition shift,
+and the efficiency cost of robustness without converting the diagnostic into selection.
+See [the longer promotion evidence](DID_RCS_COMPOSITION_LONGER_PROMOTION_EVIDENCE.md).
 
 The primary external comparator is the authors' official R `compdid` implementation.
 Its pinned point/influence gate and subsequent standard-error comparison now pass through
 `benchmarks/validate_did_rcs_compdid_reference.R`; the saved artifact is validated in
 `tests/validation/test_did_rcs_compdid_parity.py`. Stata is recorded unavailable unless a
 reviewed command targets the same post-period treated ATT and influence moment. The hash-
-pinned real-data sensitivity example reports robust and stationary estimates together
-without pretest-based selection.
+pinned real-data sensitivity examples report robust and stationary estimates together
+without pretest-based selection. Official `compdid` has no maintained aligned longer or
+staggered interface, so that comparator cell remains unavailable rather than manufactured.
 
-Staggered group-time aggregation remains a later promotion gate after the pairwise score.
-It begins only after the diagnostic and global influence-alignment gates pass, and it
-requires both control rules, anticipation, target-period treated shares and share
-influence, conditional placebos, event/calendar/ESavg aggregation, observation/PSU
-inference, simultaneous bands, publication-scale coverage, OutputHub, and graph-data
-parity.
+The remaining repeated-section extension is survey-population combination. It stays under
+the separate survey contract because design weights change the target and variance; raw
+sampling weights continue to refuse.
 
 ## Pre-mortem
 

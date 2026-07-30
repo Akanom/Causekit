@@ -32,8 +32,8 @@ class _MultinomialLogit:
         design = np.column_stack([np.ones(len(X)), X.to_numpy(dtype=float)])
         classes = np.sort(y.unique())
         positions = pd.Index(classes).get_indexer(y)
-        if len(classes) != 4 or np.any(positions < 0):
-            raise ValueError("The example requires all four group-period cells per fold.")
+        if len(classes) < 2 or np.any(positions < 0):
+            raise ValueError("The example requires at least two labelled classes per fold.")
         n_parameters = (len(classes) - 1) * design.shape[1]
 
         def objective(flat: np.ndarray) -> tuple[float, np.ndarray]:

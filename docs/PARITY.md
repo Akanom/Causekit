@@ -37,7 +37,7 @@ uses different estimands or moments. Neither counts as a pass.
 | Conventional staggered DiD | hand/influence identities pass | real hospital group-time/influence contract passes | Stata/IC 17 same group-time/influence contract passes; `didregress` common-effect aggregation is non-comparable | pass for aligned contract |
 | Repeated-cross-section DiD, stationary composition | hand, aggregation, HC1/CR1, and 32-cell publication coverage contracts pass | pinned `did` 2.5.0 `att_gt(panel = FALSE, est_method = "reg")` passes both control rules after explicit HC0-to-HC1 mapping | reviewed Stata/IC 17 `csdid` matches group-time estimates/SEs and aggregate points; aggregate SEs use non-comparable cell-share influence | pass for available aligned fields |
 | Repeated-cross-section DiD, covariate adjusted | hand score/influence, leakage, double-robustness, hash-verified real-data, and 44-cell publication coverage contracts pass | fixed-OOF base-R score/HC1 reconstruction passes; estimator-level implementation unavailable | reviewed estimators target different moments: unavailable | internal publication evidence and score parity pass; estimator-level external unavailable |
-| Repeated-cross-section DiD, composition-robust pairwise | hand estimate/EIF/HC1/weights, hash-pinned real-data sensitivity, 100,000-row performance, and eight-cell observation/PSU publication coverage pass | official `compdid` 0.1.0 point, HC1-equivalent SE, and every influence coordinate pass at pinned commit | no reviewed estimator targeting the same treated-target-period moment: unavailable | pairwise pointwise-inference promotion passes; staggered/diagnostic/longer-band extensions remain open |
+| Repeated-cross-section DiD, composition robust | pairwise and longer hand influence/target-share/band identities, hash-pinned real data, 120,000-row performance, and observation/PSU pointwise/joint/diagnostic promotion pass | official `compdid` 0.1.0 pairwise point/IF and fixed-influence stationarity diagnostic pass; aligned longer estimator unavailable | no reviewed estimator targeting the same treated-target-period influence moment: unavailable | pairwise and longer/staggered internal promotion pass; survey combinations remain open |
 | Efficient DiD, no covariates | native result checked on fixture and real data | pinned public `edid` commit passes fixture and real hospital data | unavailable: Stata heterogeneous DiD does not implement PT-All optimal weighting | pass for available aligned comparator |
 | Efficient DiD, covariate adjusted | deterministic equation, refusal, and simulation evidence pass | unavailable: pinned public `edid` explicitly excludes covariates | unavailable: no identified Chen–Sant'Anna–Xie PT-All implementation | internal validation; external unavailable |
 | `PartiallyLinearDML` residual stage | hand score plus independent Statsmodels HC1 pass | base R 4.5.1 matrix/HC1 contract passes | reviewed Stata/IC 17 no-intercept HC1 contract passes | pass |
@@ -132,7 +132,7 @@ hash-bound `benchmarks/did_rcs_simultaneous_promotion_evidence.json` certificate
 draws, zero refusals, and 16 passing publication-scale joint-coverage cells. This is
 internal inferential evidence, not manufactured cross-language random-number parity.
 
-The pairwise composition-robust row combines the independent Python hand contract in
+The composition-robust row begins with the independent pairwise Python hand contract in
 `tests/test_did_rcs_composition.py` with
 `benchmarks/validate_did_rcs_compdid_reference.R`. The official comparator pins
 `compdid` 0.1.0 commit `894bd65a952c30f01a4e0005efba4cb335065eb7` and the relevant
@@ -157,6 +157,16 @@ cells. The associated Sequeira run is a hash-pinned sensitivity comparison under
 ridge nuisances, not external estimator parity; both targets are reported without
 pretest selection. Details and reproduction commands are in
 `docs/DID_RCS_COMPOSITION_PROMOTION_EVIDENCE.md`.
+
+The longer-design extension preserves the pairwise score in a shared-fold task lattice,
+zero-pads every pair influence on the complete sample, and aggregates with target-period
+treated-cell shares plus their estimated-share influence. Official R 4.5.1 diagnostic
+mapping passes on fixed aligned estimates/influences. The 322-row hospital sensitivity,
+120,000-row performance certificate, and four-cell 4,000-fit publication certificate pass
+conditional-pretrend size, pointwise/joint coverage, and diagnostic size/power with zero
+refusals. Official `compdid` has no aligned longer/staggered estimator interface; R/Stata
+estimator-level cells remain unavailable. Details are in
+`docs/DID_RCS_COMPOSITION_LONGER_PROMOTION_EVIDENCE.md`.
 
 The fixed-score matching R harness is `benchmarks/validate_matching_reference.R`. It
 pins CRAN `Matching` commit `1208eaa7bfa888b1fc903481dddfb8c0dffa40d5`

@@ -91,13 +91,27 @@ versions may refine APIs, but breaking changes must still be documented explicit
   refusals. All eight bias, SE-calibration, and pointwise-coverage cells pass; the record
   separately quantifies stationary efficiency and stationary-score target bias under
   shift.
+- Public `did_rcs_composition_test` and immutable
+  `RepeatedCrossSectionCompositionDiagnostic`. The aligned robust-minus-stationary
+  comparison uses the direct difference influence under HC1 or PSU-CR1, refuses singular
+  or misaligned inputs without repair, reports both estimators, and never recommends one.
+  Official R `drdid_stationarity_test()` parity passes under fixed aligned influences with
+  the explicit `W_HC0 = W_HC1 * n / (n - 1)` mapping.
+- Reusable masked multiclass task orchestration in `CrossFitter`, followed by the public
+  longer/staggered `composition="robust"` pair lattice. One global row/whole-PSU fold plan
+  is shared across pair-specific four-class and three-outcome tasks; pair influences are
+  zero-padded and scaled on the complete sample. Results retain a pair ledger, target-
+  period treated-cell aggregation shares and their influence, conditional placebos,
+  robust event/calendar/ESavg paths, and fixed-seed observation/PSU simultaneous bands.
+- Longer-design promotion evidence: hash-pinned 322-row/46-hospital sensitivity, a
+  120,000-row benchmark completing eight pairs and 64 nuisance fits in 2.101 seconds with
+  346.961 MiB Python peak, and 500 replications in each stationarity/shift and
+  observation/PSU cell. All four cells pass bias, SE calibration, pointwise and joint
+  coverage, conditional-pretrend size, diagnostic size/power, and zero-refusal gates over
+  4,000 estimator fits and 108,000 nuisance fold fits.
 - Design-only contracts remain for calibrated direct pairwise cohort odds in balanced-
-  panel PT-All and repeated-section survey-design/population targets. A separate
-  composition diagnostic and longer-design alignment contract now freezes the global
-  row/PSU fold plan, pair-specific four-cell task lattice, zero-padded full-sample
-  influences, target-period aggregation shares, Hausman difference covariance, refusals,
-  and ordered failing-first gates. Unsupported combinations keep refusing; no diagnostic
-  or staggered placeholder is exported.
+  panel PT-All and repeated-section survey-design/population targets. Unsupported survey
+  combinations keep refusing; no survey placeholder is exported.
 
 ### Changed
 
@@ -115,12 +129,10 @@ versions may refine APIs, but breaking changes must still be documented explicit
 
 ### Known limitations
 
-- Stationary composition is declared but not testable from the estimator. Composition-
-  robust estimation is currently restricted to a covariate-adjusted two-period design
-  with one treated cohort; staggered aggregation, longer-design pre-trends, the aligned
-  composition diagnostic, and longer-design simultaneous coverage remain open. Pairwise
-  real-data sensitivity, performance, and pointwise coverage now pass. Sampling or survey
-  weights remain unimplemented and refuse.
+- The aligned equality diagnostic is sensitivity evidence, not proof of stationary
+  composition and not an estimator-selection rule. Sampling or survey weights remain
+  unimplemented and refuse; composition robustness does not protect against unmeasured
+  composition changes.
   Direct cohort-ratio nuisances are also design-only; the implemented PT-All path
   continues to use multiclass probabilities. Covariate estimator-level parity is
   unavailable where reviewed R/Stata public paths target different moments.

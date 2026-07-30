@@ -2,18 +2,17 @@
 
 ## Status and claim boundary
 
-This is a design-only contract. CauseKit currently implements and promotes only the
-two-group, two-period `RepeatedCrossSectionDiD(composition="robust")` score. This document
-freezes the next two implementation layers:
+This contract is implemented and promoted. It extends the two-group, two-period
+`RepeatedCrossSectionDiD(composition="robust")` score through:
 
 1. an aligned Hausman-type equality diagnostic comparing robust and stationary scores;
 2. the pair lattice, folds, influence records, aggregation shares, placebos, and bands
-   required before composition robustness can support longer or staggered designs.
+   that support longer or staggered designs.
 
-No diagnostic class, test function, `composition="both"` mode, longer robust estimator,
-or staggered wrapper is exported by this contract. Public names are implemented only
-after failing behavioral/API tests freeze them. The proposed first names are
-`did_rcs_composition_test` and `RepeatedCrossSectionCompositionDiagnostic`.
+The public diagnostic names are `did_rcs_composition_test` and
+`RepeatedCrossSectionCompositionDiagnostic`. Longer and staggered effects remain on the
+existing `RepeatedCrossSectionDiD(composition="robust")` surface; no duplicate wrapper or
+`composition="both"` pretest-selection mode was added.
 
 The authors' maintained `compdid` implementation compares its two-period nonstationary
 and stationary estimates through the empirical second moment of their difference
@@ -27,18 +26,17 @@ estimator.
 | Layer | Current status | Remaining work |
 | --- | --- | --- |
 | Pairwise estimand, score, weights, HC1/CR1, multiplier path | Promoted | Maintain unchanged |
-| Pairwise hand/refusal tests and official R point/influence parity | Promoted | Add diagnostic parity |
+| Pairwise hand/refusal tests and official R point/influence parity | Promoted | Maintain unchanged |
 | Real-data sensitivity, performance, pairwise pointwise coverage | Promoted | Do not rerun for unrelated work |
-| Composition diagnostic | Contracted here | Failing-first implementation, R parity, size/power promotion |
-| Longer-design pair and influence alignment | Contracted here | Runtime task lattice and hand identities |
-| Conditional robust pre-trends and simultaneous bands | Formula frozen here | Implementation and joint coverage |
-| Staggered event/calendar/ES-average aggregation | Formula frozen here | Implementation, parity where available, promotion |
+| Composition diagnostic | Promoted | Maintain no-selection and alignment refusals |
+| Longer-design pair and influence alignment | Promoted | Maintain global roles and ledger audits |
+| Conditional robust pre-trends and simultaneous bands | Promoted | Maintain fixed-seed joint coverage |
+| Staggered event/calendar/ES-average aggregation | Promoted | External comparator remains unavailable |
 | Survey-population combination | Separate design-only contract | Not part of this sequence |
 
-Thus the statistically difficult pairwise score is complete, but three delivery blocks
-remain for a full sample-target design: the diagnostic, longer/staggered runtime
-orchestration, and publication promotion of the resulting vector. Completion is better
-described by those gates than by a line-count percentage.
+All four delivery gates below pass. Survey-population combination remains deliberately
+separate because it changes the target population, nuisance fitting, and design-based
+variance rather than extending this unweighted score mechanically.
 
 ## Longer-design pair lattice
 
@@ -264,7 +262,7 @@ post-estimation bands and diagnostics.
 
 ## Failing-first implementation order
 
-### Gate A — pairwise diagnostic
+### Gate A — pairwise diagnostic (complete)
 
 1. Hand-computed scalar difference, influence, HC1 variance, statistic, and p-value.
 2. A clustered fixture reconstructing PSU sums, CR1, and the finite-cluster reference.
@@ -274,7 +272,7 @@ post-estimation bands and diagnostics.
    singularity refusals.
 5. OutputHub and summary evidence that always presents both estimators and never selects.
 
-### Gate B — longer influence lattice
+### Gate B — longer influence lattice (complete)
 
 1. One cohort and at least three periods: hand-reconstruct every post pair, zero-padded
    influence column, and adjacent pre-treatment placebo.
@@ -284,7 +282,7 @@ post-estimation bands and diagnostics.
 4. Row, labelled-column, pair-order, and PSU permutation invariance.
 5. Strict four-cell global/fold overlap and unsupported-pair refusals.
 
-### Gate C — joint post-estimation
+### Gate C — joint post-estimation (complete)
 
 1. Direct covariance reconstruction for group-time, event, calendar, ESavg, and placebo
    vectors under observation and PSU inference.
@@ -292,7 +290,7 @@ post-estimation bands and diagnostics.
 3. Scalar and vector equality diagnostics on longer aligned results.
 4. OutputHub and graph-data parity for every point, interval, share, and diagnostic field.
 
-### Gate D — promotion
+### Gate D — promotion (complete)
 
 Preregistered simulations cross favorable stationarity and composition shift, nonlinear
 nuisances, unequal waves, heterogeneous effects, never/not-yet controls, observation/PSU
@@ -306,6 +304,9 @@ not rerun merely to implement this extension. Longer-design real-data evidence m
 both paths and all diagnostics without pretest selection. Where no maintained R or Stata
 estimator exposes the aligned staggered target and influence, the comparator cell remains
 unavailable rather than being manufactured.
+
+The completed artifacts and exact reproduction commands are recorded in the
+[longer-design promotion evidence](DID_RCS_COMPOSITION_LONGER_PROMOTION_EVIDENCE.md).
 
 ## Pre-mortem
 

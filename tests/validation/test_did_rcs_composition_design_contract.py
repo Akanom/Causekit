@@ -40,6 +40,7 @@ def test_base_contract_routes_to_the_next_stage_without_conflicting_formula() ->
     assert "V_delta = E[psi_delta^2]" not in contract
 
 
-def test_design_contract_exports_no_premature_placeholder() -> None:
-    assert not hasattr(causekit, "did_rcs_composition_test")
-    assert not hasattr(causekit, "RepeatedCrossSectionCompositionDiagnostic")
+def test_gate_a_exports_diagnostic_but_not_uncontracted_combined_estimator() -> None:
+    assert hasattr(causekit, "did_rcs_composition_test")
+    assert hasattr(causekit, "RepeatedCrossSectionCompositionDiagnostic")
+    assert not hasattr(causekit, "RepeatedCrossSectionCompositionBoth")

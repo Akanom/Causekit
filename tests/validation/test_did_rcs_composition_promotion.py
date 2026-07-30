@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
+import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
-
-from benchmarks import benchmark_did_rcs_composition
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 PREPARE_PATH = REPOSITORY_ROOT / "benchmarks" / "prepare_did_rcs_composition_real_data.R"
@@ -21,6 +22,26 @@ REFERENCE_COMMIT = "894bd65a952c30f01a4e0005efba4cb335065eb7"
 SOURCE_BLOB = "6a6a8bbe9792bc6385849421a7fd0d76692cd79e"
 SOURCE_SHA256 = "37f113f1c706a3b35c325b996884c843beb9a4f773c3928d505ca51b285a7953"
 ANALYSIS_CSV_SHA256 = "48e3d0cc1bd2eb757e4ac0ad24a9cc60946c6041cb4c56debaac95e4aaebb492"
+
+
+def _load_module(path: Path, name: str) -> ModuleType:
+    specification = importlib.util.spec_from_file_location(name, path)
+    if specification is None or specification.loader is None:
+        raise RuntimeError(f"Could not load validation module from {path}.")
+    module = importlib.util.module_from_spec(specification)
+    sys.modules[name] = module
+    sys.path.insert(0, str(path.parent))
+    try:
+        specification.loader.exec_module(module)
+    finally:
+        sys.path.remove(str(path.parent))
+    return module
+
+
+benchmark_did_rcs_composition = _load_module(
+    REPOSITORY_ROOT / "benchmarks" / "benchmark_did_rcs_composition.py",
+    "benchmark_did_rcs_composition",
+)
 
 
 def _json(path: Path) -> dict[str, object]:

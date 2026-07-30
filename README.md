@@ -92,9 +92,10 @@ must contain at least `n_splits` observations. Fold assignment is deterministic 
 `random_state` is fixed. Supplying `clusters=` keeps every cluster wholly within one fold
 and refuses any allocation that cannot retain every treatment stratum in every fold.
 
-The same orchestrator exposes multiclass class-probability prediction and masked scalar
-regression tasks. Those operations let panel estimators request cohort-specific outcome
-changes and conditional second moments without owning or copying model implementations.
+The same orchestrator exposes multiclass class-probability prediction, task-masked
+multiclass prediction on one global fold plan, and masked scalar regression tasks. Those
+operations let estimators request cohort/pair-specific probabilities, outcome changes, and
+conditional second moments without owning or copying model implementations.
 Every task receives a fresh model per fold. A separate `second_moment_factory=` is
 optional; when omitted, the outcome factory is reused. Multiclass DataFrame outputs must
 have exactly one labelled column per observed class. Labelled column permutations are
@@ -426,11 +427,13 @@ compares four independent cohort-period cell means. With covariates it uses the 
 efficient doubly robust repeated-cross-section score with one propensity and four group-
 period outcome regressions per comparison. Both paths hold the eligible comparison rule
 fixed at target and baseline and permit unequal period and cell sizes. The current surface
-also offers a narrow `composition="robust"` path for exactly two periods and one treated
-cohort. That path cross-fits a four-cell generalized propensity and three outcome
-regressions and targets treated observations in the target-period population. Sampling
-weights remain unavailable. HC1 observation or one-way CR1 PSU inference applies to both
-composition contracts.
+also offers `composition="robust"` for pairwise, longer, and staggered designs. Every
+cohort-target pair cross-fits an ordered four-cell generalized propensity and three
+outcome regressions on one immutable global row/PSU fold plan, then zero-pads its scaled
+influence on the full analysis index. The path targets treated observations in each
+target-period population and aggregates with estimated target-period treated-cell shares.
+Sampling weights remain unavailable. HC1 observation or one-way CR1 PSU inference applies
+to both composition contracts.
 
 ```python
 from causekit import RepeatedCrossSectionDiD
@@ -486,11 +489,16 @@ print(adjusted.pretrend.placebo_effects)  # the aligned conditional score
 print(adjusted.nuisance_diagnostics)      # task-by-fold audit; no refitting
 ```
 
-Pairwise composition-change robustness is an explicit alternative estimand and score:
+Composition-change robustness is an explicit alternative estimand and score:
 
 ```python
-robust_composition = RepeatedCrossSectionDiD(composition="robust").fit(
-    two_period_samples,
+robust_composition = RepeatedCrossSectionDiD(
+    composition="robust",
+    inference="multiplier_bootstrap",
+    bootstrap_iterations=999,
+    random_state=20260730,
+).fit(
+    repeated_samples,
     outcome="outcome",
     time="period",
     treatment_time="first_treated",
@@ -504,30 +512,35 @@ robust_composition = RepeatedCrossSectionDiD(composition="robust").fit(
 )
 
 print(robust_composition.target_population)    # treated_target_period
-print(robust_composition.composition_weights)  # normalized w_00, w_01, w_10, w_11
+print(robust_composition.pair_ledger)           # pair support, overlap, shares, task keys
+print(robust_composition.composition_weights)  # pair-labelled w_00, w_01, w_10, w_11
+print(robust_composition.event_study)
+print(robust_composition.simultaneous_event_study)
 ```
 
-The generalized-propensity result must expose all four `(group, period)` class
-probabilities with exact, unique class labels. The first robust slice refuses more than
-two periods, multiple treated cohorts, empty covariates, weak four-cell overlap, survey
-weights, and any clipping or fallback. Its deterministic composition-shift contract
-recovers target-period ATT `5` while the deliberately miss-targeted stationary score
-equals the pooled-treated value `4`; row permutation and labelled probability-column
-permutation leave the robust result unchanged. A runnable provider-neutral example is
-[`examples/composition_robust_repeated_cross_section_did.py`](examples/composition_robust_repeated_cross_section_did.py).
+Each pair's generalized-propensity result must expose all four `(group, period)` class
+probabilities with exact, unique class labels. The robust path refuses empty covariates,
+unsupported global or fold-local four-cell support, weak overlap, survey weights, and any
+clipping or fallback. Its deterministic composition-shift contract recovers target-period
+ATT `5` while the deliberately miss-targeted stationary score equals the pooled-treated
+value `4`; row, PSU, pair, and labelled probability-column permutations preserve aligned
+results. Runnable provider-neutral examples are
+[`examples/composition_robust_repeated_cross_section_did.py`](examples/composition_robust_repeated_cross_section_did.py)
+and [`examples/longer_composition_robust_repeated_cross_section_did.py`](examples/longer_composition_robust_repeated_cross_section_did.py).
 The exact point estimate, HC1-equivalent standard error, and all 16 influence coordinates
 also match the official R `compdid` 0.1.0 `drdid_nonstationary()` source at pinned commit
 `894bd65a952c30f01a4e0005efba4cb335065eb7`. Reproduce that source-level comparator with
 `Rscript benchmarks/validate_did_rcs_compdid_reference.R PATH_TO_COMPDID_CHECKOUT`.
-The separate [promotion evidence](docs/DID_RCS_COMPOSITION_PROMOTION_EVIDENCE.md) records
+The pairwise [promotion evidence](docs/DID_RCS_COMPOSITION_PROMOTION_EVIDENCE.md) records
 the hash-pinned Sequeira robust/stationary sensitivity, a 100,000-row performance gate,
 and eight passing publication-scale pointwise-coverage cells across observation and PSU
 inference. These runs do not select between targets after inspecting the data.
-The next diagnostic and longer-design layer is frozen in the
-[composition diagnostic and influence-alignment contract](docs/DID_RCS_COMPOSITION_DIAGNOSTIC_ALIGNMENT_CONTRACT.md):
-one global row/PSU fold plan, pair-specific four-cell tasks, zero-padded full-sample
-influences, target-period aggregation shares, and difference-influence covariance. It
-adds no placeholder API.
+The longer/staggered [promotion evidence](docs/DID_RCS_COMPOSITION_LONGER_PROMOTION_EVIDENCE.md)
+records the public robust-minus-stationary equality diagnostic, official R diagnostic
+mapping, conditional placebos, fixed-seed simultaneous bands, a 120,000-row performance
+gate, hash-pinned hospital-data sensitivity, and four passing observation/PSU coverage,
+size, and power cells. `did_rcs_composition_test(robust, stationary)` computes covariance
+from the aligned difference influence and never selects an estimator.
 
 There is intentionally no `entity=` role and no `panel=False` switch. Every result records
 that stationary composition is an identifying assumption rather than a verified
@@ -535,8 +548,8 @@ diagnostic. Adjusted placebos use the same cross-fitted conditional score as the
 effects; failure to reject proves neither parallel trends nor stable composition. Strict
 overlap failures refuse without clipping or dropping rows. The opt-in simultaneous path
 draws one Rademacher multiplier per observation or declared PSU and reports a studentized
-max-t band over the retained event-time path. Survey weights and composition-change-
-robust staggered aggregation and diagnostics remain separate gates. See the
+max-t band over the retained event-time path. Survey-population transport remains a
+separate gate, and raw sampling weights refuse. See the
 [repeated-cross-section contract](docs/DID_REPEATED_CROSS_SECTION_CONTRACT.md).
 
 The covariate publication certificate covers 4,000 estimator fits and 240,000 fold-local
@@ -833,13 +846,13 @@ certificate. Stata aggregate standard errors are explicitly non-comparable becau
 estimated-share influence differs. Repeated-cross-section observation/PSU multiplier
 bands now pass hand identities, a seeded coverage smoke, and a hash-bound 16-cell
 publication-scale joint-coverage certificate under both no-covariate and genuinely
-cross-fitted covariate paths. The next stages are now separately frozen as design-only
-contracts for [composition-change robustness](docs/DID_RCS_COMPOSITION_CHANGE_CONTRACT.md)
-and [survey designs](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md). The balanced-panel PT-All
+cross-fitted covariate paths. Composition-change robustness now includes pairwise and
+longer/staggered target-period effects, target-share aggregation, aligned equality
+diagnostics, conditional placebos, and simultaneous bands with publication evidence.
+The next repeated-section stage remains the separately frozen design-only contract for
+[survey designs](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md). The balanced-panel PT-All
 path separately freezes [direct cohort-ratio nuisances](docs/DID_DIRECT_RATIO_CONTRACT.md).
-The composition contract now has a promoted pairwise pointwise-inference slice; its
-staggered, longer-design simultaneous, and diagnostic gates are designed but remain
-unimplemented. The direct-ratio and survey contracts add no placeholder API,
+The direct-ratio and survey contracts add no placeholder API,
 and raw survey weights still refuse.
 The causal-ML alpha includes native partially linear DML and separately contracted public
 [honest R-learner](docs/R_LEARNER_CONTRACT.md) and

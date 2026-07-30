@@ -110,6 +110,24 @@ class CrossFitTaskResult:
 
 
 @dataclass(frozen=True)
+class ClassProbabilityCrossFitTask:
+    """One masked multiclass nuisance task on a shared global fold plan.
+
+    ``train_mask`` and ``predict_mask`` preserve the task-specific analysis role while
+    folds remain global. Predictions outside ``predict_mask`` are retained as missing
+    audit placeholders and must never enter a score.
+    """
+
+    name: str
+    classes: Any
+    train_mask: Any
+    predict_mask: Any | None = None
+    class_labels: Sequence[Any] | None = None
+    factory: NuisanceFactory | None = None
+    predict: PredictionAdapter | None = None
+
+
+@dataclass(frozen=True)
 class ClassProbabilityCrossFitResult:
     """Aligned out-of-fold probabilities for a multiclass nuisance model."""
 
@@ -118,6 +136,19 @@ class ClassProbabilityCrossFitResult:
     n_splits: int
     random_state: int | None
     model_name: str
+    model_diagnostics: pd.DataFrame = field(default_factory=pd.DataFrame)
+
+
+@dataclass(frozen=True)
+class ClassProbabilityTaskCrossFitResult:
+    """Task-labelled multiclass probabilities on one immutable global fold plan."""
+
+    probabilities: pd.DataFrame
+    fold: pd.Series
+    n_splits: int
+    random_state: int | None
+    model_names: dict[str, str]
+    class_labels: dict[str, tuple[Any, ...]]
     model_diagnostics: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
@@ -790,12 +821,171 @@ class CrossFitter:
             model_diagnostics=pd.DataFrame(diagnostic_rows),
         )
 
+    def fit_predict_class_probability_tasks(
+        self,
+        X: Any,
+        *,
+        tasks: Sequence[ClassProbabilityCrossFitTask],
+        strata: Any | None = None,
+        clusters: Any | None = None,
+    ) -> ClassProbabilityTaskCrossFitResult:
+        """Cross-fit masked multiclass tasks on one deterministic global fold plan.
+
+        Every task/fold must retain all declared classes in both its training and
+        relevant holdout support. Models are fresh per task/fold and predictions are
+        emitted only for rows in the task's declared prediction role.
+        """
+
+        frame, index = _frame(X)
+        task_list = list(tasks)
+        if not task_list:
+            raise ValueError("tasks must contain at least one ClassProbabilityCrossFitTask.")
+        if not all(isinstance(task, ClassProbabilityCrossFitTask) for task in task_list):
+            raise TypeError("tasks must contain only ClassProbabilityCrossFitTask instances.")
+        names = [task.name for task in task_list]
+        if any(not isinstance(name, str) or not name.strip() for name in names):
+            raise ValueError("Every task name must be a non-empty string.")
+        if len(set(names)) != len(names):
+            raise ValueError("Cross-fitting task names must be unique.")
+        strata_series = None if strata is None else _labels(strata, name="strata", index=index)
+        cluster_values = (
+            None if clusters is None else _labels(clusters, name="clusters", index=index)
+        )
+        folds = _fold_assignments(
+            len(frame),
+            n_splits=self.n_splits,
+            random_state=self.random_state,
+            strata=strata_series,
+            clusters=cluster_values,
+        )
+
+        prepared: list[
+            tuple[
+                ClassProbabilityCrossFitTask,
+                pd.Series,
+                pd.Series,
+                pd.Series,
+                pd.Index,
+                NuisanceFactory,
+            ]
+        ] = []
+        class_labels: dict[str, tuple[Any, ...]] = {}
+        for task in task_list:
+            labels = _labels(task.classes, name=f"{task.name}.classes", index=index)
+            train_mask = _mask(task.train_mask, name=f"{task.name}.train_mask", index=index)
+            predict_mask = (
+                train_mask.copy()
+                if task.predict_mask is None
+                else _mask(
+                    task.predict_mask,
+                    name=f"{task.name}.predict_mask",
+                    index=index,
+                )
+            )
+            if not predict_mask.any():
+                raise ValueError(f"Task {task.name!r} predict_mask must select observations.")
+            if (predict_mask & ~train_mask).any():
+                raise ValueError(f"Task {task.name!r} predict_mask must be a subset of train_mask.")
+            observed = pd.Index(pd.unique(labels[train_mask]), name="class")
+            declared = (
+                observed
+                if task.class_labels is None
+                else pd.Index(list(task.class_labels), name="class")
+            )
+            if declared.empty or not declared.is_unique:
+                raise ValueError(
+                    f"Task {task.name!r} declared class labels must be non-empty and unique."
+                )
+            try:
+                declared_missing = bool(np.asarray(pd.isna(declared)).any())
+            except (TypeError, ValueError):
+                declared_missing = False
+            if declared_missing:
+                raise ValueError(f"Task {task.name!r} declared class labels must not be missing.")
+            missing = [label for label in declared if label not in observed]
+            unexpected = [label for label in observed if label not in declared]
+            if missing or unexpected or len(observed) != len(declared):
+                raise ValueError(
+                    f"Task {task.name!r} declared class labels must equal the observed "
+                    f"training-mask classes; missing={missing}, unexpected={unexpected}."
+                )
+            if len(declared) < 2:
+                raise ValueError(f"Task {task.name!r} must contain at least two classes.")
+            factory = task.factory or self.propensity_factory
+            if factory is None:
+                raise ValueError(
+                    f"Task {task.name!r} requires a task factory or propensity_factory."
+                )
+            class_labels[task.name] = tuple(declared.tolist())
+            prepared.append((task, labels, train_mask, predict_mask, declared, factory))
+
+        columns = pd.MultiIndex.from_tuples(
+            [(task.name, label) for task, _, _, _, declared, _ in prepared for label in declared],
+            names=["task", "class"],
+        )
+        probabilities = pd.DataFrame(np.nan, index=index.copy(), columns=columns, dtype=float)
+        model_names: dict[str, str] = {}
+        diagnostic_rows: list[dict[str, Any]] = []
+        seen_estimators: list[Any] = []
+        for task, labels, train_mask, predict_mask, declared, factory in prepared:
+            for fold in range(self.n_splits):
+                test = folds == fold
+                train = (~test) & train_mask.to_numpy()
+                relevant_test = test & predict_mask.to_numpy()
+                train_classes = pd.Index(pd.unique(labels.iloc[train]))
+                holdout_classes = pd.Index(pd.unique(labels.iloc[relevant_test]))
+                if any(label not in train_classes for label in declared):
+                    raise ValueError(
+                        f"Task {task.name!r} must retain every declared class outside fold {fold}."
+                    )
+                if any(label not in holdout_classes for label in declared):
+                    raise ValueError(
+                        f"Task {task.name!r} must retain every declared class in the relevant "
+                        f"holdout of fold {fold}."
+                    )
+                result = _fit(
+                    factory,
+                    frame.iloc[train],
+                    labels.iloc[train],
+                    seen_estimators=seen_estimators,
+                )
+                model_names[task.name] = type(result).__name__
+                values = _class_probability_prediction(
+                    result,
+                    frame.iloc[relevant_test],
+                    classes=declared,
+                    adapter=task.predict or self.propensity_predict,
+                )
+                probabilities.loc[index[relevant_test], pd.IndexSlice[task.name, :]] = values
+                row = _model_diagnostic_row(
+                    result,
+                    task=task.name,
+                    fold=fold,
+                    train_nobs=int(train.sum()),
+                    holdout_nobs=int(test.sum()),
+                )
+                row["relevant_holdout_nobs"] = int(relevant_test.sum())
+                row["declared_class_count"] = len(declared)
+                diagnostic_rows.append(row)
+
+        return ClassProbabilityTaskCrossFitResult(
+            probabilities=probabilities,
+            fold=pd.Series(folds, index=index.copy(), name="fold"),
+            n_splits=self.n_splits,
+            random_state=self.random_state,
+            model_names=model_names,
+            class_labels=class_labels,
+            model_diagnostics=pd.DataFrame(diagnostic_rows),
+        )
+
 
 __all__ = [
     "CATEEstimatorProtocol",
     "CATEFactory",
     "CATEResultProtocol",
+    "ClassProbabilityCrossFitTask",
     "ClassProbabilityCrossFitResult",
+    "ClassProbabilityTaskCrossFitResult",
     "CrossFitResult",
     "CrossFitTask",
     "CrossFitTaskResult",

@@ -16,14 +16,15 @@ from typing import Any, Literal, cast
 import numpy as np
 import pandas as pd
 from pandas.api.types import is_bool_dtype, is_numeric_dtype
-from scipy.stats import norm
+from scipy.stats import chi2, norm
 from scipy.stats import t as student_t
 
-from .crossfit import CrossFitTask, CrossFitter
+from .crossfit import ClassProbabilityCrossFitTask, CrossFitTask, CrossFitter
 from .did import (
     ControlGroup,
     DiDCovariance,
     _joint_wald,
+    _score_cross_covariance,
 )
 
 RCSComposition = Literal["stationary", "robust"]
@@ -57,6 +58,71 @@ class RepeatedCrossSectionPretrendDiagnostic:
 
 
 @dataclass(frozen=True)
+class RepeatedCrossSectionCompositionDiagnostic:
+    """Aligned robust-versus-stationary repeated-section equality diagnostic."""
+
+    statistic: float
+    pvalue: float
+    reject: bool
+    level: float
+    group_time: pd.DataFrame
+    influence: pd.DataFrame
+    covariance: pd.DataFrame
+    robust_covariance: pd.DataFrame
+    stationary_covariance: pd.DataFrame
+    cross_covariance: pd.DataFrame
+    n_restrictions: int
+    df_num: int
+    df_denom: float | None
+    distribution: str
+    covariance_type: DiDCovariance
+    n_clusters: int | None
+    estimation_index: pd.Index
+    inference_clusters: pd.Series
+    design_fingerprint: str
+    null_hypothesis: str
+    notes: tuple[str, ...]
+    official_hc0_statistic: float | None = None
+    official_hc0_pvalue: float | None = None
+    official_hc0_mapping: str | None = None
+
+    @property
+    def nobs(self) -> int:
+        return len(self.estimation_index)
+
+    @property
+    def params(self) -> pd.Series:
+        return self.group_time["difference"].rename("coef")
+
+    @property
+    def standard_errors(self) -> pd.Series:
+        return pd.Series(
+            np.sqrt(np.diag(self.covariance.to_numpy(dtype=float))),
+            index=self.group_time.index.copy(),
+            name="std_err",
+        )
+
+    @property
+    def pvalues(self) -> pd.Series:
+        statistics = np.abs(
+            self.params.to_numpy(dtype=float) / self.standard_errors.to_numpy(dtype=float)
+        )
+        if self.distribution == "chi2":
+            values = 2.0 * norm.sf(statistics)
+        else:
+            values = 2.0 * student_t.sf(statistics, self.df_denom)
+        return pd.Series(values, index=self.group_time.index.copy(), name="p_value")
+
+    def summary_frame(self) -> pd.DataFrame:
+        """Return both paths and their maintained robust-minus-stationary contrast."""
+
+        summary = self.group_time.copy()
+        summary["difference_std_err"] = self.standard_errors
+        summary["difference_p_value"] = self.pvalues
+        return summary
+
+
+@dataclass(frozen=True)
 class RepeatedCrossSectionDiDResult:
     """Auditable conventional DiD result for independent repeated samples."""
 
@@ -86,6 +152,8 @@ class RepeatedCrossSectionDiDResult:
     control_group: str
     composition: str
     target_population: str
+    group_time_aggregation: str
+    esavg_aggregation: str
     anticipation: int
     pre_periods: int
     sampling_unit: str
@@ -109,6 +177,7 @@ class RepeatedCrossSectionDiDResult:
     n_splits: int | None = None
     nuisance_probability_floor: float | None = None
     composition_weights: pd.DataFrame = field(default_factory=pd.DataFrame)
+    pair_ledger: pd.DataFrame = field(default_factory=pd.DataFrame)
     simultaneous_event_study: pd.DataFrame = field(default_factory=pd.DataFrame)
     simultaneous_level: float | None = None
     simultaneous_critical_value: float | None = None
@@ -477,7 +546,6 @@ def _covariate_design_fingerprint(
     *,
     n_splits: int,
     probability_floor: float,
-    composition: RCSComposition = "stationary",
 ) -> str:
     fingerprint = hashlib.sha256()
     fingerprint.update(sample.design_fingerprint.encode())
@@ -486,8 +554,6 @@ def _covariate_design_fingerprint(
         n_splits,
         probability_floor,
     )
-    if composition == "robust":
-        fingerprint_payload = (*fingerprint_payload, composition)
     fingerprint.update(repr(fingerprint_payload).encode())
     row_hashes = pd.util.hash_pandas_object(covariates, index=True).to_numpy(dtype=np.uint64)
     fingerprint.update(np.sort(row_hashes).tobytes())
@@ -881,11 +947,8 @@ def _effect_from_composition_robust_score(
         counts.append(count)
 
     used = np.flatnonzero(pair_mask)
-    if len(used) != len(sample.outcome):
-        raise RuntimeError(
-            "The first composition-robust slice requires the validated sample to contain "
-            "only its treated cohort and fixed comparison population."
-        )
+    if not len(used):
+        raise ValueError("The composition-robust pair contains no usable observations.")
     required_classes = pd.Index([0, 1, 2, 3], dtype="int64")
     missing_classes = [
         int(label) for label in required_classes if label not in generalized_propensity.columns
@@ -895,7 +958,7 @@ def _effect_from_composition_robust_score(
             "The generalized propensity is missing ordered group-period class(es): "
             f"{missing_classes}."
         )
-    probabilities = generalized_propensity.loc[:, required_classes].to_numpy(dtype=float)
+    probabilities = generalized_propensity.loc[:, required_classes].to_numpy(dtype=float)[used]
     if np.any(probabilities <= probability_floor):
         raise ValueError(
             "Cross-fitted generalized propensities violate nuisance_probability_floor; "
@@ -904,14 +967,14 @@ def _effect_from_composition_robust_score(
     if not np.allclose(probabilities.sum(axis=1), 1.0, rtol=1e-7, atol=1e-9):
         raise ValueError("Cross-fitted generalized propensities must sum to one in every row.")
 
-    m00 = outcome_predictions["outcome_control_pre"].to_numpy(dtype=float)
-    m01 = outcome_predictions["outcome_control_post"].to_numpy(dtype=float)
-    m10 = outcome_predictions["outcome_treated_pre"].to_numpy(dtype=float)
+    m00 = outcome_predictions["outcome_control_pre"].to_numpy(dtype=float)[used]
+    m01 = outcome_predictions["outcome_control_post"].to_numpy(dtype=float)[used]
+    m10 = outcome_predictions["outcome_treated_pre"].to_numpy(dtype=float)[used]
     indicators = (
-        comparison_base.astype(float),
-        comparison_target.astype(float),
-        treated_base.astype(float),
-        treated_target.astype(float),
+        comparison_base[used].astype(float),
+        comparison_target[used].astype(float),
+        treated_base[used].astype(float),
+        treated_target[used].astype(float),
     )
     p00, p01, p10 = (probabilities[:, position] for position in range(3))
     target_probability = probabilities[:, 3]
@@ -936,45 +999,57 @@ def _effect_from_composition_robust_score(
             )
         weights[label] = raw_weight / denominator
 
-    y = sample.outcome
+    y = sample.outcome[used]
     tau_target = y - m10 - m01 + m00
     signed_residual = (
         weights["w_00"] * (y - m00) - weights["w_01"] * (y - m01) - weights["w_10"] * (y - m10)
     )
     estimate = float(np.mean(weights["w_11"] * tau_target + signed_residual))
-    influence = weights["w_11"] * (tau_target - estimate) + signed_residual
-    if not np.isfinite(influence).all():
+    pair_influence = weights["w_11"] * (tau_target - estimate) + signed_residual
+    if not np.isfinite(pair_influence).all():
         raise ValueError("The composition-robust efficient influence score is non-finite.")
+    influence = np.zeros(len(sample.outcome))
+    embedding_scale = len(sample.outcome) / len(used)
+    influence[used] = embedding_scale * pair_influence
     if abs(float(influence.sum())) > 1e-8 * max(1.0, float(np.abs(influence).sum())):
         raise RuntimeError("The composition-robust efficient influence score is not centered.")
     weight_frame = pd.DataFrame(
-        {label: weights[label] for label in ("w_00", "w_01", "w_10", "w_11")},
+        0.0,
         index=sample.index.copy(),
+        columns=["w_00", "w_01", "w_10", "w_11"],
     )
+    for label in weight_frame.columns:
+        weight_frame.loc[sample.index[used], label] = embedding_scale * weights[label]
     count_tuple = (counts[0], counts[1], counts[2], counts[3])
     return estimate, influence, count_tuple, weight_frame
 
 
 def _aggregate_influence(
-    cells: list[_RepeatedEffectCell], sample: _RepeatedSample
+    cells: list[_RepeatedEffectCell],
+    sample: _RepeatedSample,
+    *,
+    composition: RCSComposition,
 ) -> tuple[float, np.ndarray]:
     n = len(sample.outcome)
-    shares = np.array([cell.cohort_share for cell in cells], dtype=float)
+    if composition == "robust":
+        masks = [
+            (sample.cohorts == cell.cohort)
+            & (sample.time_positions == int(np.searchsorted(sample.times, cell.time)))
+            for cell in cells
+        ]
+        shares = np.array([float(mask.mean()) for mask in masks], dtype=float)
+    else:
+        masks = [sample.cohorts == cell.cohort for cell in cells]
+        shares = np.array([cell.cohort_share for cell in cells], dtype=float)
     denominator = float(shares.sum())
+    if not np.isfinite(denominator) or denominator <= np.finfo(float).eps:
+        raise ValueError("Aggregation has no positive treated target share.")
     weights = shares / denominator
-    influence = np.zeros(n)
-    centered_membership = np.zeros(n)
-    masks: list[np.ndarray] = []
-    for cell in cells:
-        mask = sample.cohorts == cell.cohort
-        masks.append(mask)
-        centered_membership += mask.astype(float) - cell.cohort_share
     estimate = float(sum(weight * cell.att for weight, cell in zip(weights, cells, strict=True)))
+    influence = np.zeros(n)
     for weight, share, mask, cell in zip(weights, shares, masks, cells, strict=True):
-        share_influence = (
-            mask.astype(float) - share
-        ) / denominator - share * centered_membership / denominator**2
-        influence += weight * cell.influence + cell.att * share_influence
+        influence += weight * cell.influence
+        influence += (cell.att - estimate) * (mask.astype(float) - share) / denominator
     return estimate, influence
 
 
@@ -1090,6 +1165,7 @@ def _pretrend_diagnostic_from_cells(
     conditional: bool,
     covariates: tuple[str, ...],
     cross_fitted: bool,
+    composition: RCSComposition = "stationary",
 ) -> RepeatedCrossSectionPretrendDiagnostic:
     if not cells:
         return _empty_pretrend(
@@ -1102,6 +1178,7 @@ def _pretrend_diagnostic_from_cells(
             conditional=conditional,
             covariates=covariates,
             cross_fitted=cross_fitted,
+            composition=composition,
         )
 
     rows: list[dict[str, Any]] = []
@@ -1167,6 +1244,12 @@ def _pretrend_diagnostic_from_cells(
             notes=(
                 "Placebo effects remain available, but their joint covariance was singular.",
                 "No ridge, dimension dropping, or pseudoinverse was applied.",
+                (
+                    "The robust score permits measured composition changes but not unmeasured "
+                    "composition changes."
+                    if composition == "robust"
+                    else "Stationary composition remains an identifying assumption."
+                ),
             ),
             conditional=conditional,
             covariates=covariates,
@@ -1195,7 +1278,13 @@ def _pretrend_diagnostic_from_cells(
                 else "Placebos use four independent adjacent cohort-period cell means."
             ),
             "Failure to reject is not evidence that repeated-cross-section parallel trends is true.",
-            "Stationary composition is an identifying assumption, not established by this diagnostic.",
+            (
+                "The robust score permits measured composition changes but does not protect "
+                "against unmeasured composition changes."
+                if composition == "robust"
+                else "Stationary composition is an identifying assumption, not established by "
+                "this diagnostic."
+            ),
         ),
         conditional=conditional,
         covariates=covariates,
@@ -1227,6 +1316,7 @@ def _assemble_result(
     n_splits: int | None = None,
     nuisance_probability_floor: float | None = None,
     composition_weights: pd.DataFrame | None = None,
+    pair_ledger: pd.DataFrame | None = None,
     design_fingerprint: str | None = None,
 ) -> RepeatedCrossSectionDiDResult:
     group_rows: list[dict[str, Any]] = []
@@ -1252,6 +1342,12 @@ def _assemble_result(
                 "n_comparison_base": cell.n_comparison_base,
                 "comparison_cohorts": cell.comparison_cohorts,
                 "cohort_share": cell.cohort_share,
+                "target_share": float(
+                    np.mean(
+                        (sample.cohorts == cell.cohort)
+                        & (sample.time_positions == int(np.searchsorted(sample.times, cell.time)))
+                    )
+                ),
             }
         )
     group_time = pd.DataFrame(group_rows).set_index(["cohort", "time"]).sort_index()
@@ -1264,7 +1360,11 @@ def _assemble_result(
     event_influences: dict[int, np.ndarray] = {}
     for event_time in sorted({cell.event_time for cell in cells}):
         selected = [cell for cell in cells if cell.event_time == event_time]
-        estimate, influence = _aggregate_influence(selected, sample)
+        estimate, influence = _aggregate_influence(
+            selected,
+            sample,
+            composition=composition,
+        )
         event_influences[event_time] = influence
         event_rows.append(
             {
@@ -1283,7 +1383,11 @@ def _assemble_result(
     calendar_influences: dict[float, np.ndarray] = {}
     for calendar_value in sorted({cell.time for cell in cells if cell.event_time >= 0}):
         selected = [cell for cell in cells if cell.time == calendar_value and cell.event_time >= 0]
-        estimate, influence = _aggregate_influence(selected, sample)
+        estimate, influence = _aggregate_influence(
+            selected,
+            sample,
+            composition=composition,
+        )
         calendar_influences[calendar_value] = influence
         calendar_rows.append(
             {
@@ -1395,6 +1499,12 @@ def _assemble_result(
         control_group=control_group,
         composition=composition,
         target_population=target_population,
+        group_time_aggregation=(
+            "estimated_target_period_treated_cell_shares"
+            if composition == "robust"
+            else "estimated_pooled_treated_cohort_shares"
+        ),
+        esavg_aggregation="arithmetic_mean_of_nonnegative_event_times",
         anticipation=anticipation,
         pre_periods=1,
         sampling_unit="observation" if sample.clusters is None else "cluster",
@@ -1452,7 +1562,7 @@ def _assemble_result(
         ),
         notes=(
             (
-                "The pairwise effect uses the cross-fitted composition-change-robust efficient "
+                "Each robust pair uses the cross-fitted composition-change-robust efficient "
                 "score with one four-cell generalized propensity and three outcome regressions."
                 if composition == "robust"
                 else (
@@ -1464,8 +1574,8 @@ def _assemble_result(
             ),
             "The comparison cohort-membership rule is held fixed at target and baseline.",
             (
-                "The first composition-robust slice contains one treated cohort, so no "
-                "cross-cohort aggregation share is estimated."
+                "Robust event and calendar aggregation use estimated target-period treated-cell "
+                "shares and include their influence terms."
                 if composition == "robust"
                 else "Cohort-share aggregation includes estimated pooled-share influence terms."
             ),
@@ -1512,6 +1622,7 @@ def _assemble_result(
         composition_weights=(
             pd.DataFrame() if composition_weights is None else composition_weights.copy()
         ),
+        pair_ledger=pd.DataFrame() if pair_ledger is None else pair_ledger.copy(),
     )
 
 
@@ -1719,6 +1830,7 @@ def _fit_covariate_repeated_cross_section(
         conditional=True,
         covariates=covariate_names,
         cross_fitted=True,
+        composition=composition,
     )
     return _assemble_result(
         group_cells,
@@ -1751,7 +1863,7 @@ def _fit_covariate_repeated_cross_section(
     )
 
 
-def _fit_composition_robust_pair(
+def _fit_composition_robust_lattice(
     data: pd.DataFrame,
     sample: _RepeatedSample,
     *,
@@ -1770,16 +1882,8 @@ def _fit_composition_robust_pair(
     simultaneous_level: float,
     probability_floor: float,
 ) -> RepeatedCrossSectionDiDResult:
-    """Fit the first two-group, two-period composition-robust score."""
+    """Fit the composition-robust pair lattice on one immutable global fold plan."""
 
-    if len(sample.treated_cohorts) != 1:
-        raise NotImplementedError(
-            "The first composition='robust' slice requires exactly one treated cohort."
-        )
-    if len(sample.times) != 2:
-        raise NotImplementedError(
-            "The first composition='robust' slice requires exactly two observed periods."
-        )
     if cross_fitter.propensity_factory is None:
         raise ValueError(
             "cross_fitter must provide a propensity_factory for the four-cell generalized "
@@ -1793,68 +1897,102 @@ def _fit_composition_robust_pair(
         covariates=covariates,
         protected_names=(outcome, time, treatment_time, cluster),
     )
-    cohort = sample.treated_cohorts[0]
-    target_position = sample.effective_positions[cohort]
-    base_position = target_position - 1
-    if target_position != 1 or base_position != 0:
-        raise NotImplementedError(
-            "The first composition='robust' slice requires one clean baseline followed by "
-            "the treated target period."
-        )
-    cohort_mask = sample.cohorts == cohort
-    target_mask = sample.time_positions == target_position
-    base_mask = sample.time_positions == base_position
-    comparison_mask = _comparison_membership(
-        sample,
-        cohort=cohort,
-        target_position=target_position,
-        control_group=control_group,
-    )
-    pair_mask = (cohort_mask | comparison_mask) & (target_mask | base_mask)
-    if not pair_mask.all():
-        raise RuntimeError(
-            "The pairwise composition-robust sample contains observations outside the "
-            "treated cohort and its fixed comparison population."
-        )
-    cell_code = pd.Series(
-        2 * cohort_mask.astype(int) + target_mask.astype(int),
-        index=sample.index.copy(),
-        name="group_period_cell",
-    )
     cluster_series = (
         None
         if sample.clusters is None
         else pd.Series(sample.clusters, index=sample.index.copy(), name="cluster")
     )
-    class_result = cross_fitter.fit_predict_class_probabilities(
+    global_strata = pd.Series(
+        pd.factorize(pd.MultiIndex.from_arrays([sample.cohorts, sample.time_positions]))[0],
+        index=sample.index.copy(),
+        name="cohort_period_cell",
+    )
+    outcome_target = pd.Series(sample.outcome, index=sample.index.copy(), name="outcome")
+    comparisons: list[_CovariateComparison] = []
+    class_tasks: list[ClassProbabilityCrossFitTask] = []
+    outcome_tasks: list[CrossFitTask] = []
+    task_metadata: dict[str, tuple[float, float, str, str]] = {}
+    task_relevant_masks: dict[str, np.ndarray] = {}
+    for cohort in sample.treated_cohorts:
+        effective_position = sample.effective_positions[cohort]
+        for target_position in range(1, len(sample.times)):
+            if target_position < effective_position:
+                stage: Literal["group_time", "conditional_pretrend"] = "conditional_pretrend"
+                base_position = target_position - 1
+            else:
+                stage = "group_time"
+                base_position = effective_position - 1
+            comparison_mask = _comparison_membership(
+                sample,
+                cohort=cohort,
+                target_position=target_position,
+                control_group=control_group,
+            )
+            cohort_mask = sample.cohorts == cohort
+            target_mask = sample.time_positions == target_position
+            base_mask = sample.time_positions == base_position
+            pair_mask = (cohort_mask | comparison_mask) & (target_mask | base_mask)
+            public_time = float(sample.times[target_position])
+            task_prefix = f"rcs_robust_{len(comparisons)}"
+            task_names = {
+                "generalized_propensity": f"{task_prefix}_generalized_propensity",
+                "outcome_control_pre": f"{task_prefix}_outcome_control_pre",
+                "outcome_control_post": f"{task_prefix}_outcome_control_post",
+                "outcome_treated_pre": f"{task_prefix}_outcome_treated_pre",
+            }
+            comparison = _CovariateComparison(
+                cohort=cohort,
+                target_position=target_position,
+                base_position=base_position,
+                stage=stage,
+                comparison_mask=comparison_mask,
+                comparison_cohorts=tuple(
+                    float(value) for value in np.unique(sample.cohorts[comparison_mask])
+                ),
+                task_names=task_names,
+            )
+            comparisons.append(comparison)
+            cell_code = pd.Series(
+                2 * cohort_mask.astype(int) + target_mask.astype(int),
+                index=sample.index.copy(),
+                name=task_names["generalized_propensity"],
+            )
+            class_tasks.append(
+                ClassProbabilityCrossFitTask(
+                    name=task_names["generalized_propensity"],
+                    classes=cell_code,
+                    train_mask=pd.Series(pair_mask, index=sample.index.copy()),
+                    predict_mask=pd.Series(pair_mask, index=sample.index.copy()),
+                    class_labels=(0, 1, 2, 3),
+                )
+            )
+            outcome_masks = {
+                "outcome_control_pre": comparison_mask & base_mask,
+                "outcome_control_post": comparison_mask & target_mask,
+                "outcome_treated_pre": cohort_mask & base_mask,
+            }
+            for nuisance, mask in outcome_masks.items():
+                outcome_tasks.append(
+                    CrossFitTask(
+                        name=task_names[nuisance],
+                        target=outcome_target,
+                        train_mask=pd.Series(mask, index=sample.index.copy()),
+                    )
+                )
+            for nuisance, task_name in task_names.items():
+                task_metadata[task_name] = (cohort, public_time, nuisance, stage)
+                task_relevant_masks[task_name] = pair_mask.copy()
+
+    class_result = cross_fitter.fit_predict_class_probability_tasks(
         X,
-        classes=cell_code,
+        tasks=class_tasks,
+        strata=global_strata,
         clusters=cluster_series,
     )
-
-    task_names = {
-        "outcome_control_pre": "rcs_robust_outcome_control_pre",
-        "outcome_control_post": "rcs_robust_outcome_control_post",
-        "outcome_treated_pre": "rcs_robust_outcome_treated_pre",
-    }
-    outcome_target = pd.Series(sample.outcome, index=sample.index.copy(), name="outcome")
-    task_masks = {
-        "outcome_control_pre": comparison_mask & base_mask,
-        "outcome_control_post": comparison_mask & target_mask,
-        "outcome_treated_pre": cohort_mask & base_mask,
-    }
-    tasks = [
-        CrossFitTask(
-            name=task_names[nuisance],
-            target=outcome_target,
-            train_mask=pd.Series(mask, index=sample.index.copy()),
-        )
-        for nuisance, mask in task_masks.items()
-    ]
     outcome_result = cross_fitter.fit_predict_tasks(
         X,
-        tasks=tasks,
-        strata=cell_code,
+        tasks=outcome_tasks,
+        strata=global_strata,
         clusters=cluster_series,
     )
     if not class_result.fold.equals(outcome_result.fold):
@@ -1862,107 +2000,156 @@ def _fit_composition_robust_pair(
             "CrossFitter returned inconsistent folds for generalized-propensity and outcome tasks."
         )
 
-    ordered_classes = pd.Index([0, 1, 2, 3], dtype="int64")
-    missing_classes = [
-        int(label) for label in ordered_classes if label not in class_result.probabilities.columns
-    ]
-    if missing_classes:
-        raise ValueError(
-            "The generalized propensity is missing ordered group-period class(es): "
-            f"{missing_classes}."
-        )
-    generalized_propensity = class_result.probabilities.loc[:, ordered_classes].copy()
-    outcome_predictions = pd.DataFrame(
-        {
-            nuisance: outcome_result.predictions[task_name]
-            for nuisance, task_name in task_names.items()
-        },
-        index=sample.index.copy(),
-    )
-    public_time = float(sample.times[target_position])
-    nuisance_series = [
-        generalized_propensity[label].rename(f"generalized_propensity_{label // 2}{label % 2}")
-        for label in ordered_classes
-    ]
-    nuisance_series.extend(
-        outcome_predictions[nuisance].rename(nuisance) for nuisance in task_names
-    )
-    nuisance_predictions = pd.concat(nuisance_series, axis=1)
-    nuisance_predictions.columns = pd.MultiIndex.from_tuples(
-        [(cohort, public_time, str(name)) for name in nuisance_predictions.columns],
-        names=["cohort", "time", "nuisance"],
-    )
-
     class_diagnostics = class_result.model_diagnostics.copy()
-    class_diagnostics.insert(0, "cohort", cohort)
-    class_diagnostics.insert(1, "time", public_time)
-    class_diagnostics.insert(2, "nuisance", "generalized_propensity")
-    class_diagnostics.insert(3, "comparison_stage", "group_time")
     outcome_diagnostics = outcome_result.model_diagnostics.copy()
-    task_to_nuisance = {task_name: nuisance for nuisance, task_name in task_names.items()}
-    outcome_diagnostics.insert(0, "cohort", cohort)
-    outcome_diagnostics.insert(1, "time", public_time)
+    for diagnostics in (class_diagnostics, outcome_diagnostics):
+        parsed = diagnostics["task"].map(task_metadata)
+        diagnostics.insert(0, "cohort", parsed.map(lambda value: value[0]))
+        diagnostics.insert(1, "time", parsed.map(lambda value: value[1]))
+        diagnostics.insert(2, "nuisance", parsed.map(lambda value: value[2]))
+        diagnostics.insert(3, "comparison_stage", parsed.map(lambda value: value[3]))
+    outcome_relevant_holdout = [
+        int(
+            np.count_nonzero(
+                task_relevant_masks[str(row.task)]
+                & (outcome_result.fold.to_numpy(dtype=int) == int(row.fold))
+            )
+        )
+        for row in outcome_diagnostics.itertuples(index=False)
+    ]
     outcome_diagnostics.insert(
-        2,
-        "nuisance",
-        outcome_diagnostics["task"].map(task_to_nuisance),
+        outcome_diagnostics.columns.get_loc("holdout_nobs") + 1,
+        "relevant_holdout_nobs",
+        outcome_relevant_holdout,
     )
-    outcome_diagnostics.insert(3, "comparison_stage", "group_time")
     diagnostic_frame = pd.concat(
         [class_diagnostics, outcome_diagnostics],
         ignore_index=True,
         sort=False,
     )
-    relevant_holdout = [
-        int(np.count_nonzero(class_result.fold.to_numpy(dtype=int) == int(fold)))
-        for fold in diagnostic_frame["fold"]
-    ]
-    diagnostic_frame.insert(
-        diagnostic_frame.columns.get_loc("holdout_nobs") + 1,
-        "relevant_holdout_nobs",
-        relevant_holdout,
-    )
 
-    estimate, influence, counts, composition_weights = _effect_from_composition_robust_score(
-        sample,
-        cohort=cohort,
-        target_position=target_position,
-        base_position=base_position,
-        comparison_mask=comparison_mask,
-        generalized_propensity=generalized_propensity,
-        outcome_predictions=outcome_predictions,
-        probability_floor=probability_floor,
+    ordered_classes = pd.Index([0, 1, 2, 3], dtype="int64")
+    nuisance_columns: list[pd.Series] = []
+    nuisance_keys: list[tuple[float, float, str]] = []
+    group_cells: list[_RepeatedEffectCell] = []
+    placebo_cells: list[_RepeatedEffectCell] = []
+    weight_frames: list[pd.DataFrame] = []
+    weight_keys: list[tuple[float, float]] = []
+    pair_ledger_rows: list[dict[str, Any]] = []
+    n = len(sample.outcome)
+    for comparison in comparisons:
+        cohort = comparison.cohort
+        public_time = float(sample.times[comparison.target_position])
+        pair_mask = ((sample.cohorts == cohort) | comparison.comparison_mask) & (
+            (sample.time_positions == comparison.target_position)
+            | (sample.time_positions == comparison.base_position)
+        )
+        class_task_name = comparison.task_names["generalized_propensity"]
+        generalized_propensity = class_result.probabilities.loc[
+            :, pd.IndexSlice[class_task_name, :]
+        ].copy()
+        generalized_propensity.columns = ordered_classes.copy()
+        outcome_predictions = pd.DataFrame(
+            {
+                nuisance: outcome_result.predictions[comparison.task_names[nuisance]]
+                for nuisance in (
+                    "outcome_control_pre",
+                    "outcome_control_post",
+                    "outcome_treated_pre",
+                )
+            },
+            index=sample.index.copy(),
+        )
+        for label in ordered_classes:
+            nuisance_columns.append(
+                generalized_propensity[label]
+                .where(pair_mask)
+                .rename(f"generalized_propensity_{label // 2}{label % 2}")
+            )
+            nuisance_keys.append(
+                (cohort, public_time, f"generalized_propensity_{label // 2}{label % 2}")
+            )
+        for nuisance in outcome_predictions:
+            nuisance_columns.append(outcome_predictions[nuisance].where(pair_mask))
+            nuisance_keys.append((cohort, public_time, nuisance))
+
+        estimate, influence, counts, weights = _effect_from_composition_robust_score(
+            sample,
+            cohort=cohort,
+            target_position=comparison.target_position,
+            base_position=comparison.base_position,
+            comparison_mask=comparison.comparison_mask,
+            generalized_propensity=generalized_propensity,
+            outcome_predictions=outcome_predictions,
+            probability_floor=probability_floor,
+        )
+        cell = _RepeatedEffectCell(
+            cohort=cohort,
+            time=public_time,
+            event_time=comparison.target_position - sample.original_positions[cohort],
+            base_period=float(sample.times[comparison.base_position]),
+            att=estimate,
+            influence=influence,
+            n_treated_target=counts[0],
+            n_treated_base=counts[1],
+            n_comparison_target=counts[2],
+            n_comparison_base=counts[3],
+            comparison_cohorts=comparison.comparison_cohorts,
+            cohort_share=float(np.count_nonzero(sample.cohorts == cohort) / n),
+        )
+        (group_cells if comparison.stage == "group_time" else placebo_cells).append(cell)
+        weight_frames.append(weights)
+        weight_keys.append((cohort, public_time))
+        relevant_probabilities = generalized_propensity.loc[pair_mask].to_numpy(dtype=float)
+        pair_ledger_rows.append(
+            {
+                "cohort": cohort,
+                "time": public_time,
+                "base_period": float(sample.times[comparison.base_position]),
+                "stage": comparison.stage,
+                "comparison_cohorts": comparison.comparison_cohorts,
+                "n_treated_target": counts[0],
+                "n_treated_base": counts[1],
+                "n_comparison_target": counts[2],
+                "n_comparison_base": counts[3],
+                "pair_nobs": int(np.count_nonzero(pair_mask)),
+                "pair_sample_share": float(np.mean(pair_mask)),
+                "target_share": float(
+                    np.mean(
+                        (sample.cohorts == cohort)
+                        & (sample.time_positions == comparison.target_position)
+                    )
+                ),
+                "influence_embedding_scale": float(n / np.count_nonzero(pair_mask)),
+                "generalized_probability_min": float(relevant_probabilities.min()),
+                "generalized_probability_max": float(relevant_probabilities.max()),
+                "maximum_absolute_weight": float(weights.abs().to_numpy().max()),
+                "nuisance_task_keys": tuple(comparison.task_names.values()),
+            }
+        )
+
+    nuisance_predictions = pd.concat(nuisance_columns, axis=1)
+    nuisance_predictions.columns = pd.MultiIndex.from_tuples(
+        nuisance_keys,
+        names=["cohort", "time", "nuisance"],
     )
-    cell = _RepeatedEffectCell(
-        cohort=cohort,
-        time=public_time,
-        event_time=target_position - sample.original_positions[cohort],
-        base_period=float(sample.times[base_position]),
-        att=estimate,
-        influence=influence,
-        n_treated_target=counts[0],
-        n_treated_base=counts[1],
-        n_comparison_target=counts[2],
-        n_comparison_base=counts[3],
-        comparison_cohorts=tuple(
-            float(value) for value in np.unique(sample.cohorts[comparison_mask])
-        ),
-        cohort_share=1.0,
-    )
-    pretrend = _empty_pretrend(
+    if len(weight_frames) == 1:
+        composition_weights = weight_frames[0]
+    else:
+        composition_weights = pd.concat(weight_frames, axis=1, keys=weight_keys)
+        composition_weights.columns.names = ["cohort", "time", "weight"]
+    pretrend = _pretrend_diagnostic_from_cells(
         sample,
+        placebo_cells,
         covariance=covariance,
-        reason=(
-            "The pairwise composition-robust slice has one clean baseline and therefore "
-            "no earlier adjacent conditional pre-trend restriction."
-        ),
         conditional=True,
         covariates=covariate_names,
         cross_fitted=True,
         composition="robust",
     )
+    pair_ledger = pd.DataFrame(pair_ledger_rows).set_index(["cohort", "time"]).sort_index()
     return _assemble_result(
-        [cell],
+        group_cells,
         sample,
         covariance=covariance,
         control_group=control_group,
@@ -1984,13 +2171,230 @@ def _fit_composition_robust_pair(
         n_splits=class_result.n_splits,
         nuisance_probability_floor=probability_floor,
         composition_weights=composition_weights,
+        pair_ledger=pair_ledger,
         design_fingerprint=_covariate_design_fingerprint(
             sample,
             X,
             n_splits=class_result.n_splits,
             probability_floor=probability_floor,
-            composition="robust",
         ),
+    )
+
+
+def did_rcs_composition_test(
+    robust: RepeatedCrossSectionDiDResult,
+    stationary: RepeatedCrossSectionDiDResult,
+    *,
+    level: float = 0.95,
+) -> RepeatedCrossSectionCompositionDiagnostic:
+    """Test equality of aligned composition-robust and stationary group-time paths.
+
+    The contrast is always robust minus stationary. Its covariance is computed from
+    the aligned difference influence directly; marginal covariance subtraction,
+    coordinate deletion, ridge regularization, and pseudoinverses are not used.
+    """
+
+    if (
+        type(robust) is not RepeatedCrossSectionDiDResult
+        or type(stationary) is not RepeatedCrossSectionDiDResult
+    ):
+        raise TypeError(
+            "robust and stationary must both be exact RepeatedCrossSectionDiDResult objects."
+        )
+    if robust.composition != "robust":
+        raise ValueError("The first argument must be a composition='robust' result.")
+    if stationary.composition != "stationary":
+        raise ValueError("The second argument must be a composition='stationary' result.")
+    if not isinstance(level, Real) or isinstance(level, (bool, np.bool_)):
+        raise TypeError("level must be a real number strictly between zero and one.")
+    if not np.isfinite(level) or not 0.0 < float(level) < 1.0:
+        raise ValueError("level must be strictly between zero and one.")
+    if not robust.cross_fitted or not stationary.cross_fitted:
+        raise ValueError(
+            "The composition diagnostic requires two cross-fitted covariate-adjusted results."
+        )
+    if robust.covariates != stationary.covariates or not robust.covariates:
+        raise ValueError("The composition diagnostic requires the same covariates, non-empty.")
+    if robust.design_fingerprint != stationary.design_fingerprint:
+        raise ValueError(
+            "The composition diagnostic requires the same estimation design and sample."
+        )
+    if not robust.estimation_index.equals(stationary.estimation_index):
+        raise ValueError("The composition diagnostic requires an identically ordered sample.")
+    if (
+        robust.times != stationary.times
+        or robust.anticipation != stationary.anticipation
+        or robust.control_group != stationary.control_group
+        or robust.time_name != stationary.time_name
+        or robust.outcome_name != stationary.outcome_name
+        or robust.treatment_time_name != stationary.treatment_time_name
+        or robust.cluster_name != stationary.cluster_name
+    ):
+        raise ValueError("The composition diagnostic requires identical role and timing contracts.")
+    if robust.covariance_type != stationary.covariance_type:
+        raise ValueError("The composition diagnostic requires the same covariance declaration.")
+    if not robust.inference_clusters.equals(stationary.inference_clusters):
+        raise ValueError("The composition diagnostic requires identical inference clusters.")
+    if robust.n_splits != stationary.n_splits:
+        raise ValueError("The composition diagnostic requires the same nuisance split count.")
+    if robust.nuisance_probability_floor != stationary.nuisance_probability_floor:
+        raise ValueError("The composition diagnostic requires the same probability floor.")
+    if not robust.nuisance_fold.equals(stationary.nuisance_fold):
+        raise ValueError("The composition diagnostic requires the same nuisance-fold roles.")
+
+    robust_support = robust.group_time.index
+    stationary_support = stationary.group_time.index
+    if (
+        robust_support.empty
+        or not robust_support.is_unique
+        or not stationary_support.is_unique
+        or not robust_support.equals(stationary_support)
+    ):
+        raise ValueError(
+            "The composition diagnostic requires the same non-empty group-time support."
+        )
+    required_ledger_columns = ("base_period", "comparison_cohorts")
+    if any(
+        column not in result.group_time.columns
+        for result in (robust, stationary)
+        for column in required_ledger_columns
+    ):
+        raise ValueError("Both results must retain baseline and comparison-cohort ledgers.")
+    for column in required_ledger_columns:
+        if not robust.group_time[column].equals(stationary.group_time[column]):
+            raise ValueError(
+                "The composition diagnostic requires identical baseline periods and fixed "
+                "comparison cohorts."
+            )
+    if (
+        not robust.group_time_influence.index.equals(robust.estimation_index)
+        or not stationary.group_time_influence.index.equals(stationary.estimation_index)
+        or not robust.group_time_influence.columns.equals(robust_support)
+        or not stationary.group_time_influence.columns.equals(stationary_support)
+    ):
+        raise ValueError(
+            "The composition diagnostic requires influence records exactly aligned to sample "
+            "rows and group-time coordinates."
+        )
+
+    robust_influence = robust.group_time_influence.to_numpy(dtype=float)
+    stationary_influence = stationary.group_time_influence.to_numpy(dtype=float)
+    if not np.isfinite(robust_influence).all() or not np.isfinite(stationary_influence).all():
+        raise ValueError("Composition diagnostic influence records must be finite.")
+    centering_tolerance = 1e-10
+    if (
+        np.max(np.abs(robust_influence.mean(axis=0))) > centering_tolerance
+        or np.max(np.abs(stationary_influence.mean(axis=0))) > centering_tolerance
+    ):
+        raise ValueError("Composition diagnostic influence records must be centered.")
+
+    robust_estimates = robust.group_time["att"].to_numpy(dtype=float)
+    stationary_estimates = stationary.group_time["att"].to_numpy(dtype=float)
+    if not np.isfinite(robust_estimates).all() or not np.isfinite(stationary_estimates).all():
+        raise ValueError("Composition diagnostic estimates must be finite.")
+    difference = robust_estimates - stationary_estimates
+    difference_influence = robust_influence - stationary_influence
+    clusters = (
+        None
+        if robust.covariance_type == "robust"
+        else robust.inference_clusters.to_numpy(copy=True)
+    )
+    robust_covariance, n_clusters = _score_cross_covariance(
+        robust_influence,
+        robust_influence,
+        covariance=robust.covariance_type,
+        clusters=clusters,
+    )
+    stationary_covariance, _ = _score_cross_covariance(
+        stationary_influence,
+        stationary_influence,
+        covariance=robust.covariance_type,
+        clusters=clusters,
+    )
+    cross_covariance, _ = _score_cross_covariance(
+        robust_influence,
+        stationary_influence,
+        covariance=robust.covariance_type,
+        clusters=clusters,
+    )
+    difference_covariance, _ = _score_cross_covariance(
+        difference_influence,
+        difference_influence,
+        covariance=robust.covariance_type,
+        clusters=clusters,
+    )
+    statistic, pvalue, distribution, denominator_df = _joint_wald(
+        difference,
+        difference_covariance,
+        covariance=robust.covariance_type,
+        n_clusters=n_clusters,
+    )
+
+    group_time = pd.DataFrame(
+        {
+            "robust": robust_estimates,
+            "stationary": stationary_estimates,
+            "difference": difference,
+        },
+        index=robust_support.copy(),
+    )
+
+    def covariance_frame(values: np.ndarray) -> pd.DataFrame:
+        return pd.DataFrame(
+            values,
+            index=robust_support.copy(),
+            columns=robust_support.copy(),
+        )
+
+    official_hc0_statistic: float | None = None
+    official_hc0_pvalue: float | None = None
+    official_hc0_mapping: str | None = None
+    if robust.covariance_type == "robust":
+        n = len(robust.estimation_index)
+        official_hc0_statistic = float(statistic * n / (n - 1))
+        official_hc0_pvalue = float(chi2.sf(official_hc0_statistic, len(difference)))
+        official_hc0_mapping = "W_HC0 = W_HC1 * n / (n - 1)"
+
+    return RepeatedCrossSectionCompositionDiagnostic(
+        statistic=statistic,
+        pvalue=pvalue,
+        reject=pvalue < 1.0 - float(level),
+        level=float(level),
+        group_time=group_time,
+        influence=pd.DataFrame(
+            difference_influence,
+            index=robust.estimation_index.copy(),
+            columns=robust_support.copy(),
+        ),
+        covariance=covariance_frame(difference_covariance),
+        robust_covariance=covariance_frame(robust_covariance),
+        stationary_covariance=covariance_frame(stationary_covariance),
+        cross_covariance=covariance_frame(cross_covariance),
+        n_restrictions=len(difference),
+        df_num=len(difference),
+        df_denom=denominator_df,
+        distribution=distribution,
+        covariance_type=robust.covariance_type,
+        n_clusters=n_clusters,
+        estimation_index=robust.estimation_index.copy(),
+        inference_clusters=robust.inference_clusters.copy(),
+        design_fingerprint=robust.design_fingerprint,
+        null_hypothesis=(
+            "The aligned composition-robust and stationary group-time effects are equal."
+        ),
+        notes=(
+            "The maintained contrast is robust minus stationary and its covariance is "
+            "computed from the aligned difference influence.",
+            "Rejection is evidence against equality; failure to reject does not verify "
+            "stationary composition.",
+            "The diagnostic provides no estimator-selection recommendation and ordinary "
+            "post-selection inference is not authorized.",
+            "Singular covariance is refused without coordinate deletion, ridge, or a "
+            "pseudoinverse.",
+        ),
+        official_hc0_statistic=official_hc0_statistic,
+        official_hc0_pvalue=official_hc0_pvalue,
+        official_hc0_mapping=official_hc0_mapping,
     )
 
 
@@ -1998,9 +2402,10 @@ class RepeatedCrossSectionDiD:
     """Cohort-time DiD for repeated cross sections.
 
     Supplying covariates and a provider-neutral :class:`CrossFitter` promotes the
-    stationary estimator to its locally efficient doubly robust score. The first
-    ``composition="robust"`` slice implements the separate two-group, two-period
-    efficient score for the treated target-period population. CauseKit does not own,
+    stationary estimator to its locally efficient doubly robust score. The separate
+    ``composition="robust"`` path applies a pair-specific four-cell efficient score to
+    longer and staggered designs, embeds every influence column on one immutable global
+    sample, and targets each treated target-period population. CauseKit does not own,
     copy, or silently select nuisance-model implementations.
     """
 
@@ -2120,7 +2525,7 @@ class RepeatedCrossSectionDiD:
             if cross_fitter is None:  # defensive narrowing after the public refusal above
                 raise ValueError("cross_fitter is required for covariate adjustment.")
             if self.composition == "robust":
-                return _fit_composition_robust_pair(
+                return _fit_composition_robust_lattice(
                     data,
                     sample,
                     outcome=outcome,
@@ -2207,6 +2612,8 @@ class RepeatedCrossSectionDiD:
 
 __all__ = [
     "RepeatedCrossSectionDiD",
+    "RepeatedCrossSectionCompositionDiagnostic",
     "RepeatedCrossSectionDiDResult",
     "RepeatedCrossSectionPretrendDiagnostic",
+    "did_rcs_composition_test",
 ]

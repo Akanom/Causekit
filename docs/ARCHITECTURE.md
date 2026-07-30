@@ -251,24 +251,21 @@ aggregation, and uncertainty. It does not own a nuisance learner, import the pan
 outcome-change machinery, clip probabilities, or expose irrelevant comparison-row
 predictions as meaningful values.
 
-The implemented pairwise composition-robust branch makes two coordinated `CrossFitter`
-calls on the same four-cell-stratified observation/whole-PSU folds: one multiclass
-probability task and three masked outcome tasks. `did_rcs.py` validates the fixed class
-order, applies hard overlap refusal, constructs normalized `w_00`, `w_01`, `w_10`, and
-`w_11`, evaluates the target-period-treated efficient score and influence, and exposes the
-weights without fitting `m_11`. It deliberately refuses longer or multi-cohort designs.
-The reusable class-probability boundary accepts labelled column permutations and
-realigns them to the observed class order, but refuses missing, extra, duplicate, or
-unlabelled array schemas before a causal score can consume them.
+The composition-robust branch preserves the pairwise score instead of building one
+design-wide multinomial. `CrossFitter.fit_predict_class_probability_tasks` plans every
+`(cohort, baseline, target)` task on one immutable global row/PSU fold vector, trains only
+the pair-masked four-class rows, and predicts only relevant held-out pair rows. Coordinated
+masked outcome tasks fit `m_00`, `m_01`, and `m_10`; `m_11` is not unused work. The class-
+probability boundary realigns labelled permutations but refuses missing, extra,
+duplicate, or unlabelled schemas.
 
-The contracted longer composition-robust layer preserves the pairwise score instead of
-building one design-wide multinomial. It plans every `(cohort, baseline, target)` pair on
-one immutable global row/PSU fold vector, trains pair-masked probability/outcome tasks,
-and zero-pads each pair influence onto the complete sample index. Event and calendar
-aggregation use target-period treated-cell shares plus their estimated-share influence.
-The future equality diagnostic subtracts aligned robust and stationary influence matrices
-before covariance assembly; marginal covariance subtraction and pair-local resplitting
-are prohibited. No part of this layer is public yet.
+`did_rcs.py` hard-refuses overlap failures, constructs normalized pair weights, embeds
+each pair influence on the full sample with exact zeros outside the pair, and retains the
+support/scale/task audit in a pair ledger. Event and calendar aggregation use target-
+period treated-cell shares plus their estimated-share influence. The public composition
+diagnostic subtracts aligned robust and stationary influence matrices before covariance
+assembly; marginal covariance subtraction, pair-local resplitting, numerical rank repair,
+and diagnostic-driven estimator selection are prohibited.
 
 Survey support remains outside the runtime architecture and requires an explicit design
 object, weighted nuisance protocol, and design-based variance. A separate balanced-panel extension replaces

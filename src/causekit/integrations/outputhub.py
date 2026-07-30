@@ -7,7 +7,10 @@ from typing import Any
 import pandas as pd
 
 from ..did import DiDResult
-from ..did_rcs import RepeatedCrossSectionDiDResult
+from ..did_rcs import (
+    RepeatedCrossSectionCompositionDiagnostic,
+    RepeatedCrossSectionDiDResult,
+)
 from ..iv import IV2SLSResult
 from ..matching import NearestNeighborMatchResult
 from ..ml import DRLearnerResult, PartiallyLinearDMLResult, RLearnerResult
@@ -38,6 +41,7 @@ def to_outputhub_model(
         | RandomizedATEResult
         | ObservationalATEResult
         | DiDResult
+        | RepeatedCrossSectionCompositionDiagnostic
         | RepeatedCrossSectionDiDResult
         | NearestNeighborMatchResult
         | PartiallyLinearDMLResult
@@ -56,6 +60,7 @@ def to_outputhub_model(
             RandomizedATEResult,
             ObservationalATEResult,
             DiDResult,
+            RepeatedCrossSectionCompositionDiagnostic,
             RepeatedCrossSectionDiDResult,
             NearestNeighborMatchResult,
             PartiallyLinearDMLResult,
@@ -66,10 +71,42 @@ def to_outputhub_model(
         raise TypeError(
             "result must be an IV2SLSResult, RandomizedATEResult, "
             "ObservationalATEResult, DiDResult, RepeatedCrossSectionDiDResult, "
+            "RepeatedCrossSectionCompositionDiagnostic, "
             "NearestNeighborMatchResult, or "
             "PartiallyLinearDMLResult, DRLearnerResult, or RLearnerResult."
         )
     RegressionModel = _regression_model_class()
+    if isinstance(result, RepeatedCrossSectionCompositionDiagnostic):
+        return RegressionModel(
+            name=name or "RCS composition equality diagnostic",
+            depvar="robust_minus_stationary_att",
+            params=result.params,
+            std_errors=result.standard_errors.rename("se"),
+            pvalues=result.pvalues.rename("pvalue"),
+            statistics={
+                "Observations": result.nobs,
+                "Restrictions": result.n_restrictions,
+            },
+            diagnostics={
+                "Joint equality statistic": result.statistic,
+                "Joint equality p-value": result.pvalue,
+                "Reject equality": result.reject,
+            },
+            metadata={
+                "estimator": "rcs_composition_equality_diagnostic",
+                "contrast": "robust_minus_stationary",
+                "covariance_type": result.covariance_type,
+                "distribution": result.distribution,
+                "df_num": result.df_num,
+                "df_denom": result.df_denom,
+                "n_clusters": result.n_clusters,
+                "level": result.level,
+                "estimator_selection": False,
+                "null_hypothesis": result.null_hypothesis,
+                "official_hc0_mapping": result.official_hc0_mapping,
+            },
+            source="causekit",
+        )
     if isinstance(result, NearestNeighborMatchResult):
         return RegressionModel(
             name=name or "Nearest-neighbor matching",
@@ -163,6 +200,8 @@ def to_outputhub_model(
                 "composition": result.composition,
                 "composition_verified": False,
                 "target_population": result.target_population,
+                "group_time_aggregation": result.group_time_aggregation,
+                "esavg_aggregation": result.esavg_aggregation,
                 "anticipation": result.anticipation,
                 "pre_periods": result.pre_periods,
                 "covariance_type": result.covariance_type,
@@ -507,6 +546,7 @@ def add_to_outputhub(
         | RandomizedATEResult
         | ObservationalATEResult
         | DiDResult
+        | RepeatedCrossSectionCompositionDiagnostic
         | RepeatedCrossSectionDiDResult
         | NearestNeighborMatchResult
         | PartiallyLinearDMLResult
@@ -533,6 +573,8 @@ def add_to_outputhub(
         if isinstance(result, NearestNeighborMatchResult)
         else "Repeated-cross-section DiD"
         if isinstance(result, RepeatedCrossSectionDiDResult)
+        else "RCS composition equality diagnostic"
+        if isinstance(result, RepeatedCrossSectionCompositionDiagnostic)
         else "Efficient DiD"
         if isinstance(result, DiDResult) and result.method.startswith("chen_santanna_xie_efficient")
         else "Difference-in-Differences"
@@ -543,7 +585,41 @@ def add_to_outputhub(
     )
     model = to_outputhub_model(result, name=model_name)
     hub.add_model(model)
-    if isinstance(result, IV2SLSResult) and hasattr(hub, "add_table"):
+    if isinstance(result, RepeatedCrossSectionCompositionDiagnostic) and hasattr(hub, "add_table"):
+        metadata = {
+            "source": "causekit",
+            "estimator": "rcs_composition_equality_diagnostic",
+            "estimator_selection": False,
+        }
+        hub.add_table(
+            f"{model_name} estimates",
+            result.summary_frame().reset_index(),
+            caption=(
+                "Aligned composition-robust and stationary group-time effects and the "
+                "maintained robust-minus-stationary contrast. No estimator is selected."
+            ),
+            metadata=metadata,
+        )
+        hub.add_table(
+            f"{model_name} joint test",
+            pd.DataFrame(
+                {
+                    "statistic": [result.statistic],
+                    "p_value": [result.pvalue],
+                    "reject": [result.reject],
+                    "level": [result.level],
+                    "distribution": [result.distribution],
+                    "df_num": [result.df_num],
+                    "df_denom": [result.df_denom],
+                }
+            ),
+            caption=(
+                "Joint equality diagnostic from the aligned difference influence. Failure "
+                "to reject does not verify stationary composition."
+            ),
+            metadata=metadata,
+        )
+    elif isinstance(result, IV2SLSResult) and hasattr(hub, "add_table"):
         hub.add_table(
             f"{model_name} first-stage diagnostics",
             _first_stage_table(result).reset_index(),
@@ -716,6 +792,20 @@ def add_to_outputhub(
                     "target_population": result.target_population,
                 },
             )
+        if not result.pair_ledger.empty:
+            hub.add_table(
+                f"{model_name} pair ledger",
+                result.pair_ledger.reset_index(),
+                caption=(
+                    "Complete robust pair support, target share, influence-embedding, overlap, "
+                    "weight, comparison-cohort, and nuisance-task audit records."
+                ),
+                metadata={
+                    **table_metadata,
+                    "composition": result.composition,
+                    "target_population": result.target_population,
+                },
+            )
         if not result.pretrend.placebo_effects.empty:
             hub.add_table(
                 f"{model_name} pre-trend placebos",
@@ -754,7 +844,11 @@ def add_to_outputhub(
         hub.add_table(
             f"{model_name} event study",
             result.event_study.reset_index(),
-            caption="Pooled-cohort-share-weighted event-time effects with pointwise inference.",
+            caption=(
+                "Target-period-treated-share-weighted event-time effects with pointwise inference."
+                if result.composition == "robust"
+                else "Pooled-cohort-share-weighted event-time effects with pointwise inference."
+            ),
             metadata=table_metadata,
         )
         if not result.simultaneous_event_study.empty:
@@ -777,7 +871,11 @@ def add_to_outputhub(
         hub.add_table(
             f"{model_name} calendar-time effects",
             result.calendar_time.reset_index(),
-            caption="Pooled-cohort-share-weighted post-adoption calendar-time effects.",
+            caption=(
+                "Target-period-treated-share-weighted post-adoption calendar-time effects."
+                if result.composition == "robust"
+                else "Pooled-cohort-share-weighted post-adoption calendar-time effects."
+            ),
             metadata=table_metadata,
         )
     elif isinstance(result, DiDResult) and hasattr(hub, "add_table"):

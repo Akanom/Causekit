@@ -118,8 +118,14 @@ Its separate pairwise promotion evidence verifies the official Sequeira source h
 derived analysis hash, fits all nuisances within five whole-PSU folds, records robust and
 stationary sensitivity jointly, passes a 100,000-row performance gate, and completes
 8,000 publication-scale estimator fits plus 72,000 nuisance fold fits with zero refusals.
-All eight observation/PSU pointwise coverage cells pass. Longer robust event-study bands,
-the composition diagnostic, and staggered aggregation remain separate gates.
+All eight observation/PSU pointwise coverage cells pass.
+The promoted longer path adds shared-fold masked multiclass tasks, zero-padded pair
+influences, target-period share aggregation, conditional placebos, max-t bands, and the
+aligned robust-minus-stationary diagnostic. Official R diagnostic mapping passes under
+fixed influences; no official aligned longer estimator is available. Its hash-pinned
+hospital sensitivity, 120,000-row benchmark, and 4,000-fit publication certificate pass
+all observation/PSU bias, SE, pointwise/joint coverage, pretrend-size, diagnostic
+size/power, and zero-refusal gates.
 
 The repeated-section covariate path additionally reconstructs its normalized eight-term
 score and ratio influence, requires a shared observation/whole-PSU fold assignment, and

@@ -9,6 +9,8 @@ import pytest
 from causekit import (
     AIPWATE,
     ClassProbabilityCrossFitResult,
+    ClassProbabilityCrossFitTask,
+    ClassProbabilityTaskCrossFitResult,
     CrossFitResult,
     CrossFitTask,
     CrossFitTaskResult,
@@ -331,4 +333,214 @@ def test_generic_cross_fitting_refuses_duplicate_tasks_and_too_small_strata() ->
             X,
             tasks=[duplicate],
             strata=pd.Series([0, 0, 0, 0, 1, 1]),
+        )
+
+
+class _MaskedClassAuditResult:
+    def __init__(
+        self,
+        classes: np.ndarray,
+        probabilities: np.ndarray,
+        train_index: pd.Index,
+        registry: list[tuple[pd.Index, pd.Index]],
+    ) -> None:
+        self.classes_ = classes
+        self.probabilities = probabilities
+        self.train_index = train_index.copy()
+        self.registry = registry
+
+    def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
+        self.registry.append((self.train_index, X.index.copy()))
+        return np.tile(self.probabilities, (len(X), 1))
+
+
+class _MaskedClassAuditFactory:
+    def __init__(self, registry: list[tuple[pd.Index, pd.Index]]) -> None:
+        self.registry = registry
+
+    def __call__(self):
+        registry = self.registry
+
+        class _Model:
+            def fit(self, X: pd.DataFrame, y: pd.Series) -> _MaskedClassAuditResult:
+                classes, counts = np.unique(np.asarray(y), return_counts=True)
+                return _MaskedClassAuditResult(
+                    classes,
+                    counts / counts.sum(),
+                    X.index,
+                    registry,
+                )
+
+        return _Model()
+
+
+def _masked_class_fixture():
+    index = pd.Index([f"row-{position}" for position in range(32)], name="row")
+    X = pd.DataFrame({"x": np.arange(32, dtype=float)}, index=index)
+    global_strata = pd.Series(np.tile(np.arange(8), 4), index=index, name="global_cell")
+    first_mask = global_strata.isin([0, 1, 2, 3])
+    second_mask = global_strata.isin([4, 5, 6, 7])
+    first_classes = pd.Series(global_strata % 4, index=index, name="first_cell")
+    second_classes = pd.Series(global_strata % 4, index=index, name="second_cell")
+    return X, global_strata, first_mask, second_mask, first_classes, second_classes
+
+
+def test_masked_multiclass_tasks_share_global_folds_and_predict_only_relevant_rows() -> None:
+    X, strata, first_mask, second_mask, first_classes, second_classes = _masked_class_fixture()
+    registry: list[tuple[pd.Index, pd.Index]] = []
+    factory = _MaskedClassAuditFactory(registry)
+    tasks = [
+        ClassProbabilityCrossFitTask(
+            name="first_pair",
+            classes=first_classes,
+            train_mask=first_mask,
+            predict_mask=first_mask,
+            class_labels=(0, 1, 2, 3),
+            factory=factory,
+        ),
+        ClassProbabilityCrossFitTask(
+            name="second_pair",
+            classes=second_classes,
+            train_mask=second_mask,
+            predict_mask=second_mask,
+            class_labels=(0, 1, 2, 3),
+            factory=factory,
+        ),
+    ]
+
+    result = CrossFitter(n_splits=2, random_state=71).fit_predict_class_probability_tasks(
+        X,
+        tasks=tasks,
+        strata=strata,
+    )
+
+    assert isinstance(result, ClassProbabilityTaskCrossFitResult)
+    assert result.probabilities.columns.tolist() == [
+        ("first_pair", 0),
+        ("first_pair", 1),
+        ("first_pair", 2),
+        ("first_pair", 3),
+        ("second_pair", 0),
+        ("second_pair", 1),
+        ("second_pair", 2),
+        ("second_pair", 3),
+    ]
+    assert result.probabilities.loc[~first_mask, "first_pair"].isna().all().all()
+    assert result.probabilities.loc[~second_mask, "second_pair"].isna().all().all()
+    np.testing.assert_allclose(
+        result.probabilities.loc[first_mask, "first_pair"].sum(axis=1),
+        1.0,
+        atol=1e-14,
+    )
+    np.testing.assert_allclose(
+        result.probabilities.loc[second_mask, "second_pair"].sum(axis=1),
+        1.0,
+        atol=1e-14,
+    )
+    assert len(registry) == 4
+    for train_index, holdout_index in registry:
+        assert set(train_index).isdisjoint(holdout_index)
+    assert result.model_diagnostics["relevant_holdout_nobs"].eq(8).all()
+    assert result.model_diagnostics["declared_class_count"].eq(4).all()
+    scalar_result = CrossFitter(n_splits=2, random_state=71).fit_predict_tasks(
+        X,
+        tasks=[CrossFitTask(name="identity", target=X["x"], factory=_LinearOutcome)],
+        strata=strata,
+    )
+    pd.testing.assert_series_equal(result.fold, scalar_result.fold)
+
+
+def test_masked_multiclass_tasks_keep_psus_immutable_across_overlapping_tasks() -> None:
+    X, strata, first_mask, second_mask, first_classes, second_classes = _masked_class_fixture()
+    clusters = pd.Series(
+        [f"psu-{position % 16}" for position in range(len(X))],
+        index=X.index,
+        name="psu",
+    )
+    tasks = [
+        ClassProbabilityCrossFitTask(
+            name="first_pair",
+            classes=first_classes,
+            train_mask=first_mask,
+            class_labels=(0, 1, 2, 3),
+            factory=_ClassProbability,
+        ),
+        ClassProbabilityCrossFitTask(
+            name="second_pair",
+            classes=second_classes,
+            train_mask=second_mask,
+            class_labels=(0, 1, 2, 3),
+            factory=_ClassProbability,
+        ),
+    ]
+
+    result = CrossFitter(n_splits=2, random_state=13).fit_predict_class_probability_tasks(
+        X,
+        tasks=tasks,
+        strata=strata,
+        clusters=clusters,
+    )
+
+    assert result.fold.groupby(clusters).nunique().eq(1).all()
+    assert (pd.crosstab(result.fold, strata) > 0).all().all()
+
+
+def test_masked_multiclass_tasks_refuse_schema_support_masks_and_duplicate_names() -> None:
+    X, strata, first_mask, _, first_classes, _ = _masked_class_fixture()
+    valid = ClassProbabilityCrossFitTask(
+        name="pair",
+        classes=first_classes,
+        train_mask=first_mask,
+        class_labels=(0, 1, 2, 3),
+        factory=_ClassProbability,
+    )
+    fitter = CrossFitter(n_splits=2, random_state=7)
+
+    with pytest.raises(ValueError, match="task names must be unique"):
+        fitter.fit_predict_class_probability_tasks(X, tasks=[valid, valid], strata=strata)
+    with pytest.raises(ValueError, match="declared class labels.*observed"):
+        fitter.fit_predict_class_probability_tasks(
+            X,
+            tasks=[
+                ClassProbabilityCrossFitTask(
+                    name="bad_schema",
+                    classes=first_classes,
+                    train_mask=first_mask,
+                    class_labels=(0, 1, 2),
+                    factory=_ClassProbability,
+                )
+            ],
+            strata=strata,
+        )
+    unsupported = first_mask.copy()
+    class_three_positions = np.flatnonzero(first_mask & first_classes.eq(3))
+    unsupported.iloc[class_three_positions[:-1]] = False
+    with pytest.raises(ValueError, match="every declared class.*outside fold"):
+        fitter.fit_predict_class_probability_tasks(
+            X,
+            tasks=[
+                ClassProbabilityCrossFitTask(
+                    name="unsupported",
+                    classes=first_classes,
+                    train_mask=unsupported,
+                    class_labels=(0, 1, 2, 3),
+                    factory=_ClassProbability,
+                )
+            ],
+            strata=strata,
+        )
+    with pytest.raises(ValueError, match="predict_mask.*subset"):
+        fitter.fit_predict_class_probability_tasks(
+            X,
+            tasks=[
+                ClassProbabilityCrossFitTask(
+                    name="bad_prediction_role",
+                    classes=first_classes,
+                    train_mask=first_mask,
+                    predict_mask=pd.Series(True, index=X.index),
+                    class_labels=(0, 1, 2, 3),
+                    factory=_ClassProbability,
+                )
+            ],
+            strata=strata,
         )
