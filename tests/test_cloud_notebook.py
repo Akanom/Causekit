@@ -83,6 +83,7 @@ def test_kaggle_metadata_points_to_shared_colab_notebook_without_secrets() -> No
         "kernel_sources": [],
     }
     combined = NOTEBOOK.read_text(encoding="utf-8") + KAGGLE_METADATA.read_text(encoding="utf-8")
+    assert "https://www.kaggle.com/code/akanom/causekit-quickstart" in combined
     assert "kaggle.json" not in combined
     assert "KAGGLE_KEY" not in combined
     assert "KAGGLE_USERNAME" not in combined

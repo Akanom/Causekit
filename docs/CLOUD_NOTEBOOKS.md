@@ -46,7 +46,9 @@ cd notebooks/kaggle
 kaggle kernels push -p .
 ```
 
-The public kernel id in `kernel-metadata.json` is `akanom/causekit-quickstart`.
+The public kernel id in `kernel-metadata.json` is `akanom/causekit-quickstart`; the
+published notebook is available at
+<https://www.kaggle.com/code/akanom/causekit-quickstart>.
 
 For Google Colab, use the badge in the notebook, open the tracked file from GitHub, or
 upload the same `.ipynb` directly. Keeping one source notebook prevents Kaggle and Colab
