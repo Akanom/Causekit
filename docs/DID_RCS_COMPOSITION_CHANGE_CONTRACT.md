@@ -181,6 +181,16 @@ The reusable protocol now refuses missing, extra, duplicate, and unlabeled class
 safely realigns labelled permutations, and preserves estimates, standard errors, weights,
 influences, nuisance predictions, and design fingerprint under row permutation.
 
+The official external gate now passes. The R harness pins `compdid` 0.1.0 source commit
+`894bd65a952c30f01a4e0005efba4cb335065eb7` and the exact `att-core.R` and
+`dp-grooming.R` Git blobs, maps the persisted CauseKit probability order
+`(00,01,10,11)` into the official `(11,10,01,00)` contract, and calls
+`drdid_nonstationary(stabilized=TRUE, boot=FALSE, inffunc=TRUE)`. CauseKit and R agree on
+the point estimate, sample-SD/HC1 standard error, and all 16 ordered influence records at
+absolute tolerance `2e-14`. The official API's required `m11` column cancels algebraically
+between its target residual and regression contrast, matching CauseKit's deliberate
+three-outcome-nuisance execution path.
+
 ## Remaining promotion sequence
 
 Promotion beyond the implemented pairwise evidence still requires:
@@ -198,13 +208,13 @@ composition-test size and power, overlap, support, audit counts, zero silent fal
 runtime, and peak memory. Efficiency loss under true stationarity must be reported rather
 than hidden.
 
-The primary external comparator is the authors' official R `compdid` implementation,
-pinned by released version and source commit. CauseKit must map its four probability and
-outcome columns explicitly and compare point estimates and retained influence records
-before comparing standard errors. Stata is recorded unavailable unless a reviewed command
-targets the same post-period treated ATT and influence moment. A hash-pinned real-data
-sensitivity example must report robust and stationary estimates together without
-pretest-based selection.
+The primary external comparator is the authors' official R `compdid` implementation.
+Its pinned point/influence gate and subsequent standard-error comparison now pass through
+`benchmarks/validate_did_rcs_compdid_reference.R`; the saved artifact is validated in
+`tests/validation/test_did_rcs_compdid_parity.py`. Stata is recorded unavailable unless a
+reviewed command targets the same post-period treated ATT and influence moment. A hash-
+pinned real-data sensitivity example must report robust and stationary estimates together
+without pretest-based selection.
 
 Staggered group-time aggregation becomes a later promotion gate after the pairwise score
 passes. It requires both control rules, anticipation, target-period treated shares and

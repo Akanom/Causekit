@@ -108,6 +108,13 @@ with zero maximum aligned difference. Aggregate SEs remain explicitly non-compar
 to period-specific versus pooled estimated-share influence. The 100,000-row benchmark
 remains maintained.
 
+The pairwise composition-change score additionally passes official R `compdid` 0.1.0
+parity at commit `894bd65a952c30f01a4e0005efba4cb335065eb7`. The source-level harness
+verifies the relevant Git blobs, explicitly maps `(00,01,10,11)` CauseKit nuisance
+columns into `(11,10,01,00)`, and compares ATT, the HC1-equivalent standard error, and
+every ordered influence coordinate. Stata remains unavailable for this exact treated-
+target-period moment rather than being represented by a non-aligned command.
+
 The repeated-section covariate path additionally reconstructs its normalized eight-term
 score and ratio influence, requires a shared observation/whole-PSU fold assignment, and
 refuses low probabilities without clipping or repair. Its 4,000-fit publication

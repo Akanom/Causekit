@@ -74,6 +74,11 @@ versions may refine APIs, but breaking changes must still be documented explicit
   deterministic composition-shift design recovers target-period ATT `5` while the
   stationary score targets the pooled-treated value `4`; full result records are invariant
   to row order and labelled probability-column order.
+- Point-estimate and full 16-coordinate influence-function parity against the official R
+  `compdid` 0.1.0 `drdid_nonstationary()` implementation at source commit
+  `894bd65a952c30f01a4e0005efba4cb335065eb7`. The harness verifies the relevant Git blob
+  IDs, explicitly maps CauseKit `(00,01,10,11)` nuisances to R `(11,10,01,00)`, records
+  why the unused `m11` algebraically cancels, and hash-binds the fixture and saved output.
 - Design-only contracts remain for calibrated direct pairwise cohort odds in balanced-
   panel PT-All, the composition diagnostic and staggered composition-robust extension,
   and repeated-section survey-design/population targets. Unsupported combinations keep
@@ -98,7 +103,7 @@ versions may refine APIs, but breaking changes must still be documented explicit
 - Stationary composition is declared but not testable from the estimator. Composition-
   robust estimation is currently restricted to a covariate-adjusted two-period design
   with one treated cohort; staggered aggregation, longer-design pre-trends, the aligned
-  composition diagnostic, external parity, real-data sensitivity, and publication-scale
+  composition diagnostic, real-data sensitivity, performance, and publication-scale
   coverage remain open. Sampling or survey weights remain unimplemented and refuse.
   Direct cohort-ratio nuisances are also design-only; the implemented PT-All path
   continues to use multiclass probabilities. Covariate estimator-level parity is

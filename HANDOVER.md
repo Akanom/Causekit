@@ -259,10 +259,13 @@ future task can resume without reconstructing intent from chat history.
     score targets pooled-treated value `4`. Two additional failing-first protocol gaps
     were closed: class predictions now refuse missing, extra, duplicate, or unlabeled
     schemas, safely realign labelled permutations, and the complete robust result is row-
-    permutation invariant.
+    permutation invariant. Official R `compdid` 0.1.0 point, standard-error, and all 16
+    influence-coordinate comparisons pass at pinned commit
+    `894bd65a952c30f01a4e0005efba4cb335065eb7`; the relevant R source blobs, nuisance
+    column mappings, fixture, and saved output are pinned and audited.
     Staggered aggregation, longer-design conditional pre-trends, the composition
-    diagnostic, external `compdid` parity, real-data sensitivity, publication-scale
-    coverage, and survey combinations remain open.
+    diagnostic, real-data sensitivity, performance, publication-scale coverage, and
+    survey combinations remain open.
 
 ## Open promotion gates
 
@@ -285,9 +288,10 @@ future task can resume without reconstructing intent from chat history.
   pinned R/Stata estimator-level cells remain unavailable because their maintained public
   paths do not implement the same score. Observation/PSU multiplier mechanics and the
   16-cell publication-scale joint-band certificate pass. The narrow pairwise composition-
-  robust score passes its hand/refusal contracts, but its staggered, diagnostic, external-
-  parity, real-data, and publication-scale gates remain open. Survey designs remain a
-  separate design-only contract and continue to refuse.
+  robust score passes its hand/refusal contracts and official R `compdid` point/influence
+  parity. Its staggered, diagnostic, real-data, performance, and publication-scale gates
+  remain open. Survey designs remain a separate design-only contract and continue to
+  refuse.
 - The R-learner alpha is public with honest evaluation, calibration, groups, bands, graph
   data, simulations, base-R/Stata parity, performance, native nonlinear support, and two
   real-data CATE records. The next native nonlinear stage is frozen as a separate
@@ -326,10 +330,10 @@ future task can resume without reconstructing intent from chat history.
 ## Next development order
 
 1. Promote the implemented pairwise [composition-change](docs/DID_RCS_COMPOSITION_CHANGE_CONTRACT.md)
-   score through official `compdid` point/influence parity next, followed by real-data
-   sensitivity, performance, and preregistered coverage before adding its diagnostic or
-   staggered wrapper. Composition-shift recovery, stationary-target contrast, exact class
-   schemas, and row/labelled-column permutation gates now pass. Keep the separate
+   score through hash-pinned real-data sensitivity, performance, and preregistered
+   coverage before adding its diagnostic or staggered wrapper. Official `compdid`
+   point/influence parity, composition-shift recovery, stationary-target contrast, exact
+   class schemas, and row/labelled-column permutation gates now pass. Keep the separate
    [survey-design](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md) contract design-only until that
    base evidence is complete. The balanced-panel
    [direct-ratio](docs/DID_DIRECT_RATIO_CONTRACT.md) nuisance is a separate PT-All option;

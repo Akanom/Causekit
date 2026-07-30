@@ -515,6 +515,10 @@ recovers target-period ATT `5` while the deliberately miss-targeted stationary s
 equals the pooled-treated value `4`; row permutation and labelled probability-column
 permutation leave the robust result unchanged. A runnable provider-neutral example is
 [`examples/composition_robust_repeated_cross_section_did.py`](examples/composition_robust_repeated_cross_section_did.py).
+The exact point estimate, HC1-equivalent standard error, and all 16 influence coordinates
+also match the official R `compdid` 0.1.0 `drdid_nonstationary()` source at pinned commit
+`894bd65a952c30f01a4e0005efba4cb335065eb7`. Reproduce that source-level comparator with
+`Rscript benchmarks/validate_did_rcs_compdid_reference.R PATH_TO_COMPDID_CHECKOUT`.
 
 There is intentionally no `entity=` role and no `panel=False` switch. Every result records
 that stationary composition is an identifying assumption rather than a verified

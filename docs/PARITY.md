@@ -37,7 +37,7 @@ uses different estimands or moments. Neither counts as a pass.
 | Conventional staggered DiD | hand/influence identities pass | real hospital group-time/influence contract passes | Stata/IC 17 same group-time/influence contract passes; `didregress` common-effect aggregation is non-comparable | pass for aligned contract |
 | Repeated-cross-section DiD, stationary composition | hand, aggregation, HC1/CR1, and 32-cell publication coverage contracts pass | pinned `did` 2.5.0 `att_gt(panel = FALSE, est_method = "reg")` passes both control rules after explicit HC0-to-HC1 mapping | reviewed Stata/IC 17 `csdid` matches group-time estimates/SEs and aggregate points; aggregate SEs use non-comparable cell-share influence | pass for available aligned fields |
 | Repeated-cross-section DiD, covariate adjusted | hand score/influence, leakage, double-robustness, hash-verified real-data, and 44-cell publication coverage contracts pass | fixed-OOF base-R score/HC1 reconstruction passes; estimator-level implementation unavailable | reviewed estimators target different moments: unavailable | internal publication evidence and score parity pass; estimator-level external unavailable |
-| Repeated-cross-section DiD, composition-robust pairwise | hand estimate/EIF/HC1/weights, composition-shift recovery, stationary-target contrast, class schema, row permutation, overlap, scope, and whole-PSU fold-role contracts pass | official `compdid` point/influence comparator pending | no reviewed estimator targeting the same treated-target-period moment: unavailable | expanded internal deterministic contract passes; external parity pending |
+| Repeated-cross-section DiD, composition-robust pairwise | hand estimate/EIF/HC1/weights, composition-shift recovery, stationary-target contrast, class schema, row permutation, overlap, scope, and whole-PSU fold-role contracts pass | official `compdid` 0.1.0 point, HC1-equivalent SE, and every influence coordinate pass at pinned commit | no reviewed estimator targeting the same treated-target-period moment: unavailable | pass for the pairwise fixed-nuisance score; real-data/performance/coverage gates remain open |
 | Efficient DiD, no covariates | native result checked on fixture and real data | pinned public `edid` commit passes fixture and real hospital data | unavailable: Stata heterogeneous DiD does not implement PT-All optimal weighting | pass for available aligned comparator |
 | Efficient DiD, covariate adjusted | deterministic equation, refusal, and simulation evidence pass | unavailable: pinned public `edid` explicitly excludes covariates | unavailable: no identified Chen–Sant'Anna–Xie PT-All implementation | internal validation; external unavailable |
 | `PartiallyLinearDML` residual stage | hand score plus independent Statsmodels HC1 pass | base R 4.5.1 matrix/HC1 contract passes | reviewed Stata/IC 17 no-intercept HC1 contract passes | pass |
@@ -132,13 +132,21 @@ hash-bound `benchmarks/did_rcs_simultaneous_promotion_evidence.json` certificate
 draws, zero refusals, and 16 passing publication-scale joint-coverage cells. This is
 internal inferential evidence, not manufactured cross-language random-number parity.
 
-The pairwise composition-robust row currently records only the independent Python hand
-contract in `tests/test_did_rcs_composition.py`. It fixes the ordered generalized-
-propensity cells `(0,0)`, `(0,1)`, `(1,0)`, `(1,1)`, reconstructs the three non-target
-outcome residual terms and target-cell contrast, and compares every retained weight and
-EIF coordinate. The official R `compdid` score/influence comparator remains a promotion
-gate. No Stata command is labelled comparable without evidence that it targets the same
-treated target-period population and influence moment.
+The pairwise composition-robust row combines the independent Python hand contract in
+`tests/test_did_rcs_composition.py` with
+`benchmarks/validate_did_rcs_compdid_reference.R`. The official comparator pins
+`compdid` 0.1.0 commit `894bd65a952c30f01a4e0005efba4cb335065eb7` and the relevant
+source blobs, then executes its exported `drdid_nonstationary()` implementation directly
+from that checkout. It explicitly reorders CauseKit probabilities `(00,01,10,11)` to R
+`(11,10,01,00)` and supplies R's required `m11`, which algebraically cancels from the
+point score and influence. ATT is `2.2950387445451073`, SE is
+`0.29206804206766818`, and every one of 16 ordered influence coordinates agrees within
+`2e-14`. The canonical-LF fixture SHA-256 is
+`eafc591363edf693b42adea3f56782def6addbb7bed67dc993260b1b2b17bf2f`; the saved R
+output canonical-LF SHA-256 is
+`680802078b1634cb5f5e43096f94867ea9ed1b4f9c95fa384d9c30b51fc057a0`.
+No Stata command is labelled comparable without evidence that it targets the same treated
+target-period population and influence moment.
 The added composition-shift fixture recovers robust target ATT `5` and the distinct
 stationary pooled-treated target `4`; it is a target-definition test rather than an
 external parity claim. Exact class-schema refusals and row/labelled-column permutation

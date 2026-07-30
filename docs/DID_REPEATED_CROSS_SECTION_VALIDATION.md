@@ -33,9 +33,9 @@ weights. The retained refusals cover missing covariates, more than two periods, 
 one treated cohort, and a generalized-propensity cell at the hard probability floor.
 Separate audit assertions keep construction/holdout rows and declared PSUs disjoint,
 require identical folds across the four-class and three outcome tasks, and verify that no
-unused target-cell outcome regression is fitted. This evidence promotes only the
-pairwise score; it is not staggered, external-package, real-data, or publication-scale
-evidence.
+unused target-cell outcome regression is fitted. This evidence promotes only the pairwise
+score; it is not staggered, real-data, or publication-scale evidence. External score
+parity is promoted separately below.
 
 The next 32-row deterministic design changes treated `X` composition from `0.25` at
 baseline to `0.75` in the target period and sets the conditional effect to `2+4X`.
@@ -75,6 +75,19 @@ Rscript benchmarks/validate_did_rcs_covariate_reference.R
 Base R reconstructs the eight-component locally efficient repeated-cross-section score,
 ATT, full influence vector, and HC1 at `1e-12`. It validates the causal score with fixed
 out-of-fold nuisance predictions, not any particular nuisance-model implementation.
+
+Run the official composition-change comparator from a checkout fixed at commit
+`894bd65a952c30f01a4e0005efba4cb335065eb7`:
+
+```bash
+Rscript benchmarks/validate_did_rcs_compdid_reference.R PATH_TO_COMPDID_CHECKOUT
+```
+
+The reviewed R 4.5.1 run executes the pinned official `compdid` 0.1.0
+`drdid_nonstationary()` R source. It matches CauseKit ATT, the sample-SD/HC1 standard
+error, and all 16 ordered influence values at `2e-14`. The saved output is
+`benchmarks/validate_did_rcs_compdid_output.txt`; the test also fixes the nuisance-column
+mapping and canonical-LF SHA-256 hashes for both input and output artifacts.
 
 Stata must be run manually from the repository root:
 
@@ -207,10 +220,11 @@ observed covariate, two whole-hospital folds, and hospital CR1 inference. It ret
 `0.8676486723638247`, standard error `0.04274270577554287`, 46 PSUs, and 60 fold/task
 diagnostic rows. The source is artificial and the affine/empirical nuisances are an
 execution contract, not evidence that the nuisance models or identifying assumptions are
-substantively correct. The narrow pairwise composition-robust path has hand-contract
-evidence only; real-data sensitivity, external parity, publication-scale coverage,
-staggered composition robustness, its aligned diagnostic, and survey weights remain
-open. Covariate stationary-composition publication-scale pointwise and simultaneous
+substantively correct. The narrow pairwise composition-robust path has hand-contract and
+official R `compdid` point/influence evidence; real-data sensitivity, performance,
+publication-scale coverage, staggered composition robustness, its aligned diagnostic,
+and survey weights remain open. Covariate stationary-composition publication-scale
+pointwise and simultaneous
 joint-coverage evidence is promoted separately above.
 
 Reproduce the covariate large-sample path with:
