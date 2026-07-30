@@ -15,6 +15,7 @@ from causekit import (
     PartiallyLinearDML,
     RandomizedATE,
     RepeatedCrossSectionDiD,
+    RepeatedCrossSectionSurveyDesign,
     RLearner,
     add_to_outputhub,
     to_outputhub_model,
@@ -336,6 +337,42 @@ def test_repeated_cross_section_did_exports_cells_and_effect_tables() -> None:
         "Repeated-cross-section DiD event study",
         "Repeated-cross-section DiD simultaneous event-study bands",
         "Repeated-cross-section DiD calendar-time effects",
+    ]
+
+
+def test_survey_repeated_cross_section_exports_design_and_weight_audits() -> None:
+    data = pd.DataFrame(
+        {
+            "outcome": [5, 7, 6, 8, 9, 12, 10, 13, 3, 4, 2, 5, 4, 7, 3, 6],
+            "time": np.repeat([1.0, 2.0, 1.0, 2.0], 4),
+            "treatment_time": np.repeat([2.0, 2.0, np.inf, np.inf], 4),
+            "weight": [1, 2, 1, 3, 2, 1, 3, 1, 1, 2, 2, 1, 2, 1, 1, 2],
+            "psu": np.tile(["a1", "a2", "b1", "b2"], 4),
+            "stratum": np.tile(["a", "a", "b", "b"], 4),
+        }
+    )
+    result = RepeatedCrossSectionDiD().fit(
+        data,
+        outcome="outcome",
+        time="time",
+        treatment_time="treatment_time",
+        survey_design=RepeatedCrossSectionSurveyDesign(
+            weights="weight", psu="psu", strata="stratum"
+        ),
+        target_population="survey_population",
+    )
+
+    model = to_outputhub_model(result)
+    assert model.metadata["population_basis"] == "survey_population"
+    assert model.metadata["weight_type"] == "inverse_inclusion"
+    hub = outputhub.OutputHub("Survey repeated samples")
+    add_to_outputhub(hub, result)
+    names = [table.name for table in hub.tables]
+    assert names[:4] == [
+        "Repeated-cross-section DiD survey-weight diagnostics",
+        "Repeated-cross-section DiD survey-design diagnostics",
+        "Repeated-cross-section DiD survey-weighted cell counts",
+        "Repeated-cross-section DiD cell counts",
     ]
 
 

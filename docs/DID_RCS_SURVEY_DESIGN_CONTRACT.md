@@ -2,11 +2,13 @@
 
 ## Status and boundary
 
-This is a design-only contract. CauseKit currently refuses `sampling_weights` in
-`RepeatedCrossSectionDiD`; that refusal remains correct. A bare numeric weight column does
-not identify its meaning, target population, sampling design, nuisance-fit behavior, or
-variance estimator. No survey class, protocol, fit option, or weighted result is exported
-until the failing-first gates below are in place.
+This contract is implemented for stationary-composition repeated cross sections with and
+without covariates. CauseKit continues to refuse bare `sampling_weights` because a numeric
+column alone does not identify its meaning, target population, sampling design,
+nuisance-fit behavior, or variance estimator. Public
+`RepeatedCrossSectionSurveyDesign` and `WeightedNuisanceEstimatorProtocol` freeze those
+roles. Composition-robust combinations and survey-valid simultaneous bands remain outside
+this promoted slice.
 
 Survey design is separate from composition-change robustness. Sampling weights transport
 from sampled observations to a declared finite or superpopulation target; they do not by
@@ -17,7 +19,7 @@ than multiplying weights from independent features.
 
 ## Weight semantics and target population
 
-The first public survey path will accept inverse inclusion or calibrated analysis weights,
+The public survey path accepts inverse inclusion or calibrated analysis weights,
 not frequency weights, exposure weights, precision weights, matching weights, or
 user-invented causal weights. The result must distinguish:
 
@@ -36,10 +38,9 @@ Hájek point estimate, normalized component, target share, and Taylor-linearized
 unchanged. Weight normalization is part of each estimand component; CauseKit does not
 overwrite the user column or pretend normalized weights are known inclusion probabilities.
 
-## Planned public design object
+## Public design object
 
-The implementation phase will first add an immutable public object and fit role,
-provisionally:
+The immutable public object and fit role are:
 
 ```python
 RepeatedCrossSectionSurveyDesign(
@@ -57,7 +58,7 @@ RepeatedCrossSectionDiD(...).fit(
 )
 ```
 
-The final name is frozen by failing API tests before implementation. Inputs may be aligned
+The name was frozen by failing API tests before implementation. Inputs may be aligned
 column names or labelled one-dimensional objects following the package's existing index
 contract. The object validates and records roles; the estimator owns the target-specific
 score and inference. `weight_type` initially accepts only documented inverse-inclusion or
@@ -65,7 +66,7 @@ calibrated analysis weights. A raw `sampling_weights=` vector continues to refus
 it cannot express the design. `target_population="sample"` remains the existing
 unweighted path and cannot be paired with a survey design merely to change its variance.
 
-The first promotable estimator slice is no-covariate, `composition="stationary"`, and
+The base estimator is no-covariate, `composition="stationary"`, and
 `target_population="survey_population"`. Its inference uses a with-replacement,
 one-stage stratified PSU Taylor-linearization design. An observation is its own PSU only
 when the user explicitly requests the independent-observation design. Replicate-weight
@@ -80,9 +81,9 @@ normalization under the declared target. Cohort, event-time, calendar-time, and 
 aggregation uses design-weighted target-population shares and includes the influence of
 estimating those shares. Unweighted sample shares are not reusable.
 
-When covariates are used, nuisance training must honor the survey analysis weights in the
+When covariates are used, nuisance training honors the survey analysis weights in the
 outer training partition. The existing provider protocol `fit(X, y)` cannot silently drop
-them. A separate runtime-checkable protocol is required:
+them. The runtime-checkable protocol is:
 
 ```python
 class WeightedNuisanceEstimatorProtocol(Protocol):
@@ -97,10 +98,11 @@ them correctly; provider compliance remains an explicit assumption and sentinel 
 test the integration. CauseKit never catches a `TypeError` and retries without weights.
 Inner tuning is training-only and weighted under the same declared design.
 
-The base survey gate must be promoted before it is combined with the stationary
-covariate score, direct density ratios, or composition-robust four-cell score. Each
-combination needs a hand-derived weighted influence function and its own rate conditions;
-naively multiplying an existing influence vector by survey weights is prohibited.
+The stationary covariate score has its own eight-component survey-weighted ratio influence
+and passes weights through construction-only `CrossFitter` tasks. Direct density ratios and
+the composition-robust four-cell score remain separate. Each future combination needs a
+hand-derived weighted influence function and its own rate conditions; naively multiplying
+an existing influence vector by survey weights is prohibited.
 
 ## Design-based uncertainty
 
@@ -147,7 +149,7 @@ singleton-stratum adjustment, FPC inference, or fallback to unweighted estimatio
 
 ## Diagnostics
 
-Every weighted result will expose:
+Every weighted result exposes:
 
 - raw and normalized weight summaries, Kish effective sample size, maximum normalized
   share, and design effect diagnostics overall and by used group-period cell;
@@ -161,9 +163,9 @@ Every weighted result will expose:
 Diagnostics never prove representativeness or justify trimming. Severe concentration is
 a visible refusal under preregistered thresholds, not a hidden adjustment.
 
-## Failing-first promotion sequence
+## Completed failing-first promotion sequence
 
-Before implementation, tests must fail for:
+Before implementation, tests were observed failing for:
 
 1. a hand-computed weighted two-by-two population ATT, each normalized component, target
    share, full linearized variable, and stratified-PSU variance;
@@ -176,7 +178,7 @@ Before implementation, tests must fail for:
    forbidden-combination refusal; and
 6. independent survey-variance and design-degrees-of-freedom reconstruction.
 
-Promotion then requires nonlinear simulations with informative and noninformative
+Promotion evidence uses nonlinear simulations with informative and noninformative
 sampling, unequal wave sizes, treatment-effect heterogeneity, weight concentration, and
 multiple strata/PSUs. Bias, empirical/analytical SE calibration, pointwise coverage,
 target recovery, scale invariance, support, refusal rate, runtime, and memory gates are
@@ -191,6 +193,20 @@ complex-survey inference. A versioned public survey example must include data pr
 weight documentation, target-population interpretation, and reproducible download hashes;
 restricted microdata are not committed.
 
+The maintained R 4.5.1 / `survey` 4.5 fixture reconstructs the four component totals,
+nonlinear Hájek contrast, complete linearized variable, stratified-PSU covariance, and
+design degrees of freedom. The reviewed Stata/IC 17 `.do` file passes the same official
+`svy: total` plus `nlcom` mapping and writes results before assertions. The pinned
+YRBS sensitivity exactly reproduces the authors' sampling-weight-only four-mean point
+calculation. Their processed public file omits PSU identifiers, so CauseKit explicitly
+uses independent rows within the retained strata and does not claim that sensitivity's
+standard error reproduces the paper's bootstrap. The paper's proposed composition-balancing
+IPW target is also distinct from CauseKit's stationary-composition survey score.
+
+The exact publication-scale coverage, hash-pinned YRBS sensitivity, and fixed-size
+performance results are maintained in
+[`DID_RCS_SURVEY_PROMOTION_EVIDENCE.md`](DID_RCS_SURVEY_PROMOTION_EVIDENCE.md).
+
 ## Pre-mortem
 
 Likely failures are accepting a generic `weight` column with unknown meaning, changing the
@@ -201,7 +217,7 @@ protocol, hand linearization, and combination refusals are the required defenses
 
 ## Primary methodology
 
-- Ting Ye, Alyssa Bilinski, and Brian K. Lee (2025), [*Difference-in-differences analysis
+- Kerry Ye, Alyssa Bilinski, and Youjin Lee (2025), [*Difference-in-differences analysis
   with repeated cross-sectional survey data*](https://doi.org/10.1007/s10742-025-00364-7).
 - Pedro H. C. Sant'Anna and Qi Xu (2026), [*Difference-in-Differences with Compositional
   Changes*](https://doi.org/10.1016/j.jeconom.2025.106147), for the distinct

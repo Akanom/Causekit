@@ -65,6 +65,20 @@ REAL_DATASETS: dict[str, RealDataset] = {
         description="Hospital procedure and patient-satisfaction difference-in-differences data.",
         provenance_url="https://www.stata-press.com/data/r19/causal.html",
     ),
+    "yrbs_beverage_tax": RealDataset(
+        name="yrbs_beverage_tax",
+        filename="yrbs_beverage_tax_real_data.csv",
+        url=(
+            "https://raw.githubusercontent.com/kerryqwq/DiD-Survey-Data/"
+            "d0e1959d1e0dcc27f30b38a38f31d31fb3959799/Data/real_data.csv"
+        ),
+        sha256="7aa7b27284d3a1108bd4d7334470b2825bd68e72470f7347e8dac0d9ea3bd58f",
+        description=(
+            "Processed Youth Risk Behavior Surveillance repeated-section data used in the "
+            "Philadelphia beverage-tax study."
+        ),
+        provenance_url="https://github.com/kerryqwq/DiD-Survey-Data",
+    ),
 }
 
 
@@ -167,13 +181,15 @@ def load_real_dataset(
     data_directory: str | Path | None = None,
     download: bool = False,
 ) -> pd.DataFrame:
-    """Load one verified Stata-format dataset without converting categorical labels."""
+    """Load one verified registered dataset without converting Stata category labels."""
 
     path = verified_real_data_path(
         name,
         data_directory=data_directory,
         download=download,
     )
+    if path.suffix.lower() == ".csv":
+        return pd.read_csv(path)
     return pd.read_stata(path, convert_categoricals=False)
 
 

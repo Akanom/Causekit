@@ -15,6 +15,7 @@ from .crossfit import (
     OutcomeResultProtocol,
     PropensityResultProtocol,
     WeightedCATEEstimatorProtocol,
+    WeightedNuisanceEstimatorProtocol,
 )
 from .diagnostics import FirstStageDiagnostic, SarganTest
 from .did import (
@@ -30,6 +31,7 @@ from .did_rcs import (
     RepeatedCrossSectionDiD,
     RepeatedCrossSectionDiDResult,
     RepeatedCrossSectionPretrendDiagnostic,
+    RepeatedCrossSectionSurveyDesign,
     did_rcs_composition_test,
 )
 from .integrations import add_to_outputhub, to_outputhub_model
@@ -104,9 +106,11 @@ __all__ = [
     "RepeatedCrossSectionCompositionDiagnostic",
     "RepeatedCrossSectionDiDResult",
     "RepeatedCrossSectionPretrendDiagnostic",
+    "RepeatedCrossSectionSurveyDesign",
     "PropensityResultProtocol",
     "PropensityScoreStatus",
     "WeightedCATEEstimatorProtocol",
+    "WeightedNuisanceEstimatorProtocol",
     "SarganTest",
     "RandomizedATE",
     "RandomizedATEResult",

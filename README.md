@@ -432,8 +432,9 @@ cohort-target pair cross-fits an ordered four-cell generalized propensity and th
 outcome regressions on one immutable global row/PSU fold plan, then zero-pads its scaled
 influence on the full analysis index. The path targets treated observations in each
 target-period population and aggregates with estimated target-period treated-cell shares.
-Sampling weights remain unavailable. HC1 observation or one-way CR1 PSU inference applies
-to both composition contracts.
+The separate survey-population path below cannot yet be combined with composition
+robustness. HC1 observation or one-way CR1 PSU inference applies to both sample-population
+composition contracts.
 
 ```python
 from causekit import RepeatedCrossSectionDiD
@@ -489,6 +490,49 @@ print(adjusted.pretrend.placebo_effects)  # the aligned conditional score
 print(adjusted.nuisance_diagnostics)      # task-by-fold audit; no refitting
 ```
 
+Survey-population transport requires an immutable design object; a bare weight vector still
+refuses because it cannot declare weight meaning, PSU/stratum roles, or the population
+target. The implemented design is one-stage, with-replacement, stratified-PSU Taylor
+linearization with strict singleton-stratum refusal. Every mean uses component-wise Hájek
+normalization; event/calendar aggregation uses survey-weighted treated target-period shares
+and includes their estimated-share linearization. Multiplying all weights by one positive
+constant leaves the result unchanged.
+
+```python
+from causekit import RepeatedCrossSectionDiD, RepeatedCrossSectionSurveyDesign
+
+survey_design = RepeatedCrossSectionSurveyDesign(
+    weights="analysis_weight",
+    psu="sampling_psu",       # use None only to explicitly declare independent rows
+    strata="sampling_stratum",
+    weight_type="inverse_inclusion",  # or calibrated_analysis
+)
+
+survey_result = RepeatedCrossSectionDiD().fit(
+    repeated_samples,
+    outcome="outcome",
+    time="period",
+    treatment_time="first_treated",
+    survey_design=survey_design,
+    target_population="survey_population",
+)
+
+print(survey_result.weighted_cell_counts)
+print(survey_result.survey_weight_diagnostics)
+print(survey_result.survey_design_diagnostics)
+```
+
+Survey covariates use the same `CrossFitter` fold plan, but every factory must satisfy
+`WeightedNuisanceEstimatorProtocol.fit(X, y, *, sample_weight=...)`. CauseKit passes only
+aligned training weights, retains their fold-level hashes, sums, and Kish effective sizes,
+and never retries an unweighted fit. Composition robustness, finite-population corrections,
+replicate weights, singleton adjustment, and survey-valid simultaneous bands remain
+separately unavailable. See the
+[survey-design contract](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md) and the runnable
+[hash-pinned YRBS example](examples/survey_repeated_cross_section_did.py). The exact R,
+simulation, real-data, and performance results are recorded in the
+[survey promotion evidence](docs/DID_RCS_SURVEY_PROMOTION_EVIDENCE.md).
+
 Composition-change robustness is an explicit alternative estimand and score:
 
 ```python
@@ -520,7 +564,7 @@ print(robust_composition.simultaneous_event_study)
 
 Each pair's generalized-propensity result must expose all four `(group, period)` class
 probabilities with exact, unique class labels. The robust path refuses empty covariates,
-unsupported global or fold-local four-cell support, weak overlap, survey weights, and any
+unsupported global or fold-local four-cell support, weak overlap, survey combinations, and any
 clipping or fallback. Its deterministic composition-shift contract recovers target-period
 ATT `5` while the deliberately miss-targeted stationary score equals the pooled-treated
 value `4`; row, PSU, pair, and labelled probability-column permutations preserve aligned
@@ -548,8 +592,8 @@ diagnostic. Adjusted placebos use the same cross-fitted conditional score as the
 effects; failure to reject proves neither parallel trends nor stable composition. Strict
 overlap failures refuse without clipping or dropping rows. The opt-in simultaneous path
 draws one Rademacher multiplier per observation or declared PSU and reports a studentized
-max-t band over the retained event-time path. Survey-population transport remains a
-separate gate, and raw sampling weights refuse. See the
+max-t band over the retained event-time path. The implemented survey Taylor path remains
+separate from these model-based multiplier bands, and raw sampling weights refuse. See the
 [repeated-cross-section contract](docs/DID_REPEATED_CROSS_SECTION_CONTRACT.md).
 
 The covariate publication certificate covers 4,000 estimator fits and 240,000 fold-local
@@ -849,11 +893,11 @@ publication-scale joint-coverage certificate under both no-covariate and genuine
 cross-fitted covariate paths. Composition-change robustness now includes pairwise and
 longer/staggered target-period effects, target-share aggregation, aligned equality
 diagnostics, conditional placebos, and simultaneous bands with publication evidence.
-The next repeated-section stage remains the separately frozen design-only contract for
-[survey designs](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md). The balanced-panel PT-All
-path separately freezes [direct cohort-ratio nuisances](docs/DID_DIRECT_RATIO_CONTRACT.md).
-The direct-ratio and survey contracts add no placeholder API,
-and raw survey weights still refuse.
+The separate [survey design](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md) path now implements
+stationary-composition survey-population targets, weighted nuisance fitting, and
+stratified-PSU Taylor pointwise inference; bare weights and unsupported design
+combinations still refuse. The balanced-panel PT-All path separately freezes
+[direct cohort-ratio nuisances](docs/DID_DIRECT_RATIO_CONTRACT.md) without a placeholder.
 The causal-ML alpha includes native partially linear DML and separately contracted public
 [honest R-learner](docs/R_LEARNER_CONTRACT.md) and
 [honest DR-learner](docs/DR_LEARNER_CONTRACT.md) paths, with immutable

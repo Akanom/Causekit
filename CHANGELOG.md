@@ -109,9 +109,25 @@ versions may refine APIs, but breaking changes must still be documented explicit
   observation/PSU cell. All four cells pass bias, SE calibration, pointwise and joint
   coverage, conditional-pretrend size, diagnostic size/power, and zero-refusal gates over
   4,000 estimator fits and 108,000 nuisance fold fits.
-- Design-only contracts remain for calibrated direct pairwise cohort odds in balanced-
-  panel PT-All and repeated-section survey-design/population targets. Unsupported survey
-  combinations keep refusing; no survey placeholder is exported.
+- Public immutable `RepeatedCrossSectionSurveyDesign` and
+  `WeightedNuisanceEstimatorProtocol`. The stationary-composition survey path uses
+  component-wise Hájek means, design-weighted treated target-period aggregation shares
+  with share linearization, one-stage with-replacement stratified-PSU Taylor covariance,
+  survey design degrees of freedom, strict singleton and concentration refusals, complete
+  weight/design diagnostics, and OutputHub transport. Covariate tasks receive only aligned
+  fold-local training weights and retain hashes, sums, effective sizes, and whole-PSU roles.
+- Hand point/influence/variance identities, scale and row-order invariance, leakage and
+  unsupported-combination refusals, independent base-R, R `survey` 4.5, and reviewed
+  Stata/IC 17 `svy` parity, hash-pinned YRBS point-target sensitivity,
+  and an 8,000-fit observation/PSU publication certificate with zero refusals, coverage
+  `0.939–0.954`, SE ratios `0.956–1.003`, and maximum absolute bias `0.019`. The 100,000-
+  row performance gate completes in `0.168` seconds with `22.23` MiB Python peak. The
+  YRBS public processed file omits PSU identifiers, so its standard error is explicitly an
+  independent-observation-within-stratum sensitivity rather than paper-inference parity.
+- A design-only contract remains for calibrated direct pairwise cohort odds in balanced-
+  panel PT-All. Survey finite-population corrections, replicate weights, composition-
+  robust combinations, singleton adjustment, and design-valid simultaneous bands remain
+  unavailable rather than silently approximated.
 
 ### Changed
 
@@ -130,8 +146,9 @@ versions may refine APIs, but breaking changes must still be documented explicit
 ### Known limitations
 
 - The aligned equality diagnostic is sensitivity evidence, not proof of stationary
-  composition and not an estimator-selection rule. Sampling or survey weights remain
-  unimplemented and refuse; composition robustness does not protect against unmeasured
+  composition and not an estimator-selection rule. Bare weight vectors and combinations
+  of survey transport with composition robustness remain unsupported; the separately
+  declared stationary-composition survey design does not protect against unmeasured
   composition changes.
   Direct cohort-ratio nuisances are also design-only; the implemented PT-All path
   continues to use multiclass probabilities. Covariate estimator-level parity is

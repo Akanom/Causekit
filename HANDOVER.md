@@ -292,6 +292,26 @@ future task can resume without reconstructing intent from chat history.
     simultaneous coverage is `0.930–0.950`. Official longer `compdid` and Stata comparator
     cells remain unavailable rather than being manufactured.
 
+27. `0.7.0a6` survey-population repeated-section promotion: immutable
+    `RepeatedCrossSectionSurveyDesign` declares inverse-inclusion or calibrated analysis
+    weights, PSU/stratum roles, and strict singleton handling. Stationary-composition
+    effects use component-wise Hájek means, survey target-period treated aggregation shares
+    with share linearization, and one-stage with-replacement stratified-PSU Taylor
+    covariance with design degrees of freedom. Public `WeightedNuisanceEstimatorProtocol`
+    and weighted `CrossFitTask` inputs keep survey covariate nuisances training-only, retain
+    fold weight hashes/sums/effective sizes, and refuse unweighted providers. Hand score,
+    variance, scale, row/PSU role, concentration, leakage, and combination refusals pass.
+    Independent base-R, R `survey` 4.5, and reviewed Stata/IC 17
+    `svy: total`/`nlcom` point/Taylor/df parity passes. A hash-pinned 60,084-
+    row YRBS sensitivity exactly reproduces the authors' sampling-weight-only four-mean
+    point mapping. Its processed source omits PSUs, so its reported survey SE is explicitly
+    an independent-observation-within-stratum sensitivity rather than paper-bootstrap
+    parity. All 8,000 observation/PSU publication fits pass with zero refusals, coverage
+    `0.939–0.954`, SE ratios `0.956–1.003`, and maximum absolute bias `0.019`. The
+    100,000-row/2,500-PSU/20-stratum performance gate completes in `0.168` seconds with
+    `22.23` MiB Python peak. This evidence remains separate from the model-based
+    multiplier-band path.
+
 ## Open promotion gates
 
 - Matching still defaults to `inference="none"`. Known-score reuse-aware inference and a
@@ -316,8 +336,11 @@ future task can resume without reconstructing intent from chat history.
   passes pairwise and longer/staggered hand/refusal contracts, official R `compdid`
   point/influence and diagnostic mapping, hash-pinned real-data sensitivity, fixed-size
   performance, target-share aggregation, conditional-placebo, pointwise, and simultaneous
-  publication coverage. Survey designs remain a separate design-only contract and
-  continue to refuse.
+  publication coverage. The separate stationary-composition survey design now supports
+  no-covariate and explicitly weighted CrossFitter nuisance paths with design-based
+  pointwise Taylor inference. Finite-population corrections, replicate weights,
+  composition-robust survey combinations, singleton adjustments, and survey-valid
+  simultaneous bands remain unavailable.
 - The R-learner alpha is public with honest evaluation, calibration, groups, bands, graph
   data, simulations, base-R/Stata parity, performance, native nonlinear support, and two
   real-data CATE records. The next native nonlinear stage is frozen as a separate
@@ -355,13 +378,14 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Composition diagnostic/alignment Gates A–D are complete. Begin the separate
-   [survey-design](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md) contract only with its own
-   weighted-target theorem, hand score, nuisance protocol, and observation/PSU coverage;
-   raw survey weights continue to refuse. The balanced-panel
-   [direct-ratio](docs/DID_DIRECT_RATIO_CONTRACT.md) nuisance remains a separate PT-All
-   option; do not combine either path with composition robustness before its base gates
-   pass. Do not rerun settled composition certificates for unrelated work.
+1. The stationary repeated-section
+   [survey-design](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md) base, weighted nuisance boundary,
+   parity, real-data, performance, and observation/PSU pointwise coverage gates are
+   complete. Raw survey weights, composition combinations, FPCs, replicate weights, and
+   survey-valid simultaneous bands continue to refuse. Begin the balanced-panel
+   [direct-ratio](docs/DID_DIRECT_RATIO_CONTRACT.md) PT-All nuisance only through its own
+   failing-first ratio-calibration and `Omega_tilde` gates. Do not rerun settled composition
+   or survey certificates for unrelated work.
 2. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
    manipulation checks, bias correction, and local estimand.
 3. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed

@@ -200,6 +200,7 @@ def to_outputhub_model(
                 "composition": result.composition,
                 "composition_verified": False,
                 "target_population": result.target_population,
+                "population_basis": result.population_basis,
                 "group_time_aggregation": result.group_time_aggregation,
                 "esavg_aggregation": result.esavg_aggregation,
                 "anticipation": result.anticipation,
@@ -212,6 +213,11 @@ def to_outputhub_model(
                 "bootstrap_iterations": result.bootstrap_iterations,
                 "bootstrap_random_state": result.bootstrap_random_state,
                 "n_clusters": result.n_clusters,
+                "weight_type": result.weight_type,
+                "weight_normalization": result.weight_normalization,
+                "survey_weight_name": result.survey_weight_name,
+                "survey_psu_name": result.survey_psu_name,
+                "survey_strata_name": result.survey_strata_name,
                 "covariates": list(result.covariates),
                 "nuisance_cross_fitted": result.cross_fitted,
                 "nuisance_n_splits": result.n_splits,
@@ -760,7 +766,12 @@ def add_to_outputhub(
             metadata={"source": "causekit", "estimator": "randomized_ate"},
         )
     elif isinstance(result, RepeatedCrossSectionDiDResult) and hasattr(hub, "add_table"):
-        table_metadata = {"source": "causekit", "estimator": result.method}
+        table_metadata = {
+            "source": "causekit",
+            "estimator": result.method,
+            "population_basis": result.population_basis,
+            "target_population": result.target_population,
+        }
         if result.cross_fitted:
             hub.add_table(
                 f"{model_name} nuisance fitting diagnostics",
@@ -806,6 +817,40 @@ def add_to_outputhub(
                     "target_population": result.target_population,
                 },
             )
+        if result.population_basis == "survey_population":
+            hub.add_table(
+                f"{model_name} survey-weight diagnostics",
+                result.survey_weight_diagnostics.reset_index(names="diagnostic"),
+                caption=(
+                    "Declared analysis-weight concentration and effective-sample-size audit; "
+                    "these diagnostics do not establish representativeness."
+                ),
+                metadata={
+                    **table_metadata,
+                    "weight_type": result.weight_type,
+                    "normalization": result.weight_normalization,
+                },
+            )
+            hub.add_table(
+                f"{model_name} survey-design diagnostics",
+                result.survey_design_diagnostics.rename_axis("diagnostic")
+                .rename("value")
+                .reset_index(),
+                caption=(
+                    "One-stage with-replacement stratified-PSU Taylor design audit and design "
+                    "degrees of freedom."
+                ),
+                metadata=table_metadata,
+            )
+            hub.add_table(
+                f"{model_name} survey-weighted cell counts",
+                result.weighted_cell_counts.reset_index(),
+                caption=(
+                    "Unweighted row/PSU support, design-weight mass, population share, Kish "
+                    "effective sample size, and maximum normalized weight by cohort-period cell."
+                ),
+                metadata=table_metadata,
+            )
         if not result.pretrend.placebo_effects.empty:
             hub.add_table(
                 f"{model_name} pre-trend placebos",
@@ -834,10 +879,14 @@ def add_to_outputhub(
             f"{model_name} group-time effects",
             result.group_time.reset_index(),
             caption=(
-                "Cross-fitted locally efficient doubly robust cohort-time effects with "
-                "pointwise observation/PSU inference."
-                if result.cross_fitted
-                else "Four-cell cohort-time effects with pointwise observation/PSU inference."
+                "Four-component Hájek cohort-time effects with stratified-PSU Taylor inference."
+                if result.population_basis == "survey_population"
+                else (
+                    "Cross-fitted locally efficient doubly robust cohort-time effects with "
+                    "pointwise observation/PSU inference."
+                    if result.cross_fitted
+                    else "Four-cell cohort-time effects with pointwise observation/PSU inference."
+                )
             ),
             metadata=table_metadata,
         )
@@ -845,9 +894,13 @@ def add_to_outputhub(
             f"{model_name} event study",
             result.event_study.reset_index(),
             caption=(
-                "Target-period-treated-share-weighted event-time effects with pointwise inference."
-                if result.composition == "robust"
-                else "Pooled-cohort-share-weighted event-time effects with pointwise inference."
+                "Survey target-period-treated-share-weighted event-time effects with design-based pointwise inference."
+                if result.population_basis == "survey_population"
+                else (
+                    "Target-period-treated-share-weighted event-time effects with pointwise inference."
+                    if result.composition == "robust"
+                    else "Pooled-cohort-share-weighted event-time effects with pointwise inference."
+                )
             ),
             metadata=table_metadata,
         )
@@ -872,9 +925,13 @@ def add_to_outputhub(
             f"{model_name} calendar-time effects",
             result.calendar_time.reset_index(),
             caption=(
-                "Target-period-treated-share-weighted post-adoption calendar-time effects."
-                if result.composition == "robust"
-                else "Pooled-cohort-share-weighted post-adoption calendar-time effects."
+                "Survey target-period-treated-share-weighted post-adoption calendar-time effects."
+                if result.population_basis == "survey_population"
+                else (
+                    "Target-period-treated-share-weighted post-adoption calendar-time effects."
+                    if result.composition == "robust"
+                    else "Pooled-cohort-share-weighted post-adoption calendar-time effects."
+                )
             ),
             metadata=table_metadata,
         )

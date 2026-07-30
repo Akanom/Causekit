@@ -47,6 +47,22 @@ class _LinearOutcome:
         return _LinearResult(np.linalg.lstsq(design, np.asarray(y), rcond=None)[0])
 
 
+class _WeightedAuditOutcome:
+    records: list[tuple[pd.Index, pd.Series]] = []
+
+    def fit(
+        self, X: pd.DataFrame, y: pd.Series, *, sample_weight: pd.Series
+    ) -> _WeightedAuditOutcome:
+        assert X.index.equals(y.index)
+        assert X.index.equals(sample_weight.index)
+        self.records.append((X.index.copy(), sample_weight.copy()))
+        self.mean_ = float(np.average(y, weights=sample_weight))
+        return self
+
+    def predict(self, X: pd.DataFrame) -> pd.Series:
+        return pd.Series(self.mean_, index=X.index)
+
+
 class _DiagnosticLinearResult(_LinearResult):
     def nuisance_diagnostics(self):
         return {"selected_alpha": 0.25, "effective_df": 2.5}
@@ -249,6 +265,64 @@ def test_masked_regression_tasks_share_folds_and_preserve_task_labels() -> None:
     assert result.predictions.index.equals(X.index)
     np.testing.assert_allclose(result.predictions, np.column_stack([target, target]), atol=1e-12)
     assert set(result.model_names) == {"all", "stratum_zero"}
+
+
+def test_weighted_tasks_pass_training_only_aligned_weights_and_record_audit() -> None:
+    _WeightedAuditOutcome.records.clear()
+    index = pd.Index([f"row_{value}" for value in range(12)])
+    X = pd.DataFrame({"x": np.arange(12, dtype=float)}, index=index)
+    target = pd.Series(np.arange(12, dtype=float), index=index)
+    weights = pd.Series(np.arange(1, 13, dtype=float), index=index, name="survey_weight")
+    fitter = CrossFitter(
+        outcome_factory=_WeightedAuditOutcome,
+        n_splits=3,
+        random_state=17,
+    )
+
+    result = fitter.fit_predict_tasks(
+        X,
+        tasks=[CrossFitTask(name="weighted", target=target, sample_weight=weights)],
+        strata=pd.Series(np.tile([0, 1], 6), index=index),
+    )
+
+    assert len(_WeightedAuditOutcome.records) == 3
+    for fold, (train_index, consumed_weights) in enumerate(_WeightedAuditOutcome.records):
+        expected_index = result.fold.index[result.fold.ne(fold)]
+        assert train_index.equals(expected_index)
+        pd.testing.assert_series_equal(consumed_weights, weights.loc[expected_index])
+        assert train_index.intersection(result.fold.index[result.fold.eq(fold)]).empty
+    diagnostics = result.model_diagnostics.set_index("fold")
+    for fold in range(3):
+        train_weights = weights.loc[result.fold.index[result.fold.ne(fold)]]
+        assert diagnostics.loc[fold, "weight_sum"] == pytest.approx(train_weights.sum())
+        assert diagnostics.loc[fold, "weight_effective_n"] == pytest.approx(
+            train_weights.sum() ** 2 / train_weights.pow(2).sum()
+        )
+        assert isinstance(diagnostics.loc[fold, "weight_hash"], str)
+
+
+def test_weighted_tasks_refuse_unweighted_provider_and_weight_index_drift() -> None:
+    index = pd.RangeIndex(12)
+    X = pd.DataFrame({"x": np.arange(12, dtype=float)}, index=index)
+    target = pd.Series(np.arange(12, dtype=float), index=index)
+    weights = pd.Series(np.ones(12), index=index)
+    fitter = CrossFitter(outcome_factory=_LinearOutcome, n_splits=2, random_state=4)
+    with pytest.raises(TypeError, match="sample_weight"):
+        fitter.fit_predict_tasks(
+            X,
+            tasks=[CrossFitTask(name="weighted", target=target, sample_weight=weights)],
+        )
+    with pytest.raises(ValueError, match="indices"):
+        fitter.fit_predict_tasks(
+            X,
+            tasks=[
+                CrossFitTask(
+                    name="weighted",
+                    target=target,
+                    sample_weight=weights.sample(frac=1.0, random_state=2),
+                )
+            ],
+        )
 
 
 def test_clustered_task_cross_fitting_keeps_clusters_wholly_within_folds() -> None:

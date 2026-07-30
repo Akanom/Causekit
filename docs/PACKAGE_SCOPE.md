@@ -61,7 +61,7 @@ and four group-period outcome regressions per comparison, implements the locally
 doubly robust repeated-cross-section score, and aligns conditional pre-trend placebos to
 that score. Both paths retain fixed comparison membership, pooled cohort-share
 aggregation, cell-count audits, and HC1 observation or one-way CR1 PSU inference. It has
-no entity role and still refuses sampling weights. A separate
+no entity role. A separate
 `composition="robust"` path supports pairwise, longer, and staggered target-period
 effects. It cross-fits pair-specific four-cell generalized propensities plus three outcome
 regressions on one global fold plan, embeds full-sample influences, aggregates with target-
@@ -76,6 +76,15 @@ no-covariate and covariate-adjusted pointwise paths; the latter includes conditi
 placebo coverage and joint pre-trend size with genuinely fitted fold-local nuisances. A
 third 16-cell certificate covers the complete event vector under observation/PSU
 sampling for both paths and both control rules with zero refusals.
+
+The stationary-composition survey-population route requires an immutable
+`RepeatedCrossSectionSurveyDesign`; bare weights remain invalid. It supports inverse-
+inclusion or calibrated analysis weights, component-wise Hájek point targets, explicit
+PSU/stratum roles, one-stage with-replacement stratified-PSU Taylor inference, and strict
+singleton refusal. Covariate adjustment requires weighted nuisance providers through
+`CrossFitter`, which retains fold-local weight-consumption audits. Composition combinations,
+FPCs, replicate weights, singleton adjustment, and survey-valid simultaneous bands remain
+outside this release.
 
 The causal-ML surface adds `PartiallyLinearDML` for the scalar DML2 coefficient in a
 declared constant-effect partially linear model. CauseKit owns its default standardized
@@ -114,7 +123,8 @@ The current alpha does not provide:
 - panel fixed effects, dynamic-panel GMM, or panel IV;
 - weak-IV-robust confidence sets or a complete identification-robust testing suite;
 - heteroskedasticity-robust overidentification tests;
-- multiway clustering, general-purpose bootstrap inference, sampling weights, or survey design;
+- multiway clustering, general-purpose bootstrap inference, general survey designs beyond
+  the implemented one-stage repeated-section Taylor contract, or survey replicate weights;
 - nonlinear IV, GMM beyond linear 2SLS, or control-function estimators;
 - automatic discovery, selection, or validation of instruments;
 - native causal forests, dose-response curves, or policy learning beyond the implemented

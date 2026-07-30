@@ -33,6 +33,7 @@ PUBLIC_EXPORTS = {
     "NuisanceDiagnosticsProtocol",
     "PropensityResultProtocol",
     "WeightedCATEEstimatorProtocol",
+    "WeightedNuisanceEstimatorProtocol",
     "OutcomeResultProtocol",
     "NearestNeighborMatch",
     "NearestNeighborMatchResult",
@@ -56,6 +57,7 @@ PUBLIC_EXPORTS = {
     "RepeatedCrossSectionCompositionDiagnostic",
     "RepeatedCrossSectionDiDResult",
     "RepeatedCrossSectionPretrendDiagnostic",
+    "RepeatedCrossSectionSurveyDesign",
     "did_rcs_composition_test",
     "confint",
     "fitted_values",
@@ -173,6 +175,8 @@ def test_estimator_signatures_keep_identification_inputs_explicit() -> None:
     assert "entity" not in repeated_cross_section_fit.parameters
     assert "panel" not in repeated_cross_section_fit.parameters
     assert repeated_cross_section_fit.parameters["cross_fitter"].default is None
+    assert repeated_cross_section_fit.parameters["survey_design"].default is None
+    assert repeated_cross_section_fit.parameters["target_population"].default == "sample"
 
     partially_linear_dml = inspect.signature(causekit.PartiallyLinearDML)
     assert partially_linear_dml.parameters["outcome_factory"].default is None

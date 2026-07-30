@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from numbers import Integral, Real
@@ -16,6 +17,13 @@ class NuisanceEstimatorProtocol(Protocol):
     """Minimal fit protocol supported by the cross-fitting orchestrator."""
 
     def fit(self, X: Any, y: Any) -> Any: ...
+
+
+@runtime_checkable
+class WeightedNuisanceEstimatorProtocol(Protocol):
+    """Nuisance fit contract that must consume aligned training analysis weights."""
+
+    def fit(self, X: Any, y: Any, *, sample_weight: Any) -> Any: ...
 
 
 @runtime_checkable
@@ -95,6 +103,7 @@ class CrossFitTask:
     train_mask: Any | None = None
     factory: NuisanceFactory | None = None
     predict: PredictionAdapter | None = None
+    sample_weight: Any | None = None
 
 
 @dataclass(frozen=True)
@@ -170,6 +179,28 @@ def _fit(
     return estimator if result is None else result
 
 
+def _fit_weighted(
+    factory: NuisanceFactory,
+    X: Any,
+    y: Any,
+    sample_weight: pd.Series,
+    *,
+    seen_estimators: list[Any] | None = None,
+) -> Any:
+    estimator = factory()
+    if not isinstance(estimator, WeightedNuisanceEstimatorProtocol):
+        raise TypeError(
+            "Each weighted nuisance factory must return an object with "
+            "fit(X, y, *, sample_weight=...)."
+        )
+    if seen_estimators is not None:
+        if any(estimator is previous for previous in seen_estimators):
+            raise ValueError("Each nuisance factory call must return a fresh estimator instance.")
+        seen_estimators.append(estimator)
+    result = estimator.fit(X, y, sample_weight=sample_weight)
+    return estimator if result is None else result
+
+
 _DIAGNOSTIC_RESERVED_COLUMNS = {
     "task",
     "fold",
@@ -177,6 +208,11 @@ _DIAGNOSTIC_RESERVED_COLUMNS = {
     "train_nobs",
     "holdout_nobs",
     "diagnostics_available",
+    "weight_sum",
+    "weight_effective_n",
+    "weight_min",
+    "weight_max",
+    "weight_hash",
 }
 
 
@@ -187,6 +223,7 @@ def _model_diagnostic_row(
     fold: int,
     train_nobs: int,
     holdout_nobs: int,
+    sample_weight: pd.Series | None = None,
 ) -> dict[str, Any]:
     row: dict[str, Any] = {
         "task": task,
@@ -196,6 +233,23 @@ def _model_diagnostic_row(
         "holdout_nobs": holdout_nobs,
         "diagnostics_available": False,
     }
+    if sample_weight is not None:
+        values = sample_weight.to_numpy(dtype=float)
+        weight_sum = float(values.sum())
+        digest = hashlib.sha256(
+            pd.util.hash_pandas_object(sample_weight, index=True)
+            .to_numpy(dtype=np.uint64)
+            .tobytes()
+        ).hexdigest()
+        row.update(
+            {
+                "weight_sum": weight_sum,
+                "weight_effective_n": weight_sum**2 / float(np.dot(values, values)),
+                "weight_min": float(values.min()),
+                "weight_max": float(values.max()),
+                "weight_hash": digest,
+            }
+        )
     if not isinstance(result, NuisanceDiagnosticsProtocol):
         return row
     supplied = result.nuisance_diagnostics()
@@ -332,6 +386,16 @@ def _series(value: Any, *, name: str, index: pd.Index) -> pd.Series:
     if not np.isfinite(series.to_numpy()).all():
         raise ValueError(f"{name} must contain only finite values.")
     return series
+
+
+def _weights(value: Any, *, name: str, index: pd.Index) -> pd.Series:
+    raw = value.to_numpy() if isinstance(value, pd.Series) else np.asarray(value)
+    if np.iscomplexobj(raw):
+        raise ValueError(f"{name} must contain only real numeric values.")
+    weights = _series(value, name=name, index=index)
+    if np.any(weights.to_numpy(dtype=float) <= 0.0):
+        raise ValueError(f"{name} must contain only strictly positive values.")
+    return weights
 
 
 def _labels(value: Any, *, name: str, index: pd.Index) -> pd.Series:
@@ -774,6 +838,15 @@ class CrossFitter:
         seen_estimators: list[Any] = []
         for task_position, task in enumerate(task_list):
             target = _series(task.target, name=task.name, index=index)
+            sample_weight = (
+                None
+                if task.sample_weight is None
+                else _weights(
+                    task.sample_weight,
+                    name=f"{task.name}.sample_weight",
+                    index=index,
+                )
+            )
             train_mask = (
                 pd.Series(True, index=index)
                 if task.train_mask is None
@@ -789,11 +862,22 @@ class CrossFitter:
                     raise ValueError(
                         f"Task {task.name!r} has no training observations outside fold {fold}."
                     )
-                result = _fit(
-                    factory,
-                    frame.iloc[train],
-                    target.iloc[train],
-                    seen_estimators=seen_estimators,
+                training_weights = None if sample_weight is None else sample_weight.iloc[train]
+                result = (
+                    _fit(
+                        factory,
+                        frame.iloc[train],
+                        target.iloc[train],
+                        seen_estimators=seen_estimators,
+                    )
+                    if training_weights is None
+                    else _fit_weighted(
+                        factory,
+                        frame.iloc[train],
+                        target.iloc[train],
+                        training_weights,
+                        seen_estimators=seen_estimators,
+                    )
                 )
                 model_names[task.name] = type(result).__name__
                 predictions[test, task_position] = _prediction(
@@ -810,6 +894,7 @@ class CrossFitter:
                         fold=fold,
                         train_nobs=int(train.sum()),
                         holdout_nobs=int(test.sum()),
+                        sample_weight=training_weights,
                     )
                 )
         return CrossFitTaskResult(
@@ -991,6 +1076,7 @@ __all__ = [
     "CrossFitTaskResult",
     "CrossFitter",
     "NuisanceEstimatorProtocol",
+    "WeightedNuisanceEstimatorProtocol",
     "NuisanceDiagnosticsProtocol",
     "NuisanceFactory",
     "OutcomeResultProtocol",

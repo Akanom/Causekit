@@ -16,7 +16,13 @@ from causekit.datasets import (
 
 
 def test_real_dataset_registry_is_https_and_sha256_pinned() -> None:
-    assert set(REAL_DATASETS) == {"cattaneo2", "hospdd", "hsng", "nsw_mixtape"}
+    assert set(REAL_DATASETS) == {
+        "cattaneo2",
+        "hospdd",
+        "hsng",
+        "nsw_mixtape",
+        "yrbs_beverage_tax",
+    }
     for name, specification in REAL_DATASETS.items():
         assert name == specification.name
         assert specification.url.startswith("https://")

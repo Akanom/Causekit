@@ -251,7 +251,7 @@ Current promotion status is:
     480,000 nuisance fold fits complete, the narrowest realized PSU cell spans 31
     clusters, and the refusal ledger is empty. Seeds and indivisible PSU roles are audited.
 
-## Composition promotion and the remaining survey stage
+## Composition and survey promotion boundaries
 
 Two repeated-section capabilities have independent contracts:
 
@@ -261,9 +261,10 @@ Two repeated-section capabilities have independent contracts:
   OutputHub transport, and publication evidence. The diagnostic cannot be used for
   pretest-based estimator selection.
 - [Survey designs](DID_RCS_SURVEY_DESIGN_CONTRACT.md) change the population measure and
-  design-based uncertainty. Bare `sampling_weights` remain insufficient; a validated
-  design, explicit population target, weighted nuisance protocol, and survey-specific
-  variance gate are required.
+  design-based uncertainty. The stationary no-covariate and weighted-nuisance paths now
+  require a validated design and explicit population target and use survey-specific Taylor
+  inference. Bare `sampling_weights` remain insufficient; composition combinations,
+  replicate weights, finite-population corrections, and survey simultaneous bands refuse.
 
 These options cannot be combined by multiplying weights or reusing a score. Their
 Cartesian combination requires its own theorem, hand influence contract, refusals, and

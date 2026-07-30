@@ -1,0 +1,16 @@
+contract=survey_rcs_component_hajek_stratified_psu_taylor
+stata_version=17
+exact_tolerance= 1.00000000000000e-12
+nlcom_se_tolerance= 1.00000000000000e-09
+estimate=   1.7619047619047623
+standard_error=  .054727974540350013
+survey_estimate=   1.7619047619047623
+survey_standard_error=  .054727974494774463
+survey_standard_error_absolute_difference= 4.55755502781763e-11
+design_df=                    2
+estimate_status=pass
+standard_error_status=pass
+survey_estimate_status=pass
+survey_standard_error_status=pass
+design_df_status=pass
+parity_status=pass
