@@ -8,8 +8,9 @@ opt-in cross-fitted covariate-adjusted slice are implemented as
 `RepeatedCrossSectionDiD`. Each was added only after its hand identities and refusal tests
 had been written and observed failing. The covariate path implements the locally efficient
 doubly robust repeated-cross-section score of Sant'Anna and Zhao (2020), not the balanced-
-panel PT-All machinery. Composition-change robustness, survey weights, and simultaneous
-bands remain separate promotion gates rather than implicit features.
+panel PT-All machinery. Observation/PSU simultaneous bands are promoted.
+Composition-change robustness and survey designs remain separate design-only promotion
+gates rather than implicit features.
 
 Repeated cross sections are not an option on the balanced-panel classes. The observations,
 influence functions, nuisance tasks, and composition assumptions differ materially from a
@@ -245,6 +246,26 @@ Current promotion status is:
     480,000 nuisance fold fits complete, the narrowest realized PSU cell spans 31
     clusters, and the refusal ledger is empty. Seeds and indivisible PSU roles are audited.
 
+## Separately contracted next stages
+
+Two repeated-section capabilities now have independent design contracts. Neither changes
+the current public API or its refusals:
+
+- [Composition-change robustness](DID_RCS_COMPOSITION_CHANGE_CONTRACT.md) targets the ATT
+  among treated members of the target-period population and requires a four-cell
+  generalized propensity, a different efficient influence function, and a diagnostic
+  that cannot be used for pretest-based estimator selection.
+- [Survey designs](DID_RCS_SURVEY_DESIGN_CONTRACT.md) change the population measure and
+  design-based uncertainty. Bare `sampling_weights` remain insufficient; a validated
+  design, explicit population target, weighted nuisance protocol, and survey-specific
+  variance gate are required.
+
+These options cannot be combined by multiplying weights or reusing a score. Their
+Cartesian combination requires its own theorem, hand influence contract, refusals, and
+coverage certificate before it can be exported. The separately contracted
+[direct cohort-ratio nuisance](DID_DIRECT_RATIO_CONTRACT.md) belongs first to balanced-
+panel `EfficientDiD`; its calibrated PT-All odds must not be passed into this score.
+
 ## Alternatives considered
 
 - Adding `panel=False` to `DifferenceInDifferences` was rejected because it would put two
@@ -273,5 +294,5 @@ result metadata are release gates.
   Multiple Time Periods*](https://doi.org/10.1016/j.jeconom.2020.12.001).
 - Pedro H. C. Sant'Anna and Jun Zhao (2020), [*Doubly Robust Difference-in-Differences
   Estimators*](https://doi.org/10.1016/j.jeconom.2020.06.003).
-- Pedro H. C. Sant'Anna and Qi Xu (2023), [*Difference-in-Differences with Compositional
-  Changes*](https://arxiv.org/abs/2304.13925).
+- Pedro H. C. Sant'Anna and Qi Xu (2026), [*Difference-in-Differences with Compositional
+  Changes*](https://doi.org/10.1016/j.jeconom.2025.106147).

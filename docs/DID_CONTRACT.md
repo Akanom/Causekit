@@ -114,6 +114,10 @@ The density ratios are formed from aligned out-of-fold multiclass probabilities.
 a supported implementation route in the paper, although direct ratio regression may be
 more stable near weak overlap. Every probability used in a ratio must exceed
 `nuisance_probability_floor`; the implementation refuses instead of clipping.
+The alternative is frozen, but not implemented, in the
+[direct cohort-ratio nuisance contract](DID_DIRECT_RATIO_CONTRACT.md). It requires
+calibrated pairwise cohort odds and an algebraically equivalent conditional-covariance
+refactor; scale-free density ratios cannot be substituted directly into the PT-All score.
 
 For equation (3.12), conditional covariances are estimated as cross-fitted regressions of
 products of out-of-fold outcome-change residuals. A dedicated

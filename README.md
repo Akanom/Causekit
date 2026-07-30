@@ -785,8 +785,12 @@ certificate. Stata aggregate standard errors are explicitly non-comparable becau
 estimated-share influence differs. Repeated-cross-section observation/PSU multiplier
 bands now pass hand identities, a seeded coverage smoke, and a hash-bound 16-cell
 publication-scale joint-coverage certificate under both no-covariate and genuinely
-cross-fitted covariate paths. Composition-change robustness and survey weights remain
-separate.
+cross-fitted covariate paths. The next stages are now separately frozen as design-only
+contracts for [composition-change robustness](docs/DID_RCS_COMPOSITION_CHANGE_CONTRACT.md)
+and [survey designs](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md). The balanced-panel PT-All
+path separately freezes [direct cohort-ratio nuisances](docs/DID_DIRECT_RATIO_CONTRACT.md).
+They add no placeholder API; the existing robust-composition and raw-weight refusals
+remain in force.
 The causal-ML alpha includes native partially linear DML and separately contracted public
 [honest R-learner](docs/R_LEARNER_CONTRACT.md) and
 [honest DR-learner](docs/DR_LEARNER_CONTRACT.md) paths, with immutable

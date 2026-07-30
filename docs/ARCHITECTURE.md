@@ -251,6 +251,14 @@ aggregation, and uncertainty. It does not own a nuisance learner, import the pan
 outcome-change machinery, clip probabilities, or expose irrelevant comparison-row
 predictions as meaningful values.
 
+Two repeated-section extensions remain outside the runtime architecture. Composition
+robustness requires a four-cell generalized propensity and target-period treated
+influence; survey support requires an explicit design object, weighted nuisance protocol,
+and design-based variance. A third, separate balanced-panel extension replaces
+`EfficientDiD` multiclass probability ratios with calibrated pairwise cohort odds and
+refactors its conditional covariance only by a scale that cancels in normalized efficient
+weights. Their contracts prohibit placeholder exports and cross-score reuse.
+
 No nuisance learner lives in `did.py`. The covariate-adjusted efficient path expresses
 cohort classification, group-specific outcome changes, and conditional residual products
 as public `CrossFitter` operations. `did.py` owns the causal score, equation (3.12)

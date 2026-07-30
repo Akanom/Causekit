@@ -209,7 +209,7 @@ and validation gates:
 | Family | Required design questions before promotion |
 | --- | --- |
 | Matching extensions | Publication-scale sensitivity/coverage and available Python/R/Stata evidence pass; generic-score, selected-target, tie-expanded, clustered, survey, and bootstrap inference remain separately prohibited or deferred |
-| DiD promotion | Covariate-adjusted repeated-cross-section DiD, aligned conditional pre-trends, publication-scale pointwise and observation/PSU joint-band coverage are implemented; composition robustness and survey weights retain separate gates |
+| DiD promotion | Covariate-adjusted balanced-panel PT-All and repeated-section paths are implemented; direct PT-All cohort ratios, repeated-section composition robustness, and repeated-section survey designs have separate design-only contracts and retain separate gates |
 | Causal ML promotion | Implement the frozen construction-cross-fitted native orthogonal-stack contract, then harden R-/DR-learners with repeated-split and publication-scale evidence; unit-level intervals, RATE, and policy evaluation retain separate contracts |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
 | Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |
@@ -225,6 +225,12 @@ is not a claim that arbitrary estimated or machine-learning scores have supporte
 
 The conventional/efficient distinction, timing rules, formulas, covariate nuisance path,
 and inference boundaries are recorded in [Difference-in-differences contract](DID_CONTRACT.md).
+
+The balanced-panel PT-All [direct cohort-ratio](DID_DIRECT_RATIO_CONTRACT.md) nuisance and
+the repeated-section [composition-change](DID_RCS_COMPOSITION_CHANGE_CONTRACT.md) and
+[survey-design](DID_RCS_SURVEY_DESIGN_CONTRACT.md) paths are frozen independently. They
+are not public APIs and cannot be reused or composed until their score-specific gates
+pass.
 
 ## Out of current scope
 

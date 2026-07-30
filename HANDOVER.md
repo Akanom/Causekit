@@ -258,8 +258,9 @@ future task can resume without reconstructing intent from chat history.
   because it conditions on the supplied score. Do not substitute a generic sandwich,
   ordinary bootstrap, or cluster wrapper.
 - Efficient DiD owns no nuisance model classes. The implemented covariate path must keep
-  consuming public cross-fitting factories; direct density-ratio regression remains a
-  possible future stability enhancement over ratios of multiclass probabilities.
+  consuming public cross-fitting factories. Its direct cohort-ratio replacement for
+  multiclass probability ratios is now frozen in `docs/DID_DIRECT_RATIO_CONTRACT.md`; it
+  remains design-only and must preserve calibrated pair orientation and the PT-All score.
 - Repeated-cross-section DiD's no-covariate and explicit CrossFitter covariate-adjusted
   stationary-composition paths are public. Publication-scale no-covariate and covariate
   pointwise coverage and
@@ -267,8 +268,9 @@ future task can resume without reconstructing intent from chat history.
   recorded as non-comparable. The covariate score has independent fixed-OOF base-R parity;
   pinned R/Stata estimator-level cells remain unavailable because their maintained public
   paths do not implement the same score. Observation/PSU multiplier mechanics and the
-  16-cell publication-scale joint-band certificate pass; compositional-change robustness
-  and survey weights remain open.
+  16-cell publication-scale joint-band certificate pass. Compositional-change robustness
+  and survey designs are now frozen in separate design-only contracts; both remain
+  unimplemented and their current refusals stay active.
 - The R-learner alpha is public with honest evaluation, calibration, groups, bands, graph
   data, simulations, base-R/Stata parity, performance, native nonlinear support, and two
   real-data CATE records. The next native nonlinear stage is frozen as a separate
@@ -306,8 +308,13 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Continue broader DiD evidence and separately contract direct-ratio nuisance support,
-   composition-change robustness, and survey weights only if justified.
+1. Implement only one repeated-section extension at a time from its failing-first
+   [composition-change](docs/DID_RCS_COMPOSITION_CHANGE_CONTRACT.md) or
+   [survey-design](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md) contract. The recommended first
+   implementation is the pairwise composition-robust score because it addresses an
+   identifying restriction. The balanced-panel
+   [direct-ratio](docs/DID_DIRECT_RATIO_CONTRACT.md) nuisance is a separate PT-All option;
+   do not combine or reuse these paths before their base gates pass.
 2. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
    manipulation checks, bias correction, and local estimand.
 3. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
