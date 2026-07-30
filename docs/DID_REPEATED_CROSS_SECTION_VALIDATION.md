@@ -92,6 +92,31 @@ SE divided by empirical SD was `0.938–1.029`, maximum absolute bias was `0.015
 fit refused. Coverage Monte Carlo SE was at most `0.0082`. The run took 29.77 seconds on
 the recorded Python 3.14.6 / Windows 11 environment; timing is descriptive.
 
+The covariate-adjusted certificate is separate:
+
+```bash
+python benchmarks/validate_did_rcs_covariate_promotion.py --replications 1000 --workers 8
+```
+
+It made 4,000 estimator fits and 240,000 fresh fold/task nuisance fits across favorable
+balanced and stressed-overlap unequal-period designs, both control rules, three
+group-time effects, five public aggregates, and three conditional placebos. All 44
+effect/placebo cells passed: pointwise coverage was `0.940–0.964`, mean analytical SE
+divided by empirical SD was `0.954–1.048`, maximum absolute bias was `0.0089`, and
+coverage Monte Carlo SE was at most `0.0075`. All four joint conditional-pre-trend size
+cells passed at rejection rates `0.049–0.057`. There were no refusals, unavailable tests,
+clipped probabilities, trimmed rows, or oracle nuisance predictions; the realized fitted
+probability range was `0.0290–0.9065`.
+
+The first stressed design used the same conditional cohort probabilities with one-third
+of the final sample sizes and correctly produced 11 fold-support refusals in 1,000 draws.
+The publication design therefore preserves the probabilities, unequal-period ratio,
+estimands, seed, and acceptance gates but requires at least 32 expected observations in
+every period-X-cohort cell. Any realized failure still refuses and enters the saved reason
+ledger; the promoted run's ledger is empty. The recorded Python 3.14.6 / Windows 11 run
+took 120.54 seconds; timing is descriptive. The hash-bound certificate is
+`benchmarks/did_rcs_covariate_promotion_evidence.json`.
+
 ## Public-data and performance smoke
 
 `examples/real_world_causal_workflow.py` preserves the hash-pinned Stata `hospdd` rows,
@@ -115,8 +140,9 @@ observed covariate, two whole-hospital folds, and hospital CR1 inference. It ret
 `0.8676486723638247`, standard error `0.04274270577554287`, 46 PSUs, and 60 fold/task
 diagnostic rows. The source is artificial and the affine/empirical nuisances are an
 execution contract, not evidence that the nuisance models or identifying assumptions are
-substantively correct. Composition-change robustness, survey weights, covariate
-publication-scale coverage, and simultaneous bands remain open.
+substantively correct. Composition-change robustness, survey weights, and simultaneous
+bands remain open; covariate publication-scale pointwise coverage is promoted separately
+above.
 
 Reproduce the covariate large-sample path with:
 

@@ -205,6 +205,14 @@ Current promotion status is:
    60 fold/task audit rows, conditional placebos, and a real observed covariate. The source
    labels these data artificial, so this remains execution evidence rather than a
    substantive causal result.
+9. The covariate publication certificate uses 1,000 replications in each of two fixed
+   designs and both control rules: 4,000 estimator fits, 240,000 fresh nuisance fold fits,
+   44 group/aggregate/placebo coverage cells, and four joint conditional-pre-trend size
+   cells. All pass the preregistered bias, coverage, SE-calibration, Monte Carlo error,
+   overlap, audit-count, availability, and zero-refusal gates. The stressed design retains
+   severe conditional cohort probabilities and unequal periods while requiring at least
+   32 expected observations in every period-X-cohort cell; realized failures are never
+   repaired or omitted from the refusal ledger.
 
 ## Alternatives considered
 

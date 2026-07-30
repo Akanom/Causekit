@@ -216,6 +216,18 @@ future task can resume without reconstructing intent from chat history.
     managed peak memory on the recorded environment. The hospital source is artificial
     and is execution evidence, not a substantive causal result.
 
+22. `0.7.0a6` covariate repeated-cross-section publication promotion: a hash-bound,
+    deterministic 1,000-replication certificate exercises favorable balanced and
+    stressed-overlap unequal-period designs under both control rules. All 44
+    group/aggregate/conditional-placebo pointwise cells pass with coverage `0.940–0.964`,
+    mean-SE/empirical-SD ratios `0.954–1.048`, maximum absolute bias `0.0089`, and zero
+    refusals across 4,000 estimator and 240,000 fold-local nuisance fits. All four joint
+    conditional-pre-trend size cells pass at `0.049–0.057`. The initial one-third-size
+    stress design exposed 11 fold-support refusals; the promoted design holds conditional
+    probabilities, unequal-period ratio, targets, seed, and gates fixed while requiring
+    at least 32 expected observations per period-X-cohort cell. No estimator or
+    simultaneous-band code changed.
+
 ## Open promotion gates
 
 - Matching still defaults to `inference="none"`. Known-score reuse-aware inference and a
@@ -229,7 +241,8 @@ future task can resume without reconstructing intent from chat history.
   consuming public cross-fitting factories; direct density-ratio regression remains a
   possible future stability enhancement over ratios of multiclass probabilities.
 - Repeated-cross-section DiD's no-covariate and explicit CrossFitter covariate-adjusted
-  stationary-composition paths are public. Publication-scale no-covariate coverage and
+  stationary-composition paths are public. Publication-scale no-covariate and covariate
+  pointwise coverage and
   available estimator-level R `did`/Stata `csdid` parity pass, with Stata aggregate SEs
   recorded as non-comparable. The covariate score has independent fixed-OOF base-R parity;
   pinned R/Stata estimator-level cells remain unavailable because their maintained public
@@ -272,12 +285,15 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Return to publication-scale panel/repeated-cross-section DiD coverage, estimator-level
-   repeated-cross-section R/Stata parity, direct-ratio nuisance support if justified, the
-   conditional covariate pre-trend score, and broader reference evidence.
-2. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
+1. Design repeated-cross-section observation/PSU multiplier simultaneous event-study
+   bands against the promoted no-covariate and covariate pointwise influence contracts;
+   begin with failing max-t identity, seed, cluster-role, and refusal tests. Do not reuse
+   panel entities or ordinary observation bootstrap draws.
+2. Continue broader DiD evidence and separately contract direct-ratio nuisance support,
+   composition-change robustness, and survey weights only if justified.
+3. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
    manipulation checks, bias correction, and local estimand.
-3. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
+4. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
    effects, and clustered covariance contracts.
 
 Continue to preserve the matching tie/inference, target-population, and no-quadratic-

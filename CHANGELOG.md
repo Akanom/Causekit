@@ -41,6 +41,13 @@ versions may refine APIs, but breaking changes must still be documented explicit
   contracts; both double-robustness legs; staggered aggregation identities; seeded
   simulation; fixed-OOF base-R parity; OutputHub diagnostics; and a hash-verified 7,368-row
   real-data/PSU execution smoke.
+- A hash-bound covariate publication certificate with 1,000 replications per design,
+  both control rules, 4,000 estimator fits, and 240,000 fold-local nuisance fits. All 44
+  effect/placebo coverage cells and four joint conditional-pre-trend size cells pass the
+  fixed calibration, bias, overlap, availability, audit-count, and zero-refusal gates.
+  The initial undersized stressed design's fold-support failures are documented; the
+  promoted design preserves its probabilities and unequal-size ratio while enforcing a
+  minimum expected period-X-cohort cell size.
 
 ### Changed
 
@@ -48,7 +55,8 @@ versions may refine APIs, but breaking changes must still be documented explicit
   `DifferenceInDifferences` and `EfficientDiD` remain separate and unchanged; there is no
   `panel=False` alias or synthesized entity identifier.
 - The repeated-cross-section design contract now records the implemented first-slice and
-  completed no-covariate promotion evidence.
+  completed no-covariate and covariate pointwise promotion evidence. Simultaneous-band
+  behavior is unchanged and remains closed.
 
 ### Known limitations
 

@@ -485,6 +485,11 @@ overlap failures refuse without clipping or dropping rows. Simultaneous bands, s
 weights, and composition-change-robust scores remain separate gates. See the
 [repeated-cross-section contract](docs/DID_REPEATED_CROSS_SECTION_CONTRACT.md).
 
+The covariate publication certificate covers 4,000 estimator fits and 240,000 fold-local
+nuisance fits. All 44 group/aggregate/conditional-placebo coverage cells and four joint
+conditional-pre-trend size cells pass with zero refusals. This promotes pointwise
+inference evidence only; it does not silently activate simultaneous bands.
+
 There is no formula API yet. Prepare numeric arrays, `Series`, or `DataFrame` objects
 explicitly, including categorical encoding and transformations. `add_constant=True` is
 the default; set it to `False` when the supplied exogenous design already contains the
@@ -761,8 +766,11 @@ uncontaminated pre-trend placebos, and a PT-All/PT-Post Hausman diagnostic. The 
 implemented no-covariate stationary-composition first slice with observation/PSU scores,
 cell audits, pre-trend placebos, OutputHub, a 32-cell publication-scale coverage
 certificate, pinned estimator-level R `did` parity, reviewed aligned Stata `csdid` parity,
-a public-data workflow, and a 100,000-row smoke. Stata aggregate standard errors are
-explicitly non-comparable because their estimated-share influence differs.
+a public-data workflow, and a 100,000-row smoke. Its cross-fitted covariate path also has
+a separate 44-cell pointwise coverage and four-cell conditional-pre-trend-size
+certificate. Stata aggregate standard errors are explicitly non-comparable because their
+estimated-share influence differs; repeated-cross-section simultaneous bands remain the
+next separate inference contract.
 The causal-ML alpha includes native partially linear DML and separately contracted public
 [honest R-learner](docs/R_LEARNER_CONTRACT.md) and
 [honest DR-learner](docs/DR_LEARNER_CONTRACT.md) paths, with immutable

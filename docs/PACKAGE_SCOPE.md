@@ -62,7 +62,9 @@ doubly robust repeated-cross-section score, and aligns conditional pre-trend pla
 that score. Both paths retain fixed comparison membership, pooled cohort-share
 aggregation, cell-count audits, and HC1 observation or one-way CR1 PSU inference. It has
 no entity role and still refuses sampling weights, composition-change-robust labels, and
-simultaneous bands.
+simultaneous bands. Separate 1,000-replication publication certificates cover the
+no-covariate and covariate-adjusted pointwise paths; the latter includes conditional
+placebo coverage and joint pre-trend size with genuinely fitted fold-local nuisances.
 
 The causal-ML surface adds `PartiallyLinearDML` for the scalar DML2 coefficient in a
 declared constant-effect partially linear model. CauseKit owns its default standardized
@@ -203,7 +205,7 @@ and validation gates:
 | Family | Required design questions before promotion |
 | --- | --- |
 | Matching extensions | Publication-scale sensitivity/coverage and available Python/R/Stata evidence pass; generic-score, selected-target, tie-expanded, clustered, survey, and bootstrap inference remain separately prohibited or deferred |
-| DiD promotion | Covariate-adjusted repeated-cross-section DiD and aligned conditional pre-trends are implemented; composition robustness, survey weights, and simultaneous bands retain separate contracts |
+| DiD promotion | Covariate-adjusted repeated-cross-section DiD, aligned conditional pre-trends, and publication-scale pointwise coverage are promoted; composition robustness, survey weights, and simultaneous bands retain separate contracts |
 | Causal ML promotion | Implement the frozen construction-cross-fitted native orthogonal-stack contract, then harden R-/DR-learners with repeated-split and publication-scale evidence; unit-level intervals, RATE, and policy evaluation retain separate contracts |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
 | Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |
