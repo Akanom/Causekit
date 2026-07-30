@@ -104,11 +104,26 @@ probability. The four aligned cell contributions are added to obtain each
 terms, just as the panel path does, but the shares are estimated from repeated samples and
 cannot reuse entity-level panel formulas.
 
-The first slice will use the package's HC1-style scaling for independent observations and
-one-way CR1 score aggregation for declared clusters. Pointwise normal or finite-cluster
-`t` references will follow the existing public convention. Multiplier event-study bands
-are a later inference gate and must draw one multiplier per observation or cluster—not one
-per nonexistent panel entity.
+The implemented pointwise path uses the package's HC1-style scaling for independent
+observations and one-way CR1 score aggregation for declared clusters. Pointwise normal or
+finite-cluster `t` references follow the existing public convention. With
+`inference="multiplier_bootstrap"`, the simultaneous path retains the same event-study
+estimate, standard error, and influence matrix, then draws one Rademacher multiplier per
+observation or declared PSU—not one per nonexistent panel entity. For `n` observations,
+observation draws are
+
+```text
+sqrt(n/(n-1)) * sum_i xi_i * psi_i(event) / n.
+```
+
+For `G` declared PSUs, CauseKit first sums `psi_i(event)` within PSU and uses
+`sqrt(G/(G-1))` with one indivisible multiplier per PSU. Each draw is studentized by the
+matching HC1/CR1 event standard error; the band critical value is the requested
+higher-quantile of the maximum absolute statistic. For `U` sampling units, batch size is
+`min(256, remaining, max(1, floor(8,000,000/U)))`, so large samples do not create a full
+iterations-by-observations matrix. Batching changes memory use, not the seeded multiplier
+stream. This is a multiplier approximation from fixed influence scores, not an ordinary
+row-resampling bootstrap and not nuisance refitting.
 
 Pre-trend placebos will compare independent cohort-period cell means and expose their full
 observation-level influence matrix. They cannot call the panel pre-trend helper. The
@@ -167,7 +182,10 @@ finite adoption times outside observed periods, missing or non-finite roles, abs
 baselines, empty or undersized group-period cells, invalid anticipation, unsupported
 sampling weights or survey designs, malformed clusters, covariates without `CrossFitter`,
 own-observation nuisance predictions, weak group-period overlap, and requests for the
-panel PT-All efficiency or Hausman labels.
+panel PT-All efficiency or Hausman labels. Simultaneous inference additionally refuses
+unknown inference labels, fewer than 99 multiplier draws, malformed seeds or confidence
+levels, missing clustered roles, and any event coordinate with a nonpositive or nonfinite
+standard error.
 
 No implicit row deletion, weight normalization, propensity clipping, variance repair,
 ridge, pseudoinverse, or generic bootstrap will be introduced merely to produce a result.
@@ -213,6 +231,14 @@ Current promotion status is:
    severe conditional cohort probabilities and unequal periods while requiring at least
    32 expected observations in every period-X-cohort cell; realized failures are never
    repaired or omitted from the refusal ledger.
+10. Failing-first observation and PSU max-t tests independently reconstruct every seeded
+    Rademacher draw, finite-sample factor, studentization, higher-quantile critical value,
+    and band endpoint. Seeded repeatability, analytic-path emptiness, indivisible PSU
+    roles, invalid configuration, and zero-standard-error refusals pass. The covariate
+    integration test verifies that bands reuse retained OOF influence scores without an
+    extra nuisance fit. A 100-replication, two-event observation-level joint-coverage
+    smoke passes its frozen `>= 88/100` gate. Publication-scale observation and PSU joint-
+    coverage certificates remain a separate promotion gate.
 
 ## Alternatives considered
 

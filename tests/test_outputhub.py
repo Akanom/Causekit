@@ -307,7 +307,9 @@ def test_repeated_cross_section_did_exports_cells_and_effect_tables() -> None:
             "treatment_time": [2.0, 2.0, 2.0, 2.0, np.inf, np.inf, np.inf, np.inf],
         }
     )
-    result = RepeatedCrossSectionDiD().fit(
+    result = RepeatedCrossSectionDiD(
+        inference="multiplier_bootstrap", bootstrap_iterations=99, random_state=41
+    ).fit(
         data,
         outcome="outcome",
         time="time",
@@ -321,6 +323,10 @@ def test_repeated_cross_section_did_exports_cells_and_effect_tables() -> None:
     assert model.metadata["sampling_unit"] == "observation"
     assert model.metadata["composition"] == "stationary"
     assert model.metadata["composition_verified"] is False
+    assert model.metadata["inference_method"] == "multiplier_bootstrap"
+    assert model.metadata["simultaneous_level"] == 0.95
+    assert model.metadata["bootstrap_iterations"] == 99
+    assert model.metadata["bootstrap_random_state"] == 41
     assert model.statistics["Observations"] == 8
     hub = outputhub.OutputHub("Repeated samples")
     add_to_outputhub(hub, result)
@@ -328,6 +334,7 @@ def test_repeated_cross_section_did_exports_cells_and_effect_tables() -> None:
         "Repeated-cross-section DiD cell counts",
         "Repeated-cross-section DiD group-time effects",
         "Repeated-cross-section DiD event study",
+        "Repeated-cross-section DiD simultaneous event-study bands",
         "Repeated-cross-section DiD calendar-time effects",
     ]
 

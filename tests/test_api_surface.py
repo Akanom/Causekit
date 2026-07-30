@@ -161,6 +161,9 @@ def test_estimator_signatures_keep_identification_inputs_explicit() -> None:
     assert repeated_cross_section_did.parameters["anticipation"].default == 0
     assert repeated_cross_section_did.parameters["covariance"].default == "robust"
     assert repeated_cross_section_did.parameters["inference"].default == "analytic"
+    assert repeated_cross_section_did.parameters["bootstrap_iterations"].default == 999
+    assert repeated_cross_section_did.parameters["random_state"].default is None
+    assert repeated_cross_section_did.parameters["simultaneous_level"].default == 0.95
     assert repeated_cross_section_did.parameters["nuisance_probability_floor"].default == 1e-6
     repeated_cross_section_fit = inspect.signature(causekit.RepeatedCrossSectionDiD.fit)
     assert "entity" not in repeated_cross_section_fit.parameters

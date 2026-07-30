@@ -434,6 +434,9 @@ repeated = RepeatedCrossSectionDiD(
     control_group="not_yet_treated",
     composition="stationary",
     covariance="clustered",
+    inference="multiplier_bootstrap",
+    bootstrap_iterations=999,
+    random_state=20260730,
 ).fit(
     repeated_samples,
     outcome="outcome",
@@ -445,6 +448,7 @@ repeated = RepeatedCrossSectionDiD(
 print(repeated.group_time)
 print(repeated.cell_counts)
 print(repeated.event_study)
+print(repeated.simultaneous_event_study)
 print(repeated.pretrend.placebo_effects)
 ```
 
@@ -481,14 +485,19 @@ There is intentionally no `entity=` role and no `panel=False` switch. Every resu
 that stationary composition is an identifying assumption rather than a verified
 diagnostic. Adjusted placebos use the same cross-fitted conditional score as the reported
 effects; failure to reject proves neither parallel trends nor stable composition. Strict
-overlap failures refuse without clipping or dropping rows. Simultaneous bands, survey
-weights, and composition-change-robust scores remain separate gates. See the
+overlap failures refuse without clipping or dropping rows. The opt-in simultaneous path
+draws one Rademacher multiplier per observation or declared PSU and reports a studentized
+max-t band over the retained event-time path. Survey weights and composition-change-
+robust scores remain separate gates. See the
 [repeated-cross-section contract](docs/DID_REPEATED_CROSS_SECTION_CONTRACT.md).
 
 The covariate publication certificate covers 4,000 estimator fits and 240,000 fold-local
 nuisance fits. All 44 group/aggregate/conditional-placebo coverage cells and four joint
 conditional-pre-trend size cells pass with zero refusals. This promotes pointwise
-inference evidence only; it does not silently activate simultaneous bands.
+inference evidence. Simultaneous-band mechanics pass independent observation/PSU
+identities, seeded reproduction, strict refusals, covariate integration, and a
+100-replication joint-coverage smoke; publication-scale joint coverage remains a separate
+promotion gate.
 
 There is no formula API yet. Prepare numeric arrays, `Series`, or `DataFrame` objects
 explicitly, including categorical encoding and transformations. `add_constant=True` is
@@ -769,8 +778,9 @@ certificate, pinned estimator-level R `did` parity, reviewed aligned Stata `csdi
 a public-data workflow, and a 100,000-row smoke. Its cross-fitted covariate path also has
 a separate 44-cell pointwise coverage and four-cell conditional-pre-trend-size
 certificate. Stata aggregate standard errors are explicitly non-comparable because their
-estimated-share influence differs; repeated-cross-section simultaneous bands remain the
-next separate inference contract.
+estimated-share influence differs. Repeated-cross-section observation/PSU multiplier
+bands now pass hand identities and a seeded coverage smoke; publication-scale joint-band
+coverage remains separate.
 The causal-ML alpha includes native partially linear DML and separately contracted public
 [honest R-learner](docs/R_LEARNER_CONTRACT.md) and
 [honest DR-learner](docs/DR_LEARNER_CONTRACT.md) paths, with immutable

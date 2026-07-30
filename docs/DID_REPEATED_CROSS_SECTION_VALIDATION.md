@@ -117,6 +117,25 @@ ledger; the promoted run's ledger is empty. The recorded Python 3.14.6 / Windows
 took 120.54 seconds; timing is descriptive. The hash-bound certificate is
 `benchmarks/did_rcs_covariate_promotion_evidence.json`.
 
+## Simultaneous event-study contract
+
+The observation-level hand test reconstructs 513 seeded Rademacher max-t draws directly
+from the retained event-study influence matrix and HC1 standard errors. A separate PSU
+test first sums scores within the declared clusters, draws exactly one multiplier per
+indivisible PSU, and reconstructs the CR1-studentized critical value and endpoints. The
+implementation uses batches of at most 256 draws; seeded equality and repeat fitting are
+part of the contract. The analytic path exposes an empty band and `None` configuration
+metadata rather than a pointwise table relabelled as simultaneous.
+
+Refusal tests cover an ordinary-bootstrap label, fewer than 99 iterations, Boolean
+iteration counts, noninteger seeds, invalid levels, and nonpositive event standard errors.
+The fixed-OOF covariate fixture verifies that the multiplier layer consumes the retained
+event influence after exactly the original ten nuisance fold/task fits. A deterministic
+100-replication two-event observation-level smoke passed its preregistered joint-coverage
+gate of at least 88 covered paths. This is implementation evidence, not the still-open
+publication-scale observation/PSU joint-coverage certificate and not external-package
+random-number parity.
+
 ## Public-data and performance smoke
 
 `examples/real_world_causal_workflow.py` preserves the hash-pinned Stata `hospdd` rows,
@@ -135,14 +154,26 @@ On Python 3.14.6 / Windows 11, the 2026-07-30 run completed in `0.2551` seconds 
 `34.656` MiB Python-managed peak memory, six group-time effects, and four event-time
 effects. These figures are descriptive and environment-specific.
 
+The large-sample multiplier path is reproducible with:
+
+```bash
+python benchmarks/benchmark_did_rcs.py --n-observations 100000 --periods 6 --inference multiplier_bootstrap --bootstrap-iterations 999 --measure-memory
+```
+
+The 2026-07-30 Python 3.14.6 / Windows 11 run completed 999 four-coordinate max-t draws
+in `2.117` seconds with `208.581` MiB Python-managed peak memory and critical value
+`2.4571086724809366`. The bounded batches avoid an iterations-by-observations allocation;
+time and memory remain descriptive and environment-specific.
+
 The covariate real-data test uses the same hash-verified 7,368 rows, `frequency` as an
 observed covariate, two whole-hospital folds, and hospital CR1 inference. It returns ESavg
 `0.8676486723638247`, standard error `0.04274270577554287`, 46 PSUs, and 60 fold/task
 diagnostic rows. The source is artificial and the affine/empirical nuisances are an
 execution contract, not evidence that the nuisance models or identifying assumptions are
-substantively correct. Composition-change robustness, survey weights, and simultaneous
-bands remain open; covariate publication-scale pointwise coverage is promoted separately
-above.
+substantively correct. Composition-change robustness and survey weights remain open;
+covariate publication-scale pointwise coverage is promoted separately above, while
+simultaneous bands currently have hand and seeded-smoke rather than publication-scale
+joint-coverage evidence.
 
 Reproduce the covariate large-sample path with:
 

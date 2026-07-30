@@ -301,6 +301,12 @@ counts, nuisance fit, or a pre-trend test. Observation-level HC1 or declared-PSU
 replace entity-level panel changes. Composition-change robustness is not approximated by
 either stationary-composition path.
 
+The opt-in repeated-section multiplier path leaves those point estimates and analytical
+standard errors unchanged. It draws Rademacher multipliers once per observation under
+HC1, or once per declared indivisible PSU after summing observation influences under CR1,
+and studentizes every reported event coordinate before taking the maximum absolute draw.
+It does not resample rows, reconstruct synthetic panels, or refit cross-fitted nuisances.
+
 ## Honest heterogeneous effects
 
 `RLearner` targets `tau(x) = E[Y(1)-Y(0) | X=x]` for an exact binary treatment. A causal

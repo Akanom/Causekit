@@ -61,8 +61,10 @@ and four group-period outcome regressions per comparison, implements the locally
 doubly robust repeated-cross-section score, and aligns conditional pre-trend placebos to
 that score. Both paths retain fixed comparison membership, pooled cohort-share
 aggregation, cell-count audits, and HC1 observation or one-way CR1 PSU inference. It has
-no entity role and still refuses sampling weights, composition-change-robust labels, and
-simultaneous bands. Separate 1,000-replication publication certificates cover the
+no entity role and still refuses sampling weights and composition-change-robust labels.
+Its opt-in multiplier path draws once per observation or indivisible PSU and supplies
+studentized max-t simultaneous event-study bands without nuisance refitting. Separate
+1,000-replication publication certificates cover the
 no-covariate and covariate-adjusted pointwise paths; the latter includes conditional
 placebo coverage and joint pre-trend size with genuinely fitted fold-local nuisances.
 
@@ -205,7 +207,7 @@ and validation gates:
 | Family | Required design questions before promotion |
 | --- | --- |
 | Matching extensions | Publication-scale sensitivity/coverage and available Python/R/Stata evidence pass; generic-score, selected-target, tie-expanded, clustered, survey, and bootstrap inference remain separately prohibited or deferred |
-| DiD promotion | Covariate-adjusted repeated-cross-section DiD, aligned conditional pre-trends, and publication-scale pointwise coverage are promoted; composition robustness, survey weights, and simultaneous bands retain separate contracts |
+| DiD promotion | Covariate-adjusted repeated-cross-section DiD, aligned conditional pre-trends, publication-scale pointwise coverage, and observation/PSU max-t mechanics are implemented; publication-scale joint-band coverage, composition robustness, and survey weights retain separate gates |
 | Causal ML promotion | Implement the frozen construction-cross-fitted native orthogonal-stack contract, then harden R-/DR-learners with repeated-split and publication-scale evidence; unit-level intervals, RATE, and policy evaluation retain separate contracts |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
 | Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |

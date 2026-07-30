@@ -228,6 +228,17 @@ future task can resume without reconstructing intent from chat history.
     at least 32 expected observations per period-X-cohort cell. No estimator or
     simultaneous-band code changed.
 
+23. `0.7.0a6` repeated-cross-section simultaneous-band alpha: opt-in
+    `inference="multiplier_bootstrap"` reuses the retained event-study influence matrix and
+    draws one Rademacher multiplier per observation or per indivisible declared PSU after
+    cluster summation. HC1/CR1 finite-sample factors, studentization, higher-quantile max-t
+    critical values, endpoints, seed/configuration metadata, and OutputHub transport are
+    public. Observation and PSU hand identities, repeat-seed equality, invalid-setting and
+    zero-SE refusals, covariate no-refit integration, and a 100-replication two-event joint-
+    coverage smoke pass. The bounded-batch 100,000-row/four-event/999-draw benchmark takes
+    2.117 seconds and 208.581 MiB Python-managed peak memory on the recorded environment.
+    No panel entity or ordinary row-resampling bootstrap is reused.
+
 ## Open promotion gates
 
 - Matching still defaults to `inference="none"`. Known-score reuse-aware inference and a
@@ -246,8 +257,9 @@ future task can resume without reconstructing intent from chat history.
   available estimator-level R `did`/Stata `csdid` parity pass, with Stata aggregate SEs
   recorded as non-comparable. The covariate score has independent fixed-OOF base-R parity;
   pinned R/Stata estimator-level cells remain unavailable because their maintained public
-  paths do not implement the same score. Observation/PSU multiplier bands,
-  compositional-change robustness, and survey weights remain open.
+  paths do not implement the same score. Observation/PSU multiplier mechanics pass hand
+  and seeded-smoke gates; publication-scale joint-band coverage, compositional-change
+  robustness, and survey weights remain open.
 - The R-learner alpha is public with honest evaluation, calibration, groups, bands, graph
   data, simulations, base-R/Stata parity, performance, native nonlinear support, and two
   real-data CATE records. The next native nonlinear stage is frozen as a separate
@@ -285,10 +297,9 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Design repeated-cross-section observation/PSU multiplier simultaneous event-study
-   bands against the promoted no-covariate and covariate pointwise influence contracts;
-   begin with failing max-t identity, seed, cluster-role, and refusal tests. Do not reuse
-   panel entities or ordinary observation bootstrap draws.
+1. Promote repeated-cross-section simultaneous inference with preregistered publication-
+   scale joint-band coverage under observation and PSU sampling for both no-covariate and
+   cross-fitted covariate paths; retain zero-refusal and fixed-seed evidence.
 2. Continue broader DiD evidence and separately contract direct-ratio nuisance support,
    composition-change robustness, and survey weights only if justified.
 3. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,

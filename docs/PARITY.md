@@ -123,6 +123,10 @@ The separate hash-bound Python certificate
 four passing joint conditional-pre-trend size cells. It strengthens internal inferential
 evidence without manufacturing estimator-level parity where no aligned external surface
 exists.
+The observation/PSU simultaneous layer is likewise validated against direct retained-
+influence reconstructions in Python. R/Stata pseudo-random streams or resampling commands
+are not relabelled as exact parity for CauseKit's seeded Rademacher sequence; publication-
+scale joint-band coverage remains a separate internal promotion gate.
 
 The fixed-score matching R harness is `benchmarks/validate_matching_reference.R`. It
 pins CRAN `Matching` commit `1208eaa7bfa888b1fc903481dddfb8c0dffa40d5`

@@ -11,7 +11,7 @@ import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from numbers import Integral, Real
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import numpy as np
 import pandas as pd
@@ -27,7 +27,9 @@ from .did import (
 )
 
 RCSComposition = Literal["stationary"]
-RCSInference = Literal["analytic"]
+RCSInference = Literal["analytic", "multiplier_bootstrap"]
+_MAX_MULTIPLIER_BATCH = 256
+_MAX_MULTIPLIER_ELEMENTS = 8_000_000
 
 
 @dataclass(frozen=True)
@@ -105,6 +107,11 @@ class RepeatedCrossSectionDiDResult:
     nuisance_diagnostics: pd.DataFrame = field(default_factory=pd.DataFrame)
     n_splits: int | None = None
     nuisance_probability_floor: float | None = None
+    simultaneous_event_study: pd.DataFrame = field(default_factory=pd.DataFrame)
+    simultaneous_level: float | None = None
+    simultaneous_critical_value: float | None = None
+    bootstrap_iterations: int | None = None
+    bootstrap_random_state: int | None = None
 
     @property
     def nobs(self) -> int:
@@ -546,6 +553,68 @@ def _score_statistics_rcs(
             )
         )
     return standard_error, statistic, pvalue, distribution, inference_df, n_clusters
+
+
+def _multiplier_event_study_band_rcs(
+    event_study: pd.DataFrame,
+    influence: pd.DataFrame,
+    *,
+    sample: _RepeatedSample,
+    covariance: DiDCovariance,
+    iterations: int,
+    random_state: int | None,
+    level: float,
+) -> tuple[pd.DataFrame, float]:
+    """Studentized max-t bands at the repeated-section sampling-unit level."""
+
+    scores = influence.to_numpy(dtype=float)
+    standard_errors = event_study["std_err"].to_numpy(dtype=float)
+    if np.any(~np.isfinite(standard_errors)) or np.any(standard_errors <= 0.0):
+        raise ValueError(
+            "Simultaneous event-study bands require a positive finite standard error "
+            "for every event time."
+        )
+    n = len(sample.outcome)
+    if covariance == "robust":
+        score_units = scores
+        finite_sample_scale = np.sqrt(n / (n - 1))
+    else:
+        if sample.cluster_codes is None or sample.n_clusters is None:
+            raise ValueError("cluster labels are required for clustered multiplier bands.")
+        score_units = np.zeros((sample.n_clusters, scores.shape[1]))
+        np.add.at(score_units, sample.cluster_codes, scores)
+        finite_sample_scale = np.sqrt(sample.n_clusters / (sample.n_clusters - 1))
+
+    rng = np.random.default_rng(random_state)
+    maximum_statistics = np.empty(iterations, dtype=float)
+    completed = 0
+    while completed < iterations:
+        memory_bounded_batch = max(1, _MAX_MULTIPLIER_ELEMENTS // len(score_units))
+        batch = min(
+            _MAX_MULTIPLIER_BATCH,
+            memory_bounded_batch,
+            iterations - completed,
+        )
+        multipliers = rng.choice(np.array([-1.0, 1.0]), size=(batch, len(score_units)))
+        perturbations = finite_sample_scale * multipliers @ score_units / n
+        maximum_statistics[completed : completed + batch] = np.max(
+            np.abs(perturbations / standard_errors), axis=1
+        )
+        completed += batch
+    critical = float(np.quantile(maximum_statistics, level, method="higher"))
+    estimates = event_study["att"].to_numpy(dtype=float)
+    bands = pd.DataFrame(
+        {
+            "att": estimates,
+            "std_err": standard_errors,
+            "critical_value": critical,
+            "level": level,
+            "lower": estimates - critical * standard_errors,
+            "upper": estimates + critical * standard_errors,
+        },
+        index=event_study.index.copy(),
+    )
+    return bands, critical
 
 
 def _summary_row_rcs(
@@ -1011,6 +1080,10 @@ def _assemble_result(
     control_group: ControlGroup,
     composition: RCSComposition,
     anticipation: int,
+    inference: RCSInference,
+    bootstrap_iterations: int,
+    bootstrap_random_state: int | None,
+    simultaneous_level: float,
     outcome_name: str,
     time_name: str,
     treatment_time_name: str,
@@ -1108,6 +1181,20 @@ def _assemble_result(
         name="n_observations",
     )
     cohort_sizes.index.name = "cohort"
+    simultaneous_event_study = pd.DataFrame(
+        columns=["att", "std_err", "critical_value", "level", "lower", "upper"]
+    )
+    simultaneous_critical_value: float | None = None
+    if inference == "multiplier_bootstrap":
+        simultaneous_event_study, simultaneous_critical_value = _multiplier_event_study_band_rcs(
+            event_study,
+            event_study_influence,
+            sample=sample,
+            covariance=covariance,
+            iterations=bootstrap_iterations,
+            random_state=bootstrap_random_state,
+            level=simultaneous_level,
+        )
     pretrend = (
         _pretrend_diagnostic(sample, covariance=covariance, control_group=control_group)
         if pretrend_override is None
@@ -1144,6 +1231,7 @@ def _assemble_result(
         event_study_influence=event_study_influence,
         calendar_time_influence=calendar_time_influence,
         overall_influence=overall_influence,
+        simultaneous_event_study=simultaneous_event_study,
         pretrend=pretrend,
         cell_counts=sample.cell_counts.copy(),
         cohort_sizes=cohort_sizes,
@@ -1153,7 +1241,15 @@ def _assemble_result(
         covariance_type=covariance,
         inference_distribution=distribution,
         inference_df=inference_df,
-        inference_method="analytic",
+        inference_method=inference,
+        simultaneous_level=(simultaneous_level if inference == "multiplier_bootstrap" else None),
+        simultaneous_critical_value=simultaneous_critical_value,
+        bootstrap_iterations=(
+            bootstrap_iterations if inference == "multiplier_bootstrap" else None
+        ),
+        bootstrap_random_state=(
+            bootstrap_random_state if inference == "multiplier_bootstrap" else None
+        ),
         method=method,
         parallel_trends=parallel_trends,
         control_group=control_group,
@@ -1210,7 +1306,12 @@ def _assemble_result(
                 if covariate_names
                 else ()
             ),
-            "Reported confidence intervals are pointwise; simultaneous bands are not implemented on this surface.",
+            (
+                "Event-study bands use studentized Rademacher multipliers drawn once per "
+                "observation or declared PSU."
+                if inference == "multiplier_bootstrap"
+                else "Reported confidence intervals are pointwise."
+            ),
         ),
         nuisance_predictions=(
             pd.DataFrame() if nuisance_predictions is None else nuisance_predictions.copy()
@@ -1240,6 +1341,10 @@ def _fit_covariate_repeated_cross_section(
     composition: RCSComposition,
     anticipation: int,
     covariance: DiDCovariance,
+    inference: RCSInference,
+    bootstrap_iterations: int,
+    bootstrap_random_state: int | None,
+    simultaneous_level: float,
     probability_floor: float,
 ) -> RepeatedCrossSectionDiDResult:
     if cross_fitter.propensity_factory is None:
@@ -1434,6 +1539,10 @@ def _fit_covariate_repeated_cross_section(
         control_group=control_group,
         composition=composition,
         anticipation=anticipation,
+        inference=inference,
+        bootstrap_iterations=bootstrap_iterations,
+        bootstrap_random_state=bootstrap_random_state,
+        simultaneous_level=simultaneous_level,
         outcome_name=outcome,
         time_name=time,
         treatment_time_name=treatment_time,
@@ -1467,6 +1576,9 @@ class RepeatedCrossSectionDiD:
     anticipation: int
     covariance: DiDCovariance
     inference: RCSInference
+    bootstrap_iterations: int
+    random_state: int | None
+    simultaneous_level: float
     nuisance_probability_floor: float
 
     def __init__(
@@ -1477,6 +1589,9 @@ class RepeatedCrossSectionDiD:
         anticipation: int = 0,
         covariance: DiDCovariance = "robust",
         inference: RCSInference = "analytic",
+        bootstrap_iterations: int = 999,
+        random_state: int | None = None,
+        simultaneous_level: float = 0.95,
         nuisance_probability_floor: float = 1e-6,
     ) -> None:
         if control_group not in {"never_treated", "not_yet_treated"}:
@@ -1492,11 +1607,24 @@ class RepeatedCrossSectionDiD:
             raise ValueError("anticipation must be a non-negative integer.")
         if covariance not in {"robust", "clustered"}:
             raise ValueError("covariance must be 'robust' or 'clustered'.")
-        if inference != "analytic":
-            raise NotImplementedError(
-                "inference must be 'analytic'; observation/PSU multiplier bands require "
-                "a separate promotion gate."
-            )
+        if inference not in {"analytic", "multiplier_bootstrap"}:
+            raise ValueError("inference must be 'analytic' or 'multiplier_bootstrap'.")
+        if (
+            isinstance(bootstrap_iterations, (bool, np.bool_))
+            or not isinstance(bootstrap_iterations, Integral)
+            or int(bootstrap_iterations) < 99
+        ):
+            raise ValueError("bootstrap_iterations must be an integer of at least 99.")
+        if random_state is not None and (
+            isinstance(random_state, (bool, np.bool_)) or not isinstance(random_state, Integral)
+        ):
+            raise TypeError("random_state must be an integer or None.")
+        if isinstance(simultaneous_level, (bool, np.bool_)) or not isinstance(
+            simultaneous_level, Real
+        ):
+            raise TypeError("simultaneous_level must be a finite real number.")
+        if not np.isfinite(simultaneous_level) or not 0.0 < float(simultaneous_level) < 1.0:
+            raise ValueError("simultaneous_level must be strictly between zero and one.")
         if not isinstance(nuisance_probability_floor, Real) or isinstance(
             nuisance_probability_floor, (bool, np.bool_)
         ):
@@ -1512,7 +1640,10 @@ class RepeatedCrossSectionDiD:
         self.composition = composition
         self.anticipation = int(anticipation)
         self.covariance = covariance
-        self.inference = inference
+        self.inference = cast(RCSInference, inference)
+        self.bootstrap_iterations = int(bootstrap_iterations)
+        self.random_state = None if random_state is None else int(random_state)
+        self.simultaneous_level = float(simultaneous_level)
         self.nuisance_probability_floor = float(nuisance_probability_floor)
 
     def fit(
@@ -1567,6 +1698,10 @@ class RepeatedCrossSectionDiD:
                 composition=self.composition,
                 anticipation=self.anticipation,
                 covariance=self.covariance,
+                inference=self.inference,
+                bootstrap_iterations=self.bootstrap_iterations,
+                bootstrap_random_state=self.random_state,
+                simultaneous_level=self.simultaneous_level,
                 probability_floor=self.nuisance_probability_floor,
             )
         cells: list[_RepeatedEffectCell] = []
@@ -1606,6 +1741,10 @@ class RepeatedCrossSectionDiD:
             control_group=self.control_group,
             composition=self.composition,
             anticipation=self.anticipation,
+            inference=self.inference,
+            bootstrap_iterations=self.bootstrap_iterations,
+            bootstrap_random_state=self.random_state,
+            simultaneous_level=self.simultaneous_level,
             outcome_name=outcome,
             time_name=time,
             treatment_time_name=treatment_time,

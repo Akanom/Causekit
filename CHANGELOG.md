@@ -48,6 +48,15 @@ versions may refine APIs, but breaking changes must still be documented explicit
   The initial undersized stressed design's fold-support failures are documented; the
   promoted design preserves its probabilities and unequal-size ratio while enforcing a
   minimum expected period-X-cohort cell size.
+- Opt-in repeated-cross-section `inference="multiplier_bootstrap"` with studentized
+  Rademacher max-t event-study bands. Robust inference draws once per observation;
+  clustered inference sums scores and draws once per indivisible PSU. Results and
+  OutputHub retain the critical value, confidence level, iteration count, seed, sampling
+  unit, and exact band table. Failing-first hand identities, deterministic reproduction,
+  PSU-role, configuration/degeneracy refusals, covariate no-refit integration, and a
+  100-replication joint-coverage smoke pass. A bounded-batch 100,000-row/four-event/999-
+  draw benchmark completes in 2.117 seconds with 208.581 MiB Python-managed peak memory
+  on the recorded environment.
 
 ### Changed
 
@@ -55,18 +64,18 @@ versions may refine APIs, but breaking changes must still be documented explicit
   `DifferenceInDifferences` and `EfficientDiD` remain separate and unchanged; there is no
   `panel=False` alias or synthesized entity identifier.
 - The repeated-cross-section design contract now records the implemented first-slice and
-  completed no-covariate and covariate pointwise promotion evidence. Simultaneous-band
-  behavior is unchanged and remains closed.
+  completed no-covariate and covariate pointwise promotion evidence plus the opt-in
+  observation/PSU simultaneous-band contract.
 
 ### Known limitations
 
 - Stationary composition is declared but not testable from the estimator.
-  Compositional-change-robust estimation, sampling or survey weights, and simultaneous
-  event-study bands remain unimplemented and refuse. Covariate estimator-level parity is
+  Compositional-change-robust estimation and sampling or survey weights remain
+  unimplemented and refuse. Covariate estimator-level parity is
   unavailable where reviewed R/Stata public paths target different moments.
 - Stata `csdid` aggregate standard errors are non-comparable to the maintained pooled-
-  cohort-share uncertainty contract. Observation/PSU simultaneous bands remain separately
-  unimplemented.
+  cohort-share uncertainty contract. Observation/PSU band mechanics pass hand identities
+  and a seeded smoke; publication-scale joint-band coverage remains open.
 
 ## [0.7.0a5] - Unreleased
 

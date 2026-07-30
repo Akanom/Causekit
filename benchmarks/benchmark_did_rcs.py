@@ -3,6 +3,7 @@
 Run from the repository root::
 
     python benchmarks/benchmark_did_rcs.py --n-observations 100000 --measure-memory
+    python benchmarks/benchmark_did_rcs.py --n-observations 100000 --inference multiplier_bootstrap --bootstrap-iterations 999 --measure-memory
 """
 
 from __future__ import annotations
@@ -49,6 +50,12 @@ def main() -> None:
     parser.add_argument("--n-observations", type=int, default=100_000)
     parser.add_argument("--periods", type=int, default=6)
     parser.add_argument("--seed", type=int, default=20_260_730)
+    parser.add_argument(
+        "--inference",
+        choices=("analytic", "multiplier_bootstrap"),
+        default="analytic",
+    )
+    parser.add_argument("--bootstrap-iterations", type=int, default=999)
     parser.add_argument("--measure-memory", action="store_true")
     args = parser.parse_args()
 
@@ -56,7 +63,12 @@ def main() -> None:
     if args.measure_memory:
         tracemalloc.start()
     started = time.perf_counter()
-    result = RepeatedCrossSectionDiD(control_group="not_yet_treated").fit(
+    result = RepeatedCrossSectionDiD(
+        control_group="not_yet_treated",
+        inference=args.inference,
+        bootstrap_iterations=args.bootstrap_iterations,
+        random_state=args.seed,
+    ).fit(
         data,
         outcome="outcome",
         time="time",
@@ -79,6 +91,9 @@ def main() -> None:
                 "seed": args.seed,
                 "n_observations": len(data),
                 "n_periods": args.periods,
+                "inference": result.inference_method,
+                "bootstrap_iterations": result.bootstrap_iterations,
+                "simultaneous_critical_value": result.simultaneous_critical_value,
                 "elapsed_seconds": elapsed,
                 "peak_python_mib": peak_mib,
                 "estimate": result.estimate,

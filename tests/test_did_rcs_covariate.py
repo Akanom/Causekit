@@ -169,6 +169,37 @@ def test_hand_computed_locally_efficient_score_and_influence_contract() -> None:
     assert result.nuisance_diagnostics["comparison_stage"].eq("group_time").all()
 
 
+def test_covariate_multiplier_band_reuses_retained_oof_event_influence() -> None:
+    iterations = 99
+    seed = 424
+    result = _fit_covariate(
+        _hand_sample(),
+        inference="multiplier_bootstrap",
+        bootstrap_iterations=iterations,
+        random_state=seed,
+        simultaneous_level=0.95,
+    )
+    influence = result.event_study_influence.to_numpy(dtype=float)
+    multipliers = np.random.default_rng(seed).choice(
+        np.array([-1.0, 1.0]), size=(iterations, result.n_observations)
+    )
+    draws = (
+        np.sqrt(result.n_observations / (result.n_observations - 1))
+        * multipliers
+        @ influence
+        / result.n_observations
+    )
+    expected = np.quantile(
+        np.max(np.abs(draws / result.event_study["std_err"].to_numpy(dtype=float)), axis=1),
+        0.95,
+        method="higher",
+    )
+
+    assert result.simultaneous_critical_value == pytest.approx(expected, abs=1e-14)
+    assert len(result.nuisance_diagnostics) == 10
+    assert result.nuisance_predictions.notna().all().all()
+
+
 class _AuditResult:
     def __init__(
         self,

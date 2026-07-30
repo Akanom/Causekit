@@ -167,6 +167,10 @@ def to_outputhub_model(
                 "covariance_type": result.covariance_type,
                 "inference_distribution": result.inference_distribution,
                 "inference_method": result.inference_method,
+                "simultaneous_level": result.simultaneous_level,
+                "simultaneous_critical_value": result.simultaneous_critical_value,
+                "bootstrap_iterations": result.bootstrap_iterations,
+                "bootstrap_random_state": result.bootstrap_random_state,
                 "n_clusters": result.n_clusters,
                 "covariates": list(result.covariates),
                 "nuisance_cross_fitted": result.cross_fitted,
@@ -732,6 +736,23 @@ def add_to_outputhub(
             caption="Pooled-cohort-share-weighted event-time effects with pointwise inference.",
             metadata=table_metadata,
         )
+        if not result.simultaneous_event_study.empty:
+            hub.add_table(
+                f"{model_name} simultaneous event-study bands",
+                result.simultaneous_event_study.reset_index(),
+                caption=(
+                    "Studentized Rademacher multiplier max-t bands over the reported "
+                    "event-time path, drawn once per observation or declared PSU."
+                ),
+                metadata={
+                    **table_metadata,
+                    "sampling_unit": result.sampling_unit,
+                    "level": result.simultaneous_level,
+                    "critical_value": result.simultaneous_critical_value,
+                    "iterations": result.bootstrap_iterations,
+                    "random_state": result.bootstrap_random_state,
+                },
+            )
         hub.add_table(
             f"{model_name} calendar-time effects",
             result.calendar_time.reset_index(),

@@ -82,6 +82,7 @@ The installed source tree assigns one primary responsibility to each module:
 | `causekit.crossfit` | Public nuisance protocols, deterministic stratified fold orchestration, binary/multiclass probabilities, masked scalar tasks, fresh-model fitting, prediction adaptation, and aligned out-of-fold records |
 | `causekit.matching` | Supplied-score ATT/ATC/ATE matching, sorted scalar neighbor search, support/caliper rules, fractional ties, weights, reuse, balance, and separate fixed-score or validated Logit-MLE analytical inference |
 | `causekit.did` | Balanced-panel validation, conventional group-time DiD, cross-fitted covariate PT-All scores/conditional weights, pointwise and simultaneous influence inference, and cohort/event/calendar aggregation |
+| `causekit.did_rcs` | Stationary repeated-section validation, marginal/cross-fitted doubly robust scores, observation/PSU pointwise and multiplier max-t inference, conditional placebos, and cohort/event/calendar aggregation |
 | `causekit.ml` | Native ridge-GCV nuisance fitting, shared-fold partially linear DML2 score, influence inference, fold-level tuning diagnostics, and fitted result |
 | `causekit.postestimation` | Summary, covariance, confidence interval, prediction, residual, fitted-value, linear-combination, and Wald helpers |
 | `causekit.integrations.outputhub` | Lazy optional conversion and insertion into Universal Output Hub |

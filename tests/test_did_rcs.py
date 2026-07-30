@@ -199,6 +199,232 @@ def test_clustered_cr1_covariance_is_reconstructed_from_psu_scores() -> None:
     assert result.sampling_unit == "cluster"
 
 
+def test_observation_multiplier_band_matches_hand_computed_rademacher_max_t() -> None:
+    iterations = 513
+    seed = 20_260_730
+    level = 0.90
+    result = _fit(
+        _staggered_sample(),
+        inference="multiplier_bootstrap",
+        bootstrap_iterations=iterations,
+        random_state=seed,
+        simultaneous_level=level,
+    )
+    influence = result.event_study_influence.to_numpy(dtype=float)
+    standard_errors = result.event_study["std_err"].to_numpy(dtype=float)
+    multipliers = np.random.default_rng(seed).choice(
+        np.array([-1.0, 1.0]), size=(iterations, result.n_observations)
+    )
+    draws = (
+        np.sqrt(result.n_observations / (result.n_observations - 1))
+        * multipliers
+        @ influence
+        / result.n_observations
+    )
+    expected_critical = np.quantile(
+        np.max(np.abs(draws / standard_errors), axis=1), level, method="higher"
+    )
+
+    assert result.inference_method == "multiplier_bootstrap"
+    assert result.simultaneous_level == level
+    assert result.simultaneous_critical_value == pytest.approx(expected_critical, abs=1e-14)
+    assert result.bootstrap_iterations == iterations
+    assert result.bootstrap_random_state == seed
+    np.testing.assert_allclose(
+        result.simultaneous_event_study["lower"],
+        result.event_study["att"] - expected_critical * standard_errors,
+        rtol=0.0,
+        atol=1e-14,
+    )
+    np.testing.assert_allclose(
+        result.simultaneous_event_study["upper"],
+        result.event_study["att"] + expected_critical * standard_errors,
+        rtol=0.0,
+        atol=1e-14,
+    )
+
+
+def test_multiplier_band_is_seeded_and_analytic_path_retains_no_band() -> None:
+    model = RepeatedCrossSectionDiD(
+        inference="multiplier_bootstrap",
+        bootstrap_iterations=101,
+        random_state=733,
+    )
+    first = model.fit(
+        _staggered_sample(), outcome="outcome", time="time", treatment_time="treatment_time"
+    )
+    second = model.fit(
+        _staggered_sample(), outcome="outcome", time="time", treatment_time="treatment_time"
+    )
+    analytic = _fit(_staggered_sample())
+
+    pd.testing.assert_frame_equal(first.simultaneous_event_study, second.simultaneous_event_study)
+    assert first.simultaneous_critical_value == second.simultaneous_critical_value
+    assert analytic.simultaneous_event_study.empty
+    assert analytic.simultaneous_level is None
+    assert analytic.simultaneous_critical_value is None
+    assert analytic.bootstrap_iterations is None
+    assert analytic.bootstrap_random_state is None
+
+
+def test_psu_multiplier_band_uses_one_draw_per_indivisible_cluster() -> None:
+    data = _staggered_sample()
+    replicate_zero = data.index.str.endswith("r0")
+    flipped_cells = (data["treatment_time"] == 2.0) & (data["time"] >= 2.0)
+    data["psu"] = np.where(replicate_zero ^ flipped_cells, "a", "b")
+    iterations = 199
+    seed = 91
+    level = 0.95
+    result = RepeatedCrossSectionDiD(
+        covariance="clustered",
+        inference="multiplier_bootstrap",
+        bootstrap_iterations=iterations,
+        random_state=seed,
+        simultaneous_level=level,
+    ).fit(
+        data,
+        outcome="outcome",
+        time="time",
+        treatment_time="treatment_time",
+        cluster="psu",
+    )
+    cluster_scores = (
+        result.event_study_influence.groupby(data["psu"], sort=False).sum().to_numpy(dtype=float)
+    )
+    multipliers = np.random.default_rng(seed).choice(
+        np.array([-1.0, 1.0]), size=(iterations, result.n_clusters)
+    )
+    draws = (
+        np.sqrt(result.n_clusters / (result.n_clusters - 1))
+        * multipliers
+        @ cluster_scores
+        / result.n_observations
+    )
+    expected_critical = np.quantile(
+        np.max(np.abs(draws / result.event_study["std_err"].to_numpy(dtype=float)), axis=1),
+        level,
+        method="higher",
+    )
+
+    assert result.sampling_unit == "cluster"
+    assert result.n_clusters == 2
+    assert result.simultaneous_critical_value == pytest.approx(expected_critical, abs=1e-14)
+
+
+@pytest.mark.parametrize(
+    ("constructor", "error", "message"),
+    [
+        ({"inference": "ordinary_bootstrap"}, ValueError, "inference"),
+        (
+            {"inference": "multiplier_bootstrap", "bootstrap_iterations": 20},
+            ValueError,
+            "at least 99",
+        ),
+        (
+            {"inference": "multiplier_bootstrap", "bootstrap_iterations": True},
+            ValueError,
+            "at least 99",
+        ),
+        (
+            {"inference": "multiplier_bootstrap", "bootstrap_iterations": 99.0},
+            ValueError,
+            "at least 99",
+        ),
+        (
+            {"inference": "multiplier_bootstrap", "random_state": 1.5},
+            TypeError,
+            "random_state",
+        ),
+        (
+            {"inference": "multiplier_bootstrap", "random_state": True},
+            TypeError,
+            "random_state",
+        ),
+        (
+            {"inference": "multiplier_bootstrap", "simultaneous_level": 1.0},
+            ValueError,
+            "strictly between",
+        ),
+        (
+            {"inference": "multiplier_bootstrap", "simultaneous_level": "0.95"},
+            TypeError,
+            "simultaneous_level",
+        ),
+        (
+            {"inference": "multiplier_bootstrap", "simultaneous_level": True},
+            TypeError,
+            "simultaneous_level",
+        ),
+        (
+            {"inference": "multiplier_bootstrap", "simultaneous_level": np.nan},
+            ValueError,
+            "strictly between",
+        ),
+    ],
+)
+def test_multiplier_band_configuration_refuses_invalid_contracts(
+    constructor: dict[str, object], error: type[Exception], message: str
+) -> None:
+    with pytest.raises(error, match=message):
+        RepeatedCrossSectionDiD(**constructor)
+
+
+def test_multiplier_band_refuses_nonpositive_event_standard_error() -> None:
+    data = _staggered_sample()
+    data["outcome"] = (
+        data["time"]
+        + data["treatment_time"].replace(np.inf, 0.0)
+        + 2.0 * ((data["treatment_time"] == 2.0) & (data["time"] >= 2.0)).astype(float)
+    )
+    with pytest.raises(ValueError, match="positive finite standard error"):
+        _fit(
+            data,
+            inference="multiplier_bootstrap",
+            bootstrap_iterations=99,
+            random_state=1,
+        )
+
+
+@pytest.mark.simulation
+def test_observation_multiplier_band_has_seeded_joint_coverage_smoke() -> None:
+    repetitions = 100
+    jointly_covered = 0
+    truth = np.array([1.5, 1.5])
+    for seed in range(repetitions):
+        rng = np.random.default_rng(seed)
+        rows: list[dict[str, float]] = []
+        for cohort, level in ((2.0, 0.0), (3.0, 0.4), (np.inf, -0.2)):
+            for period in (1.0, 2.0, 3.0):
+                effect = 0.0
+                if cohort == 2.0 and period == 2.0:
+                    effect = 1.0
+                elif cohort == 2.0 and period == 3.0:
+                    effect = 1.5
+                elif cohort == 3.0 and period == 3.0:
+                    effect = 2.0
+                for outcome in level + 0.3 * period + effect + rng.normal(size=80):
+                    rows.append(
+                        {
+                            "outcome": float(outcome),
+                            "time": period,
+                            "treatment_time": cohort,
+                        }
+                    )
+        result = _fit(
+            pd.DataFrame(rows),
+            inference="multiplier_bootstrap",
+            bootstrap_iterations=199,
+            random_state=seed + 10_000,
+        )
+        band = result.simultaneous_event_study
+        jointly_covered += int(
+            np.all(truth >= band["lower"].to_numpy(dtype=float))
+            and np.all(truth <= band["upper"].to_numpy(dtype=float))
+        )
+
+    assert jointly_covered >= 88
+
+
 @pytest.mark.parametrize(
     ("constructor", "message"),
     [
@@ -207,7 +433,7 @@ def test_clustered_cr1_covariance_is_reconstructed_from_psu_scores() -> None:
         ({"anticipation": -1}, "anticipation"),
         ({"anticipation": 0.5}, "anticipation"),
         ({"covariance": "homoskedastic"}, "covariance"),
-        ({"inference": "multiplier_bootstrap"}, "inference"),
+        ({"inference": "ordinary_bootstrap"}, "inference"),
     ],
 )
 def test_constructor_refuses_unsupported_contracts(
