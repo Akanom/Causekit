@@ -1,0 +1,3 @@
+# Reviewed parity outputs are byte-pinned artifacts. Preserve the exact line endings
+# written by the originating R or Stata run so SHA-256 certificates survive checkout.
+benchmarks/validate_*_output.txt -text -diff

@@ -525,11 +525,11 @@ def _fold_assignments(
         folds[positions] = np.arange(nobs) % n_splits
         return folds
     for label in pd.unique(strata):
-        positions = np.flatnonzero(strata.to_numpy() == label)
-        if len(positions) < n_splits:
+        stratum_positions = np.flatnonzero(strata.to_numpy() == label)
+        if len(stratum_positions) < n_splits:
             raise ValueError("Each stratum must contain at least n_splits observations.")
-        rng.shuffle(positions)
-        folds[positions] = np.arange(len(positions)) % n_splits
+        rng.shuffle(stratum_positions)
+        folds[stratum_positions] = np.arange(len(stratum_positions)) % n_splits
     return folds
 
 

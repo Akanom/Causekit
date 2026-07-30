@@ -2246,8 +2246,9 @@ class EfficientDiD:
                         f"No admissible PT-All generated outcomes exist for cohort {cohort}."
                     )
                 influence_matrix = np.vstack(candidate_influences)
+                candidate_weights: np.ndarray
                 if len(candidate_influences) == 1:
-                    weights = np.ones(1)
+                    candidate_weights = np.ones(1)
                     condition_number = 1.0
                 else:
                     covariance_matrix = np.atleast_2d(np.cov(influence_matrix, ddof=1))
@@ -2271,12 +2272,12 @@ class EfficientDiD:
                         raise ValueError(
                             "The efficient weight normalization is singular or non-finite."
                         )
-                    weights = solved / denominator
-                att = float(weights @ np.asarray(candidate_atts))
-                efficient_influence = weights @ influence_matrix
+                    candidate_weights = solved / denominator
+                att = float(candidate_weights @ np.asarray(candidate_atts))
+                efficient_influence = candidate_weights @ influence_matrix
                 public_time = float(panel.times[target_position])
                 for weight, candidate_att, metadata, candidate_if in zip(
-                    weights,
+                    candidate_weights,
                     candidate_atts,
                     candidate_metadata,
                     candidate_influences,

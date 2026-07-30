@@ -126,6 +126,7 @@ def wald_test(
             raise ValueError(f"Unknown parameters: {sorted(unknown)}.")
         for name, weight in row.items():
             matrix[row_index, result.params.index.get_loc(name)] = float(weight)
+    null_values: np.ndarray
     if isinstance(values, (int, float, np.integer, np.floating)):
         null_values = np.full(len(rows), float(values))
     else:
