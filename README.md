@@ -745,7 +745,7 @@ attrition correction, or multi-arm experiments.
 
 ## Installation
 
-From PyPI after publication:
+From PyPI:
 
 ```bash
 python -m pip install causekit==0.7.0a6
@@ -782,14 +782,14 @@ reviewed notebook serves both Kaggle and Google Colab:
 - [`notebooks/kaggle/causekit_quickstart.ipynb`](notebooks/kaggle/causekit_quickstart.ipynb)
 - [Open the notebook in Google Colab](https://colab.research.google.com/github/Akanom/Causekit/blob/main/notebooks/kaggle/causekit_quickstart.ipynb)
 - [Cloud notebook publication and security guide](docs/CLOUD_NOTEBOOKS.md)
+- [Maintainer release procedure](docs/RELEASING.md)
 
 The notebook downloads only registered hash-pinned public data, exercises randomized,
 observational ML, matching, conventional DiD, RD/graphing, and OutputHub paths, and keeps
 identification caveats beside the output. It is an executable example, not a replacement
-for the formal parity harness. Until CauseKit is published on PyPI, build the wheel with
-`python -m build`, upload it in Colab or attach it as a private Kaggle input, and let the
-bounded install cell consume that exact wheel. An unauthenticated install from the private
-development repository is intentionally unsupported.
+for the formal parity harness. Its bounded install cell consumes the exact
+`causekit==0.7.0a6` PyPI release; it does not clone the private development repository or
+request a GitHub token.
 
 ## Real-world workflow
 

@@ -14,6 +14,7 @@ authors:
   - family-names: Akanbi
     given-names: "Oluwajuwon Mayomi"
 version: 0.7.0a6
+date-released: 2026-07-30
 repository-code: "https://github.com/Akanom/causekit"
 url: "https://github.com/Akanom/causekit"
 license: MIT
