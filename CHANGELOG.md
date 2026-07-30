@@ -4,7 +4,7 @@ All notable changes to CauseKit are recorded here. The project follows
 [Semantic Versioning](https://semver.org/) once a public contract is released. Alpha
 versions may refine APIs, but breaking changes must still be documented explicitly.
 
-## [0.7.0a6] - Unreleased
+## [0.7.0a6] - 2026-07-30
 
 ### Added
 
@@ -14,10 +14,14 @@ versions may refine APIs, but breaking changes must still be documented explicit
   conventional DiD, RD graphing, and OutputHub while keeping identification boundaries
   visible. Kaggle metadata, stale-module eviction, empty-output checks, and a cloud
   publication/security guide are included.
-- The cloud install cell now consumes an exact locally built wheel, discovers Colab
-  uploads and Kaggle inputs, and enforces a three-minute installation timeout. It no
-  longer attempts an unauthenticated VCS installation from the private development
-  repository.
+- The cloud install cell now consumes the exact `causekit==0.7.0a6` PyPI release with
+  a three-minute installation timeout. It no longer attempts an unauthenticated VCS
+  installation from the private development repository or requires users to upload a
+  locally built wheel.
+- A release-only PyPI Trusted Publishing workflow separates distribution construction
+  from the OIDC-authorized upload, verifies that the release tag matches package
+  metadata, pins every action by commit, and publishes PyPI attestations without a
+  stored API token.
 - A cross-platform parity portability gate. Hash-bound Python/R/Stata generator sources
   now have explicit LF checkout rules, the saved-artifact validation suite passes with
   `core.autocrlf` enabled, and a matrix-completeness test refuses unregistered public

@@ -30,19 +30,20 @@ def test_cloud_notebook_is_clean_valid_and_portable() -> None:
             assert cell["outputs"] == []
 
 
-def test_install_cell_is_bounded_private_release_safe_and_evicts_stale_modules() -> None:
+def test_install_cell_is_bounded_pypi_pinned_and_evicts_stale_modules() -> None:
     install = _source(2)
 
     assert EXPECTED_VERSION in install
-    assert "WHEEL_NAME" in install
     assert "causekit[validation,plot,outputhub]" in install
-    assert 'Path("/kaggle/input")' in install
-    assert "from google.colab import files" in install
-    assert "files.upload()" in install
+    assert "=={EXPECTED_VERSION}" in install
+    assert "https://pypi.org/simple" in install
+    assert "--disable-pip-version-check" in install
     assert "timeout=180" in install
     assert "git+https://" not in install
     assert "github" not in install.lower()
     assert "token" not in install.lower()
+    assert "files.upload()" not in install
+    assert "WHEEL_NAME" not in install
     assert "tuple(sys.modules)" in install
     assert 'module_name == "causekit"' in install
     assert 'module_name.startswith("causekit.")' in install
