@@ -27,9 +27,23 @@ Python/R/Stata validation harnesses.
 ## Repository notebook
 
 The shared notebook is
-`notebooks/kaggle/causekit_quickstart.ipynb`. Its install cell pins a reviewed CauseKit
-Git commit and clears stale imported modules before re-import. It requires internet
-access for the package and registered public datasets but does not require a GPU.
+`notebooks/kaggle/causekit_quickstart.ipynb`. CauseKit is not yet on PyPI and its
+development repository is private, so an unauthenticated `git+https` installation is not
+a valid cloud setup. Build the reviewed wheel locally first:
+
+```bash
+python -m build
+```
+
+For Colab, run the install cell and select
+`dist/causekit-0.7.0a6-py3-none-any.whl` in the upload prompt. For Kaggle, upload that
+wheel as a private Kaggle dataset and attach it to the notebook as an input. The cell
+searches both environments for the exact versioned wheel, installs its validation,
+plotting, and OutputHub extras with a three-minute timeout, and clears stale imported
+modules before re-import. It never embeds or requests a GitHub token. Internet access is
+still required for public dependencies and registered public datasets; a GPU is not
+required. After CauseKit is released on PyPI, replace this wheel-upload step with an exact
+version pin and retain the timeout.
 
 To upload it to Kaggle from an authenticated machine:
 

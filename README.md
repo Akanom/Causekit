@@ -786,7 +786,10 @@ reviewed notebook serves both Kaggle and Google Colab:
 The notebook downloads only registered hash-pinned public data, exercises randomized,
 observational ML, matching, conventional DiD, RD/graphing, and OutputHub paths, and keeps
 identification caveats beside the output. It is an executable example, not a replacement
-for the formal parity harness.
+for the formal parity harness. Until CauseKit is published on PyPI, build the wheel with
+`python -m build`, upload it in Colab or attach it as a private Kaggle input, and let the
+bounded install cell consume that exact wheel. An unauthenticated install from the private
+development repository is intentionally unsupported.
 
 ## Real-world workflow
 
