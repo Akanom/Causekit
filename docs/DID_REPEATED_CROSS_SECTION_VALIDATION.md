@@ -132,8 +132,21 @@ iteration counts, noninteger seeds, invalid levels, and nonpositive event standa
 The fixed-OOF covariate fixture verifies that the multiplier layer consumes the retained
 event influence after exactly the original ten nuisance fold/task fits. A deterministic
 100-replication two-event observation-level smoke passed its preregistered joint-coverage
-gate of at least 88 covered paths. This is implementation evidence, not the still-open
-publication-scale observation/PSU joint-coverage certificate and not external-package
+gate of at least 88 covered paths.
+
+The publication certificate is reproduced with:
+
+```bash
+python benchmarks/validate_did_rcs_simultaneous_promotion.py --replications 1000 --band-iterations 999 --workers 8
+```
+
+It crosses favorable/stressed designs, unadjusted/cross-fitted scores, observation/PSU
+sampling, and both control rules. All 16 complete-event-vector cells pass with joint
+coverage `0.931–0.961` and Monte Carlo SE at most `0.0081`. All 16,000 estimator fits,
+480,000 fold-local nuisance fits, and 15,984,000 multiplier draws complete with zero
+refusals; all PSU counts and whole-cluster fold roles match, and minimum realized cell
+support is 31 PSUs. The recorded Python 3.14.6 / Windows 11 run took 451.00 seconds;
+timing is descriptive. This is internal inferential evidence, not external-package
 random-number parity.
 
 ## Public-data and performance smoke
@@ -171,9 +184,8 @@ observed covariate, two whole-hospital folds, and hospital CR1 inference. It ret
 diagnostic rows. The source is artificial and the affine/empirical nuisances are an
 execution contract, not evidence that the nuisance models or identifying assumptions are
 substantively correct. Composition-change robustness and survey weights remain open;
-covariate publication-scale pointwise coverage is promoted separately above, while
-simultaneous bands currently have hand and seeded-smoke rather than publication-scale
-joint-coverage evidence.
+covariate publication-scale pointwise and simultaneous joint-coverage evidence is
+promoted separately above.
 
 Reproduce the covariate large-sample path with:
 

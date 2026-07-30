@@ -239,6 +239,15 @@ future task can resume without reconstructing intent from chat history.
     2.117 seconds and 208.581 MiB Python-managed peak memory on the recorded environment.
     No panel entity or ordinary row-resampling bootstrap is reused.
 
+24. `0.7.0a6` repeated-cross-section simultaneous-inference promotion: a hash-bound
+    fixed-seed certificate crosses two designs, unadjusted and genuinely cross-fitted
+    covariate scores, observation and indivisible-PSU sampling, and both control rules.
+    All 16 complete event-vector cells pass joint coverage at `0.931–0.961`, with Monte
+    Carlo SE at most `0.0081` and zero refusals across 16,000 estimator fits, 480,000
+    nuisance fold fits, and 15,984,000 default-setting max-t draws. Every band metadata,
+    coordinate, cluster-count, and whole-PSU fold-role audit passes; minimum realized PSU
+    cell support is 31. No estimator code or public default changed.
+
 ## Open promotion gates
 
 - Matching still defaults to `inference="none"`. Known-score reuse-aware inference and a
@@ -257,9 +266,9 @@ future task can resume without reconstructing intent from chat history.
   available estimator-level R `did`/Stata `csdid` parity pass, with Stata aggregate SEs
   recorded as non-comparable. The covariate score has independent fixed-OOF base-R parity;
   pinned R/Stata estimator-level cells remain unavailable because their maintained public
-  paths do not implement the same score. Observation/PSU multiplier mechanics pass hand
-  and seeded-smoke gates; publication-scale joint-band coverage, compositional-change
-  robustness, and survey weights remain open.
+  paths do not implement the same score. Observation/PSU multiplier mechanics and the
+  16-cell publication-scale joint-band certificate pass; compositional-change robustness
+  and survey weights remain open.
 - The R-learner alpha is public with honest evaluation, calibration, groups, bands, graph
   data, simulations, base-R/Stata parity, performance, native nonlinear support, and two
   real-data CATE records. The next native nonlinear stage is frozen as a separate
@@ -297,14 +306,11 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Promote repeated-cross-section simultaneous inference with preregistered publication-
-   scale joint-band coverage under observation and PSU sampling for both no-covariate and
-   cross-fitted covariate paths; retain zero-refusal and fixed-seed evidence.
-2. Continue broader DiD evidence and separately contract direct-ratio nuisance support,
+1. Continue broader DiD evidence and separately contract direct-ratio nuisance support,
    composition-change robustness, and survey weights only if justified.
-3. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
+2. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
    manipulation checks, bias correction, and local estimand.
-4. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
+3. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
    effects, and clustered covariance contracts.
 
 Continue to preserve the matching tie/inference, target-population, and no-quadratic-

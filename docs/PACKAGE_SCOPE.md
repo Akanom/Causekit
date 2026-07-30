@@ -66,7 +66,9 @@ Its opt-in multiplier path draws once per observation or indivisible PSU and sup
 studentized max-t simultaneous event-study bands without nuisance refitting. Separate
 1,000-replication publication certificates cover the
 no-covariate and covariate-adjusted pointwise paths; the latter includes conditional
-placebo coverage and joint pre-trend size with genuinely fitted fold-local nuisances.
+placebo coverage and joint pre-trend size with genuinely fitted fold-local nuisances. A
+third 16-cell certificate covers the complete event vector under observation/PSU
+sampling for both paths and both control rules with zero refusals.
 
 The causal-ML surface adds `PartiallyLinearDML` for the scalar DML2 coefficient in a
 declared constant-effect partially linear model. CauseKit owns its default standardized
@@ -207,7 +209,7 @@ and validation gates:
 | Family | Required design questions before promotion |
 | --- | --- |
 | Matching extensions | Publication-scale sensitivity/coverage and available Python/R/Stata evidence pass; generic-score, selected-target, tie-expanded, clustered, survey, and bootstrap inference remain separately prohibited or deferred |
-| DiD promotion | Covariate-adjusted repeated-cross-section DiD, aligned conditional pre-trends, publication-scale pointwise coverage, and observation/PSU max-t mechanics are implemented; publication-scale joint-band coverage, composition robustness, and survey weights retain separate gates |
+| DiD promotion | Covariate-adjusted repeated-cross-section DiD, aligned conditional pre-trends, publication-scale pointwise and observation/PSU joint-band coverage are implemented; composition robustness and survey weights retain separate gates |
 | Causal ML promotion | Implement the frozen construction-cross-fitted native orthogonal-stack contract, then harden R-/DR-learners with repeated-split and publication-scale evidence; unit-level intervals, RATE, and policy evaluation retain separate contracts |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
 | Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |

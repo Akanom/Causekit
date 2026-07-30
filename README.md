@@ -496,8 +496,12 @@ nuisance fits. All 44 group/aggregate/conditional-placebo coverage cells and fou
 conditional-pre-trend size cells pass with zero refusals. This promotes pointwise
 inference evidence. Simultaneous-band mechanics pass independent observation/PSU
 identities, seeded reproduction, strict refusals, covariate integration, and a
-100-replication joint-coverage smoke; publication-scale joint coverage remains a separate
-promotion gate.
+100-replication joint-coverage smoke. The separate hash-bound simultaneous certificate
+then exercises 1,000 replications in each of 16 observation/PSU, unadjusted/cross-fitted,
+control-rule, and design cells at the public 999-draw setting. All event-vector joint-
+coverage cells pass at `0.931–0.961`, with zero refusals across 16,000 estimator fits and
+480,000 nuisance fold fits. This promotes internal coverage evidence; it does not create
+cross-software random-stream parity or relax the stationary-composition assumption.
 
 There is no formula API yet. Prepare numeric arrays, `Series`, or `DataFrame` objects
 explicitly, including categorical encoding and transformations. `add_constant=True` is
@@ -779,8 +783,10 @@ a public-data workflow, and a 100,000-row smoke. Its cross-fitted covariate path
 a separate 44-cell pointwise coverage and four-cell conditional-pre-trend-size
 certificate. Stata aggregate standard errors are explicitly non-comparable because their
 estimated-share influence differs. Repeated-cross-section observation/PSU multiplier
-bands now pass hand identities and a seeded coverage smoke; publication-scale joint-band
-coverage remains separate.
+bands now pass hand identities, a seeded coverage smoke, and a hash-bound 16-cell
+publication-scale joint-coverage certificate under both no-covariate and genuinely
+cross-fitted covariate paths. Composition-change robustness and survey weights remain
+separate.
 The causal-ML alpha includes native partially linear DML and separately contracted public
 [honest R-learner](docs/R_LEARNER_CONTRACT.md) and
 [honest DR-learner](docs/DR_LEARNER_CONTRACT.md) paths, with immutable

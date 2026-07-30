@@ -95,8 +95,8 @@ independent group-period mean scores, require the comparison cohort rule to be i
 at target and baseline, include pooled estimated-cohort-share terms, and verify staggered
 never/not-yet aggregation, unequal period sizes, row permutation, anticipation, adjacent
 placebos, HC1, and cluster-summed CR1. Missing or undersized cells, entity/panel roles,
-unsupported composition, covariates, sampling weights, simultaneous inference, and
-malformed PSUs refuse. Base R 4.5.1 reproduces the hand estimate, influence vector, and
+unsupported composition, sampling weights, malformed PSUs, and invalid simultaneous-
+inference settings refuse. Base R 4.5.1 reproduces the hand estimate, influence vector, and
 HC1 standard error. The publication certificate runs 1,000 replications in balanced and
 unequal-period designs for both control rules; all 32 group/event/calendar/ESavg cells
 pass with coverage `0.928–0.958`, SE ratios `0.938–1.029`, maximum absolute bias `0.0159`,
@@ -108,14 +108,15 @@ with zero maximum aligned difference. Aggregate SEs remain explicitly non-compar
 to period-specific versus pooled estimated-share influence. The 100,000-row benchmark
 remains maintained.
 
-The covariate path additionally requires exact shared-fold alignment across multiclass
-cohort probabilities, masked outcome-change tasks, and residual-product second-moment
-tasks; a multi-moment fixture must exercise observation-specific conditional covariance
-inversion. Tests must prove that low cohort probabilities and singular conditional
-systems refuse without clipping or repair. Simultaneous-band tests reconstruct the seeded
-Rademacher max-t critical value from entity scores and from cluster-summed scores. A fixed-
-seed Monte Carlo smoke checks bias and empirical coverage without being presented as a
-publication-scale coverage study.
+The repeated-section covariate path additionally reconstructs its normalized eight-term
+score and ratio influence, requires a shared observation/whole-PSU fold assignment, and
+refuses low probabilities without clipping or repair. Its 4,000-fit publication
+certificate covers 44 pointwise effect/placebo cells and four joint conditional-pretrend
+size cells. Simultaneous-band tests reconstruct seeded Rademacher max-t critical values
+from observation scores and PSU-summed scores. The separate fixed-seed publication
+certificate crosses two designs, both adjustment paths, both sampling units, and both
+control rules: all 16 event-vector joint-coverage cells pass at `0.931–0.961`, with zero
+refusals across 16,000 estimator fits and 480,000 fold-local nuisance fits.
 
 The recorded efficient reference is `david-loeb/edid` commit
 `f55a4a4aba14f0826f59ad7aa4af3bafaeba529b`. On the eight-entity orthogonal-score fixture,

@@ -1,0 +1,839 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-07-30T06:55:15.659835+00:00",
+  "generator": "benchmarks/validate_did_rcs_simultaneous_promotion.py",
+  "generator_sha256": "d3c495e489f5f1ebf833bfb06abef8147ceb5f4f1d3277ec904078d4375e6376",
+  "reproduction_command": "python benchmarks/validate_did_rcs_simultaneous_promotion.py --replications 1000 --band-iterations 999 --workers 8",
+  "python_version": "3.14.6",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "causekit_version": "0.7.0a6",
+  "numpy_version": "2.4.6",
+  "pandas_version": "3.0.3",
+  "joint_coverage_certificate": {
+    "seed": 20260730,
+    "band_seed_root": 73026020,
+    "replications_per_cell": 1000,
+    "band_iterations": 999,
+    "nominal_joint_coverage": 0.95,
+    "joint_coverage_gate": [
+      0.9,
+      0.99
+    ],
+    "joint_coverage_mcse_gate": 0.011,
+    "n_splits": 2,
+    "event_times": [
+      0.0,
+      1.0
+    ],
+    "event_truth": [
+      1.3333333333333333,
+      1.5
+    ],
+    "designs": {
+      "favorable_balanced": {
+        "period_sizes": [
+          480,
+          480,
+          480,
+          480
+        ],
+        "n_psus": 48,
+        "cohort_probabilities_by_x": [
+          [
+            0.26666666666666666,
+            0.13333333333333333,
+            0.6
+          ],
+          [
+            0.4,
+            0.2,
+            0.4
+          ]
+        ]
+      },
+      "stressed_overlap_unequal": {
+        "period_sizes": [
+          3600,
+          2400,
+          1800,
+          1440
+        ],
+        "n_psus": 80,
+        "cohort_probabilities_by_x": [
+          [
+            0.05,
+            0.05,
+            0.9
+          ],
+          [
+            0.6166666666666667,
+            0.2833333333333333,
+            0.1
+          ]
+        ]
+      }
+    },
+    "dgp_contract": {
+      "unadjusted": "Independent repeated sections with stationary cohort composition and unconditional parallel trends.",
+      "covariate": "Independent repeated sections with stationary binary-X-dependent cohort composition and conditional parallel trends containing time-by-X trends.",
+      "psu": "Balanced recurring PSU labels with independent PSU-by-period-by-cohort shocks plus idiosyncratic errors; one multiplier and one cross-fit fold role per indivisible PSU."
+    },
+    "nuisance_contract": "Two-fold fold-local saturated binary-X propensity and outcome nuisances; no oracle predictions, clipping, trimming, refitting, or refused-fit redraws.",
+    "total_estimator_fits": 16000,
+    "total_nuisance_fold_fits": 480000,
+    "total_multiplier_draws": 15984000,
+    "refusal_reasons": {},
+    "elapsed_seconds": 450.9956941000055,
+    "fits_per_second": 35.47705711898016,
+    "cells": [
+      {
+        "design": "favorable_balanced",
+        "adjustment": "unadjusted",
+        "sampling_unit": "observation",
+        "control_group": "never_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "event_times": [
+          0.0,
+          1.0
+        ],
+        "truth": [
+          1.3333333333333333,
+          1.5
+        ],
+        "jointly_covered": 952,
+        "joint_coverage": 0.952,
+        "joint_coverage_mcse": 0.006759881655768837,
+        "joint_coverage_wilson_95": [
+          0.936933911349866,
+          0.963606698979192
+        ],
+        "joint_coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_critical_value": 2.0583428684993628,
+        "mean_critical_value": 2.2103567955563252,
+        "maximum_critical_value": 2.4252410731874248,
+        "mean_simultaneous_half_width": 0.2579373392473688,
+        "mean_pointwise_half_width": 0.2287197504674386,
+        "mean_width_inflation_ratio": 1.1277537816976932,
+        "minimum_realized_cell": 51,
+        "minimum_realized_cell_clusters": null,
+        "minimum_nuisance_probability": null,
+        "maximum_nuisance_probability": null,
+        "nuisance_fold_fits_per_estimator": 0,
+        "sampling_unit_reported": "observation",
+        "n_clusters": null,
+        "all_band_metadata_matched": true,
+        "all_event_coordinates_matched": true,
+        "all_cluster_counts_matched": true,
+        "all_covariate_cluster_folds_indivisible": true,
+        "all_widths_finite_positive": true,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "adjustment": "unadjusted",
+        "sampling_unit": "observation",
+        "control_group": "not_yet_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "event_times": [
+          0.0,
+          1.0
+        ],
+        "truth": [
+          1.3333333333333333,
+          1.5
+        ],
+        "jointly_covered": 949,
+        "joint_coverage": 0.949,
+        "joint_coverage_mcse": 0.006956938982052382,
+        "joint_coverage_wilson_95": [
+          0.9335645136552383,
+          0.9609990572247332
+        ],
+        "joint_coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_critical_value": 2.0540570302766974,
+        "mean_critical_value": 2.2139107491179235,
+        "maximum_critical_value": 2.380175897036527,
+        "mean_simultaneous_half_width": 0.2618155993746294,
+        "mean_pointwise_half_width": 0.23178862188976151,
+        "mean_width_inflation_ratio": 1.1295670566301061,
+        "minimum_realized_cell": 51,
+        "minimum_realized_cell_clusters": null,
+        "minimum_nuisance_probability": null,
+        "maximum_nuisance_probability": null,
+        "nuisance_fold_fits_per_estimator": 0,
+        "sampling_unit_reported": "observation",
+        "n_clusters": null,
+        "all_band_metadata_matched": true,
+        "all_event_coordinates_matched": true,
+        "all_cluster_counts_matched": true,
+        "all_covariate_cluster_folds_indivisible": true,
+        "all_widths_finite_positive": true,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "adjustment": "unadjusted",
+        "sampling_unit": "psu",
+        "control_group": "never_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "event_times": [
+          0.0,
+          1.0
+        ],
+        "truth": [
+          1.3333333333333333,
+          1.5
+        ],
+        "jointly_covered": 950,
+        "joint_coverage": 0.95,
+        "joint_coverage_mcse": 0.006892024376045114,
+        "joint_coverage_wilson_95": [
+          0.9346861797557492,
+          0.9618697376072513
+        ],
+        "joint_coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_critical_value": 1.9676020917139776,
+        "mean_critical_value": 2.183614957746746,
+        "maximum_critical_value": 2.397401755860069,
+        "mean_simultaneous_half_width": 0.4455755742902773,
+        "mean_pointwise_half_width": 0.41062654972015666,
+        "mean_width_inflation_ratio": 1.0854356925478055,
+        "minimum_realized_cell": 49,
+        "minimum_realized_cell_clusters": 31,
+        "minimum_nuisance_probability": null,
+        "maximum_nuisance_probability": null,
+        "nuisance_fold_fits_per_estimator": 0,
+        "sampling_unit_reported": "cluster",
+        "n_clusters": 48,
+        "all_band_metadata_matched": true,
+        "all_event_coordinates_matched": true,
+        "all_cluster_counts_matched": true,
+        "all_covariate_cluster_folds_indivisible": true,
+        "all_widths_finite_positive": true,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "adjustment": "unadjusted",
+        "sampling_unit": "psu",
+        "control_group": "not_yet_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "event_times": [
+          0.0,
+          1.0
+        ],
+        "truth": [
+          1.3333333333333333,
+          1.5
+        ],
+        "jointly_covered": 946,
+        "joint_coverage": 0.946,
+        "joint_coverage_mcse": 0.0071473071852271785,
+        "joint_coverage_wilson_95": [
+          0.9302078451539475,
+          0.9583786862769372
+        ],
+        "joint_coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_critical_value": 2.0385657420723757,
+        "mean_critical_value": 2.1899802218671782,
+        "maximum_critical_value": 2.3607513660840347,
+        "mean_simultaneous_half_width": 0.447220587195906,
+        "mean_pointwise_half_width": 0.4109358355552528,
+        "mean_width_inflation_ratio": 1.0885997507735015,
+        "minimum_realized_cell": 49,
+        "minimum_realized_cell_clusters": 31,
+        "minimum_nuisance_probability": null,
+        "maximum_nuisance_probability": null,
+        "nuisance_fold_fits_per_estimator": 0,
+        "sampling_unit_reported": "cluster",
+        "n_clusters": 48,
+        "all_band_metadata_matched": true,
+        "all_event_coordinates_matched": true,
+        "all_cluster_counts_matched": true,
+        "all_covariate_cluster_folds_indivisible": true,
+        "all_widths_finite_positive": true,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "adjustment": "covariate",
+        "sampling_unit": "observation",
+        "control_group": "never_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "event_times": [
+          0.0,
+          1.0
+        ],
+        "truth": [
+          1.3333333333333333,
+          1.5
+        ],
+        "jointly_covered": 961,
+        "joint_coverage": 0.961,
+        "joint_coverage_mcse": 0.006122009474020767,
+        "joint_coverage_wilson_95": [
+          0.9471306895804986,
+          0.9713410390958196
+        ],
+        "joint_coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_critical_value": 2.0476632262242607,
+        "mean_critical_value": 2.2047711811128554,
+        "maximum_critical_value": 2.41612816544598,
+        "mean_simultaneous_half_width": 0.23588960886759217,
+        "mean_pointwise_half_width": 0.20968650281690004,
+        "mean_width_inflation_ratio": 1.1249039260434424,
+        "minimum_realized_cell": 54,
+        "minimum_realized_cell_clusters": null,
+        "minimum_nuisance_probability": 0.09248554913294797,
+        "maximum_nuisance_probability": 0.6145251396648045,
+        "nuisance_fold_fits_per_estimator": 60,
+        "sampling_unit_reported": "observation",
+        "n_clusters": null,
+        "all_band_metadata_matched": true,
+        "all_event_coordinates_matched": true,
+        "all_cluster_counts_matched": true,
+        "all_covariate_cluster_folds_indivisible": true,
+        "all_widths_finite_positive": true,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "adjustment": "covariate",
+        "sampling_unit": "observation",
+        "control_group": "not_yet_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "event_times": [
+          0.0,
+          1.0
+        ],
+        "truth": [
+          1.3333333333333333,
+          1.5
+        ],
+        "jointly_covered": 954,
+        "joint_coverage": 0.954,
+        "joint_coverage_mcse": 0.006624499981130654,
+        "joint_coverage_wilson_95": [
+          0.9391877960583809,
+          0.9653375072367351
+        ],
+        "joint_coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_critical_value": 2.0365576823674574,
+        "mean_critical_value": 2.2151401948540452,
+        "maximum_critical_value": 2.381753799422399,
+        "mean_simultaneous_half_width": 0.2413542790941518,
+        "mean_pointwise_half_width": 0.21356112377355,
+        "mean_width_inflation_ratio": 1.1301943363892337,
+        "minimum_realized_cell": 54,
+        "minimum_realized_cell_clusters": null,
+        "minimum_nuisance_probability": 0.07172995780590717,
+        "maximum_nuisance_probability": 0.6145251396648045,
+        "nuisance_fold_fits_per_estimator": 60,
+        "sampling_unit_reported": "observation",
+        "n_clusters": null,
+        "all_band_metadata_matched": true,
+        "all_event_coordinates_matched": true,
+        "all_cluster_counts_matched": true,
+        "all_covariate_cluster_folds_indivisible": true,
+        "all_widths_finite_positive": true,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "adjustment": "covariate",
+        "sampling_unit": "psu",
+        "control_group": "never_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "event_times": [
+          0.0,
+          1.0
+        ],
+        "truth": [
+          1.3333333333333333,
+          1.5
+        ],
+        "jointly_covered": 932,
+        "joint_coverage": 0.932,
+        "joint_coverage_mcse": 0.00796090447122687,
+        "joint_coverage_wilson_95": [
+          0.9146861384770105,
+          0.9460075421914699
+        ],
+        "joint_coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_critical_value": 2.00919750198965,
+        "mean_critical_value": 2.183631268288497,
+        "maximum_critical_value": 2.3949021931647083,
+        "mean_simultaneous_half_width": 0.43893681497534465,
+        "mean_pointwise_half_width": 0.4045372062304149,
+        "mean_width_inflation_ratio": 1.085443800224536,
+        "minimum_realized_cell": 54,
+        "minimum_realized_cell_clusters": 31,
+        "minimum_nuisance_probability": 0.09090909090909091,
+        "maximum_nuisance_probability": 0.6505376344086021,
+        "nuisance_fold_fits_per_estimator": 60,
+        "sampling_unit_reported": "cluster",
+        "n_clusters": 48,
+        "all_band_metadata_matched": true,
+        "all_event_coordinates_matched": true,
+        "all_cluster_counts_matched": true,
+        "all_covariate_cluster_folds_indivisible": true,
+        "all_widths_finite_positive": true,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "adjustment": "covariate",
+        "sampling_unit": "psu",
+        "control_group": "not_yet_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "event_times": [
+          0.0,
+          1.0
+        ],
+        "truth": [
+          1.3333333333333333,
+          1.5
+        ],
+        "jointly_covered": 939,
+        "joint_coverage": 0.939,
+        "joint_coverage_mcse": 0.007568289106528638,
+        "joint_coverage_wilson_95": [
+          0.9224198811757163,
+          0.9522202248739662
+        ],
+        "joint_coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_critical_value": 1.9830442048431958,
+        "mean_critical_value": 2.1884363250913,
+        "maximum_critical_value": 2.3913656938123387,
+        "mean_simultaneous_half_width": 0.4403771904501657,
+        "mean_pointwise_half_width": 0.4049284163577805,
+        "mean_width_inflation_ratio": 1.0878323074748544,
+        "minimum_realized_cell": 54,
+        "minimum_realized_cell_clusters": 31,
+        "minimum_nuisance_probability": 0.07488986784140969,
+        "maximum_nuisance_probability": 0.6505376344086021,
+        "nuisance_fold_fits_per_estimator": 60,
+        "sampling_unit_reported": "cluster",
+        "n_clusters": 48,
+        "all_band_metadata_matched": true,
+        "all_event_coordinates_matched": true,
+        "all_cluster_counts_matched": true,
+        "all_covariate_cluster_folds_indivisible": true,
+        "all_widths_finite_positive": true,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "adjustment": "unadjusted",
+        "sampling_unit": "observation",
+        "control_group": "never_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "event_times": [
+          0.0,
+          1.0
+        ],
+        "truth": [
+          1.3333333333333333,
+          1.5
+        ],
+        "jointly_covered": 956,
+        "joint_coverage": 0.956,
+        "joint_coverage_mcse": 0.006485676526007139,
+        "joint_coverage_wilson_95": [
+          0.9414482108495923,
+          0.9670617854115815
+        ],
+        "joint_coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_critical_value": 2.0704157036958515,
+        "mean_critical_value": 2.227610775065972,
+        "maximum_critical_value": 2.408861505028026,
+        "mean_simultaneous_half_width": 0.1373013799915425,
+        "mean_pointwise_half_width": 0.12080617944014928,
+        "mean_width_inflation_ratio": 1.1365569942290177,
+        "minimum_realized_cell": 196,
+        "minimum_realized_cell_clusters": null,
+        "minimum_nuisance_probability": null,
+        "maximum_nuisance_probability": null,
+        "nuisance_fold_fits_per_estimator": 0,
+        "sampling_unit_reported": "observation",
+        "n_clusters": null,
+        "all_band_metadata_matched": true,
+        "all_event_coordinates_matched": true,
+        "all_cluster_counts_matched": true,
+        "all_covariate_cluster_folds_indivisible": true,
+        "all_widths_finite_positive": true,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "adjustment": "unadjusted",
+        "sampling_unit": "observation",
+        "control_group": "not_yet_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "event_times": [
+          0.0,
+          1.0
+        ],
+        "truth": [
+          1.3333333333333333,
+          1.5
+        ],
+        "jointly_covered": 958,
+        "joint_coverage": 0.958,
+        "joint_coverage_mcse": 0.006343185319695463,
+        "joint_coverage_wilson_95": [
+          0.9437155747733968,
+          0.9687791144538346
+        ],
+        "joint_coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_critical_value": 2.0728249309485216,
+        "mean_critical_value": 2.2303344215439043,
+        "maximum_critical_value": 2.4073153535362657,
+        "mean_simultaneous_half_width": 0.1426506610228662,
+        "mean_pointwise_half_width": 0.12535678460219513,
+        "mean_width_inflation_ratio": 1.1379466353139638,
+        "minimum_realized_cell": 196,
+        "minimum_realized_cell_clusters": null,
+        "minimum_nuisance_probability": null,
+        "maximum_nuisance_probability": null,
+        "nuisance_fold_fits_per_estimator": 0,
+        "sampling_unit_reported": "observation",
+        "n_clusters": null,
+        "all_band_metadata_matched": true,
+        "all_event_coordinates_matched": true,
+        "all_cluster_counts_matched": true,
+        "all_covariate_cluster_folds_indivisible": true,
+        "all_widths_finite_positive": true,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "adjustment": "unadjusted",
+        "sampling_unit": "psu",
+        "control_group": "never_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "event_times": [
+          0.0,
+          1.0
+        ],
+        "truth": [
+          1.3333333333333333,
+          1.5
+        ],
+        "jointly_covered": 931,
+        "joint_coverage": 0.931,
+        "joint_coverage_mcse": 0.008014923580421711,
+        "joint_coverage_wilson_95": [
+          0.9135852797713628,
+          0.9451160544140889
+        ],
+        "joint_coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_critical_value": 2.016862659111441,
+        "mean_critical_value": 2.1943886341586323,
+        "maximum_critical_value": 2.3743227206223714,
+        "mean_simultaneous_half_width": 0.3053313727469966,
+        "mean_pointwise_half_width": 0.27702182230996814,
+        "mean_width_inflation_ratio": 1.1024584402465034,
+        "minimum_realized_cell": 188,
+        "minimum_realized_cell_clusters": 71,
+        "minimum_nuisance_probability": null,
+        "maximum_nuisance_probability": null,
+        "nuisance_fold_fits_per_estimator": 0,
+        "sampling_unit_reported": "cluster",
+        "n_clusters": 80,
+        "all_band_metadata_matched": true,
+        "all_event_coordinates_matched": true,
+        "all_cluster_counts_matched": true,
+        "all_covariate_cluster_folds_indivisible": true,
+        "all_widths_finite_positive": true,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "adjustment": "unadjusted",
+        "sampling_unit": "psu",
+        "control_group": "not_yet_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "event_times": [
+          0.0,
+          1.0
+        ],
+        "truth": [
+          1.3333333333333333,
+          1.5
+        ],
+        "jointly_covered": 940,
+        "joint_coverage": 0.94,
+        "joint_coverage_mcse": 0.007509993342207438,
+        "joint_coverage_wilson_95": [
+          0.9235289252086434,
+          0.953103527324068
+        ],
+        "joint_coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_critical_value": 2.055405560559033,
+        "mean_critical_value": 2.2010533520542714,
+        "maximum_critical_value": 2.364083671905063,
+        "mean_simultaneous_half_width": 0.30635764220945816,
+        "mean_pointwise_half_width": 0.2770490761149454,
+        "mean_width_inflation_ratio": 1.1058067871990598,
+        "minimum_realized_cell": 188,
+        "minimum_realized_cell_clusters": 71,
+        "minimum_nuisance_probability": null,
+        "maximum_nuisance_probability": null,
+        "nuisance_fold_fits_per_estimator": 0,
+        "sampling_unit_reported": "cluster",
+        "n_clusters": 80,
+        "all_band_metadata_matched": true,
+        "all_event_coordinates_matched": true,
+        "all_cluster_counts_matched": true,
+        "all_covariate_cluster_folds_indivisible": true,
+        "all_widths_finite_positive": true,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "adjustment": "covariate",
+        "sampling_unit": "observation",
+        "control_group": "never_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "event_times": [
+          0.0,
+          1.0
+        ],
+        "truth": [
+          1.3333333333333333,
+          1.5
+        ],
+        "jointly_covered": 948,
+        "joint_coverage": 0.948,
+        "joint_coverage_mcse": 0.007021111023192843,
+        "joint_coverage_wilson_95": [
+          0.93244426068072,
+          0.9601269637162226
+        ],
+        "joint_coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_critical_value": 2.0182630825826893,
+        "mean_critical_value": 2.1899263150258004,
+        "maximum_critical_value": 2.4010720990617087,
+        "mean_simultaneous_half_width": 0.2509861215717911,
+        "mean_pointwise_half_width": 0.224640959245392,
+        "mean_width_inflation_ratio": 1.1173298755995822,
+        "minimum_realized_cell": 198,
+        "minimum_realized_cell_clusters": null,
+        "minimum_nuisance_probability": 0.028350515463917526,
+        "maximum_nuisance_probability": 0.903125,
+        "nuisance_fold_fits_per_estimator": 60,
+        "sampling_unit_reported": "observation",
+        "n_clusters": null,
+        "all_band_metadata_matched": true,
+        "all_event_coordinates_matched": true,
+        "all_cluster_counts_matched": true,
+        "all_covariate_cluster_folds_indivisible": true,
+        "all_widths_finite_positive": true,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "adjustment": "covariate",
+        "sampling_unit": "observation",
+        "control_group": "not_yet_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "event_times": [
+          0.0,
+          1.0
+        ],
+        "truth": [
+          1.3333333333333333,
+          1.5
+        ],
+        "jointly_covered": 954,
+        "joint_coverage": 0.954,
+        "joint_coverage_mcse": 0.006624499981130654,
+        "joint_coverage_wilson_95": [
+          0.9391877960583809,
+          0.9653375072367351
+        ],
+        "joint_coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_critical_value": 2.0523092017128257,
+        "mean_critical_value": 2.219671487429892,
+        "maximum_critical_value": 2.390698885101716,
+        "mean_simultaneous_half_width": 0.2545049367682508,
+        "mean_pointwise_half_width": 0.22473633531598575,
+        "mean_width_inflation_ratio": 1.132506262838694,
+        "minimum_realized_cell": 198,
+        "minimum_realized_cell_clusters": null,
+        "minimum_nuisance_probability": 0.028028028028028028,
+        "maximum_nuisance_probability": 0.903125,
+        "nuisance_fold_fits_per_estimator": 60,
+        "sampling_unit_reported": "observation",
+        "n_clusters": null,
+        "all_band_metadata_matched": true,
+        "all_event_coordinates_matched": true,
+        "all_cluster_counts_matched": true,
+        "all_covariate_cluster_folds_indivisible": true,
+        "all_widths_finite_positive": true,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "adjustment": "covariate",
+        "sampling_unit": "psu",
+        "control_group": "never_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "event_times": [
+          0.0,
+          1.0
+        ],
+        "truth": [
+          1.3333333333333333,
+          1.5
+        ],
+        "jointly_covered": 943,
+        "joint_coverage": 0.943,
+        "joint_coverage_mcse": 0.007331507348424336,
+        "joint_coverage_wilson_95": [
+          0.9268629323405141,
+          0.9557465596412841
+        ],
+        "joint_coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_critical_value": 2.0141324323539047,
+        "mean_critical_value": 2.178360896214151,
+        "maximum_critical_value": 2.369433522821975,
+        "mean_simultaneous_half_width": 0.39536623945689175,
+        "mean_pointwise_half_width": 0.36139190434811835,
+        "mean_width_inflation_ratio": 1.0944061223025001,
+        "minimum_realized_cell": 202,
+        "minimum_realized_cell_clusters": 70,
+        "minimum_nuisance_probability": 0.029177718832891247,
+        "maximum_nuisance_probability": 0.8980169971671388,
+        "nuisance_fold_fits_per_estimator": 60,
+        "sampling_unit_reported": "cluster",
+        "n_clusters": 80,
+        "all_band_metadata_matched": true,
+        "all_event_coordinates_matched": true,
+        "all_cluster_counts_matched": true,
+        "all_covariate_cluster_folds_indivisible": true,
+        "all_widths_finite_positive": true,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "adjustment": "covariate",
+        "sampling_unit": "psu",
+        "control_group": "not_yet_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "event_times": [
+          0.0,
+          1.0
+        ],
+        "truth": [
+          1.3333333333333333,
+          1.5
+        ],
+        "jointly_covered": 937,
+        "joint_coverage": 0.937,
+        "joint_coverage_mcse": 0.007683163410991592,
+        "joint_coverage_wilson_95": [
+          0.920205076295354,
+          0.9504503367882711
+        ],
+        "joint_coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_critical_value": 2.039982023037605,
+        "mean_critical_value": 2.2049995044943027,
+        "maximum_critical_value": 2.400563293643531,
+        "mean_simultaneous_half_width": 0.4019321313068639,
+        "mean_pointwise_half_width": 0.36289259036515886,
+        "mean_width_inflation_ratio": 1.1077893298518475,
+        "minimum_realized_cell": 202,
+        "minimum_realized_cell_clusters": 70,
+        "minimum_nuisance_probability": 0.029177718832891247,
+        "maximum_nuisance_probability": 0.8970814132104454,
+        "nuisance_fold_fits_per_estimator": 60,
+        "sampling_unit_reported": "cluster",
+        "n_clusters": 80,
+        "all_band_metadata_matched": true,
+        "all_event_coordinates_matched": true,
+        "all_cluster_counts_matched": true,
+        "all_covariate_cluster_folds_indivisible": true,
+        "all_widths_finite_positive": true,
+        "status": "pass"
+      }
+    ],
+    "audit": {
+      "seed_derivation": "numpy.random.SeedSequence",
+      "fixed_root_seed": 20260730,
+      "fixed_band_seed_root": 73026020,
+      "all_band_metadata_matched": true,
+      "all_event_coordinates_matched": true,
+      "all_cluster_counts_matched": true,
+      "all_covariate_cluster_folds_indivisible": true,
+      "zero_refusal_gate": true
+    },
+    "status": "pass"
+  },
+  "overall_status": "pass"
+}

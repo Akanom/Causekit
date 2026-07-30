@@ -125,8 +125,11 @@ evidence without manufacturing estimator-level parity where no aligned external 
 exists.
 The observation/PSU simultaneous layer is likewise validated against direct retained-
 influence reconstructions in Python. R/Stata pseudo-random streams or resampling commands
-are not relabelled as exact parity for CauseKit's seeded Rademacher sequence; publication-
-scale joint-band coverage remains a separate internal promotion gate.
+are not relabelled as exact parity for CauseKit's seeded Rademacher sequence. The separate
+hash-bound `benchmarks/did_rcs_simultaneous_promotion_evidence.json` certificate records
+16,000 estimator fits, 480,000 fold-local nuisance fits, 15,984,000 fixed-seed max-t
+draws, zero refusals, and 16 passing publication-scale joint-coverage cells. This is
+internal inferential evidence, not manufactured cross-language random-number parity.
 
 The fixed-score matching R harness is `benchmarks/validate_matching_reference.R`. It
 pins CRAN `Matching` commit `1208eaa7bfa888b1fc903481dddfb8c0dffa40d5`

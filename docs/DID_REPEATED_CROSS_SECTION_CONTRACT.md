@@ -237,8 +237,13 @@ Current promotion status is:
     roles, invalid configuration, and zero-standard-error refusals pass. The covariate
     integration test verifies that bands reuse retained OOF influence scores without an
     extra nuisance fit. A 100-replication, two-event observation-level joint-coverage
-    smoke passes its frozen `>= 88/100` gate. Publication-scale observation and PSU joint-
-    coverage certificates remain a separate promotion gate.
+    smoke passes its frozen `>= 88/100` gate.
+11. The hash-bound simultaneous certificate fixes 1,000 replications per cell, 999 max-t
+    draws, two designs, both control rules, observation/PSU sampling, and unadjusted or
+    genuinely cross-fitted covariate scores. All 16 complete-event-vector joint-coverage
+    cells pass at `0.931–0.961`; Monte Carlo SE is at most `0.0081`, all 16,000 fits and
+    480,000 nuisance fold fits complete, the narrowest realized PSU cell spans 31
+    clusters, and the refusal ledger is empty. Seeds and indivisible PSU roles are audited.
 
 ## Alternatives considered
 

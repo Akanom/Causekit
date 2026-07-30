@@ -57,6 +57,13 @@ versions may refine APIs, but breaking changes must still be documented explicit
   100-replication joint-coverage smoke pass. A bounded-batch 100,000-row/four-event/999-
   draw benchmark completes in 2.117 seconds with 208.581 MiB Python-managed peak memory
   on the recorded environment.
+- A hash-bound publication-scale simultaneous-inference certificate spanning favorable
+  and stressed designs, unadjusted and cross-fitted covariate scores, observation and
+  indivisible-PSU sampling, and both control rules. Its 16,000 estimator fits, 480,000
+  fold-local nuisance fits, and 15,984,000 fixed-seed max-t draws complete with zero
+  refusals. All 16 event-vector joint-coverage cells pass at `0.931–0.961`; maximum
+  Monte Carlo SE is `0.0081`, minimum realized PSU cell support is 31 clusters, and all
+  whole-PSU fold-role audits pass.
 
 ### Changed
 
@@ -75,7 +82,9 @@ versions may refine APIs, but breaking changes must still be documented explicit
   unavailable where reviewed R/Stata public paths target different moments.
 - Stata `csdid` aggregate standard errors are non-comparable to the maintained pooled-
   cohort-share uncertainty contract. Observation/PSU band mechanics pass hand identities
-  and a seeded smoke; publication-scale joint-band coverage remains open.
+  and the internal publication-scale joint-coverage certificate. Exact seeded resampling
+  parity with R/Stata remains unavailable because their random streams and maintained
+  resampling contracts differ.
 
 ## [0.7.0a5] - Unreleased
 
