@@ -6,7 +6,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from causalkit import CrossFitter, DiDResult, DifferenceInDifferences, EfficientDiD
+from causekit import (
+    CrossFitter,
+    DiDHausmanDiagnostic,
+    DiDPretrendDiagnostic,
+    DiDResult,
+    DifferenceInDifferences,
+    EfficientDiD,
+    did_hausman_test,
+)
 
 FIT_COLUMNS = {
     "outcome": "outcome",
@@ -238,6 +246,161 @@ def test_efficient_hand_computed_weights_att_and_precision_gain() -> None:
     assert efficient.method == "chen_santanna_xie_efficient"
 
 
+def test_pretrend_diagnostic_recovers_hand_computed_placebos_and_joint_wald() -> None:
+    result = _fit(DifferenceInDifferences(), _efficient_hand_panel())
+
+    assert isinstance(result.pretrend, DiDPretrendDiagnostic)
+    assert result.pretrend.available
+    assert result.pretrend.reason is None
+    assert result.pretrend.n_restrictions == 2
+    assert result.pretrend.distribution == "chi2"
+    assert result.pretrend.df_num == 2
+    assert result.pretrend.df_denom is None
+    assert result.pretrend.statistic == pytest.approx(0.0, abs=1e-14)
+    assert result.pretrend.pvalue == pytest.approx(1.0, abs=1e-14)
+    assert result.pretrend.placebo_effects.index.tolist() == [(4.0, 2.0), (4.0, 3.0)]
+    np.testing.assert_allclose(result.pretrend.placebo_effects["att"], 0.0, atol=1e-14)
+    assert result.pretrend.placebo_effects["event_time"].tolist() == [-2, -1]
+
+    h1 = np.array([1.0, 1.0, -1.0, -1.0])
+    h2 = np.array([1.0, -1.0, 1.0, -1.0])
+    h3 = np.array([1.0, -1.0, -1.0, 1.0])
+    expected_influence = np.column_stack(
+        [
+            np.r_[np.zeros(4), 2 * (h1 - 2 * h2)],
+            np.r_[np.zeros(4), 2 * (2 * h2 - 4 * h3)],
+        ]
+    )
+    np.testing.assert_allclose(result.pretrend.influence, expected_influence, atol=1e-14)
+    expected_covariance = expected_influence.T @ expected_influence / (8 * 7)
+    np.testing.assert_allclose(result.pretrend.covariance, expected_covariance, atol=1e-14)
+
+
+def test_pretrend_excludes_the_declared_anticipation_window() -> None:
+    result = _fit(DifferenceInDifferences(anticipation=1), _efficient_hand_panel())
+
+    assert result.pretrend.placebo_effects.index.tolist() == [(4.0, 2.0)]
+    assert result.pretrend.placebo_effects["event_time"].tolist() == [-2]
+
+
+def test_clustered_pretrend_covariance_uses_one_score_sum_per_cluster() -> None:
+    data = _efficient_hand_panel()
+    data["cluster"] = data["entity"].str.rsplit("_", n=1).str[-1]
+    result = _fit(
+        DifferenceInDifferences(covariance="clustered"),
+        data,
+        cluster="cluster",
+    )
+
+    scores = result.pretrend.influence.to_numpy()
+    cluster_labels = result.inference_clusters
+    cluster_sums = np.vstack(
+        [
+            scores[cluster_labels.to_numpy() == label].sum(axis=0)
+            for label in pd.unique(cluster_labels)
+        ]
+    )
+    expected = 4 / 3 * cluster_sums.T @ cluster_sums / result.n_entities**2
+    np.testing.assert_allclose(result.pretrend.covariance, expected, atol=1e-14)
+    assert result.pretrend.distribution == "f"
+    assert result.pretrend.df_num == 2
+    assert result.pretrend.df_denom == 3
+
+
+def test_pretrend_is_explicitly_unavailable_without_clean_placebo_periods() -> None:
+    result = _fit(DifferenceInDifferences(), _covariate_panel().drop(columns="x"))
+
+    assert not result.pretrend.available
+    assert result.pretrend.n_restrictions == 0
+    assert result.pretrend.placebo_effects.empty
+    assert "uncontaminated" in str(result.pretrend.reason)
+
+
+def test_pretrend_retains_placebos_but_refuses_a_singular_joint_test() -> None:
+    data = _efficient_hand_panel()
+    patterns = {
+        f"treated_{position}": value for position, value in enumerate((1.0, -1.0, 1.0, -1.0))
+    }
+    for entity, value in patterns.items():
+        mask = data["entity"].eq(entity)
+        data.loc[mask, "outcome"] = np.array([0.0, value, 2 * value, 3.0 + 2 * value])
+    result = _fit(DifferenceInDifferences(), data)
+
+    assert not result.pretrend.available
+    assert result.pretrend.n_restrictions == 2
+    assert len(result.pretrend.placebo_effects) == 2
+    assert "no ridge or pseudoinverse" in str(result.pretrend.reason)
+
+
+def test_covariate_efficient_pretrend_refuses_to_mislabel_an_unadjusted_test() -> None:
+    result = _fit(
+        EfficientDiD(),
+        _covariate_panel(),
+        covariates=["x"],
+        cross_fitter=_did_cross_fitter(),
+    )
+
+    assert not result.pretrend.available
+    assert result.pretrend.placebo_effects.empty
+    assert "conditional" in str(result.pretrend.reason)
+
+
+def test_hausman_diagnostic_uses_common_event_path_and_difference_influence() -> None:
+    data = _efficient_hand_panel()
+    conventional = _fit(DifferenceInDifferences(), data)
+    efficient = _fit(EfficientDiD(pre_periods="all"), data)
+
+    diagnostic = did_hausman_test(conventional, efficient)
+
+    assert isinstance(diagnostic, DiDHausmanDiagnostic)
+    assert diagnostic.n_restrictions == 1
+    assert diagnostic.distribution == "chi2"
+    assert diagnostic.df_num == 1
+    assert diagnostic.df_denom is None
+    assert diagnostic.statistic == pytest.approx(0.0, abs=1e-14)
+    assert diagnostic.pvalue == pytest.approx(1.0, abs=1e-14)
+    assert not diagnostic.reject
+    assert diagnostic.recommendation == "pt_all_not_rejected"
+    assert diagnostic.event_study.index.tolist() == [0]
+    assert diagnostic.event_study.loc[0, "pt_post"] == pytest.approx(10.0)
+    assert diagnostic.event_study.loc[0, "pt_all"] == pytest.approx(10.0)
+
+    expected_influence = (
+        efficient.event_study_influence.loc[:, [0]].to_numpy()
+        - conventional.event_study_influence.loc[:, [0]].to_numpy()
+    )
+    np.testing.assert_allclose(diagnostic.influence, expected_influence, atol=1e-14)
+    expected_covariance = expected_influence.T @ expected_influence / (8 * 7)
+    np.testing.assert_allclose(diagnostic.covariance, expected_covariance, atol=1e-14)
+
+
+def test_hausman_diagnostic_refuses_incompatible_or_unsupported_results() -> None:
+    data = _efficient_hand_panel()
+    conventional = _fit(DifferenceInDifferences(), data)
+    efficient = _fit(EfficientDiD(), data)
+
+    with pytest.raises(ValueError, match="first argument"):
+        did_hausman_test(efficient, conventional)
+    with pytest.raises(ValueError, match="never-treated"):
+        did_hausman_test(
+            _fit(DifferenceInDifferences(control_group="not_yet_treated"), data),
+            efficient,
+        )
+    altered = data.copy()
+    altered.loc[altered["entity"] == "treated_0", "outcome"] += 0.25
+    with pytest.raises(ValueError, match="same estimation sample"):
+        did_hausman_test(conventional, _fit(EfficientDiD(), altered))
+
+
+def test_hausman_diagnostic_refuses_singular_difference_covariance() -> None:
+    data = _covariate_panel().drop(columns="x")
+    conventional = _fit(DifferenceInDifferences(), data)
+    efficient = _fit(EfficientDiD(), data)
+
+    with pytest.raises(ValueError, match="no ridge or pseudoinverse"):
+        did_hausman_test(conventional, efficient)
+
+
 def test_efficient_result_exposes_candidate_and_aggregate_influence_identities() -> None:
     result = _fit(EfficientDiD(), _efficient_hand_panel())
     weights = result.efficiency_weights.sort_values("bridge_period")["weight"].to_numpy()
@@ -330,6 +493,11 @@ def test_row_permutation_does_not_change_results() -> None:
 
     pd.testing.assert_frame_equal(original.group_time, permuted.group_time)
     pd.testing.assert_frame_equal(original.event_study, permuted.event_study)
+    pd.testing.assert_frame_equal(
+        original.pretrend.placebo_effects,
+        permuted.pretrend.placebo_effects,
+    )
+    assert original.design_fingerprint == permuted.design_fingerprint
 
 
 def test_clustered_overall_variance_uses_cluster_summed_entity_scores() -> None:

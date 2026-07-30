@@ -1,6 +1,6 @@
 # Validation strategy
 
-`causalkit` separates implementation checks from evidence claims. A command returning
+`causekit` separates implementation checks from evidence claims. A command returning
 success in one environment supports the tested version, fixture, specification, comparator,
 and tolerance. It does not establish universal numerical parity or validate an empirical
 instrument.
@@ -16,6 +16,15 @@ alignment, cluster-sum covariance, and a large vectorized smoke path. Nuisance p
 used in empirical validation must record whether they are oracle, fixed low-complexity,
 held-out, or cross-fitted; in-sample adaptive predictions cannot be presented as validated
 cross-fitted inference.
+
+For fixed-effects Panel IV, maintained tests must reconstruct a hand-computed within 2SLS
+coefficient, entity-cluster score meat, full absorbed-rank CR1 correction, residual degrees
+of freedom, partial first-stage R-squared, and classical F statistic. Balanced and
+connected unbalanced two-way panels must agree with explicit fixed-effect dummy 2SLS.
+Entity/time duplication, singleton entities, disconnected two-way graphs, role overlap,
+absorbed variables, order/rank failure, non-nested clusters, and invalid missing policies
+must refuse. Promotion additionally requires hash-pinned real data, Python/R/Stata parity,
+serial-error recovery/coverage, and a no-dummy/no-quadratic performance certificate.
 
 For nearest-neighbor matching, point-estimation evidence begins with hand-computed ATT,
 ATC, and bidirectional ATE examples. It must also reconstruct fractional tie weights,
@@ -35,14 +44,43 @@ and clustered inference. Its Stata/MP 17 `teffects nnmatch` output is recorded.
 
 The estimated-Logit path has hand-reconstructed ATT, ATC, and ATE adjustment vectors,
 target derivatives, normalized information, variances, and standard errors. An independent
-`statsmodels.Logit` fixture verifies fitted-result consumption without re-estimation, and
-the public protocol has been exercised directly with `limiteddepkit.BinaryLogitResult`.
+`statsmodels.Logit` fixture verifies provider-neutral fitted-result consumption without
+re-estimation.
 Refusals cover missing first-step structure, nonstationary/penalized fits, convergence,
 sample/feature/parameter/prediction/index drift, singular information, wrong score status
 or metric, and support/caliper selection. A fixed-seed 40-replication ATE smoke checks
 recovery, standard-error scale, and interval coverage. This evidence does not extend to
-generic or cross-fitted learners. The Stata `teffects psmatch` harness awaits a manual run;
-R `Matching` is non-comparable because it treats the supplied score as fixed.
+generic or cross-fitted learners. The reviewed Stata/IC 17 `teffects psmatch` artifact
+passes the ATT/ATC/ATE point, known-variance, first-step, and final-standard-error
+components at `1e-8`; R `Matching` is non-comparable because it treats the supplied score
+as fixed.
+
+For partially linear DML, maintained tests reconstruct the DML2 coefficient, orthogonal
+score, influence function, residual-treatment Jacobian, HC1 covariance, cluster-summed CR1
+covariance, and reference distribution. They also verify shared binary-stratified folds,
+native fold-local ridge-GCV defaults, deterministic continuous-treatment recovery,
+alignment/factory/fold/cluster refusals, and numerical residual-treatment identification.
+A supplied dense-grid test proves that nesting the default candidates weakly lowers every
+fold's selected GCV and improves at least one deterministic fold strictly. The dense grid
+is not the default because the one-run real-data OOF errors did not improve. CrossFitter
+contract tests reconstruct provider-neutral diagnostic rows and refuse malformed mappings.
+Statsmodels and base R independently reproduce the fixed residual-stage coefficient and
+HC1 standard error. The manually executed Stata/IC 17 harness writes its result before
+asserting; the reviewed saved output passes both estimate and standard-error assertions at
+the declared `1e-10` tolerance.
+
+For the honest R-learner, hand contracts reconstruct immutable row/cluster roles, shared
+cluster-preserving outer folds, `u/v` and `v^2`, the direct/weighted R-objective identity,
+held-out R-loss, the construction-fitted constant comparator, differential calibration,
+HC1/CR1 covariance, tie-preserving group moments, the full influence matrix, and the
+seeded max-t critical value. Leakage logs prove that evaluation indices never reach a fit
+target. Seeded simulations cover native linear and piecewise-nonlinear CATE recovery plus
+null/power and complete-path band-coverage smokes. Base R 4.5.1 independently reproduces
+fixed evaluation loss, calibration, and group covariance. The reviewed Stata/IC 17 do-file
+reconstructs the same HC1 moments and passes at `1e-8`; its maximum absolute difference is
+`1.56e-15`. The hash-pinned NSW benchmark retains the negative finding that no comparator
+showed significant differential calibration. The separate Hillstrom randomized-email
+record compares native linear and adaptive spline stages on one identical honest split.
 
 For DiD, maintained evidence must keep the conventional and efficient estimators
 separate. Conventional tests hand-compute every `ATT(g,t)`, event-time, calendar-time, and
@@ -53,14 +91,76 @@ singular systems without hidden regularization. Anticipation, control contaminat
 balanced-panel validation, entity-level HC scaling, cluster-summed covariance, and random
 cohort-share influence terms require direct tests.
 
-The covariate path additionally requires exact shared-fold alignment across multiclass
-cohort probabilities, masked outcome-change tasks, and residual-product second-moment
-tasks; a multi-moment fixture must exercise observation-specific conditional covariance
-inversion. Tests must prove that low cohort probabilities and singular conditional
-systems refuse without clipping or repair. Simultaneous-band tests reconstruct the seeded
-Rademacher max-t critical value from entity scores and from cluster-summed scores. A fixed-
-seed Monte Carlo smoke checks bias and empirical coverage without being presented as a
-publication-scale coverage study.
+Panel diagnostic tests hand-compute adjacent uncontaminated pre-period placebos, verify
+that anticipation-window leads are excluded, reconstruct the full robust and cluster-
+summed joint covariance, and retain individual placebos when a singular joint test is
+unavailable. The PT-All/PT-Post Hausman contract reconstructs the common post-treatment
+event-study difference influence function and covariance, hashes the complete estimation
+design, and refuses not-yet-treated, covariate-adjusted, mismatched, reduced-moment, and
+singular comparisons without pseudoinverse rank selection.
+
+The covariate-adjusted direct cohort-odds route separately reconstructs posterior-odds
+calibration (including unequal cohort priors), pair orientation, the scale-sensitive
+candidate score, `Omega_tilde = p_g Omega`, conditional weights, candidate/aggregate
+influence, HC1, shared entity/whole-cluster folds, and every overlap/refusal threshold.
+The promotion harness compares direct, binary-multiclass, and oracle odds on identical
+folds in nonlinear favorable- and weak-overlap designs, including pointwise and max-t
+coverage. A frozen three-class underflow case demonstrates the direct route's stability
+benefit: an irrelevant dominant class can make two score-relevant multiclass
+probabilities numerically zero even though their restricted binary odds remain finite.
+The hash-pinned hospital sensitivity holds the sample, folds, candidates, outcome and
+second-moment nuisances, and seeds fixed across routes; it is sensitivity evidence and
+does not validate conditional PT-All. Base R 4.5.1 independently reproduces the fixed-
+fold score and full influence vector. Stata estimator parity is unavailable for the same
+moment. Reproduction commands are documented in
+`docs/DID_DIRECT_RATIO_PROMOTION_EVIDENCE.md`.
+
+Repeated-cross-section DiD has a separate validation path. Tests reconstruct all four
+independent group-period mean scores, require the comparison cohort rule to be identical
+at target and baseline, include pooled estimated-cohort-share terms, and verify staggered
+never/not-yet aggregation, unequal period sizes, row permutation, anticipation, adjacent
+placebos, HC1, and cluster-summed CR1. Missing or undersized cells, entity/panel roles,
+unsupported composition, sampling weights, malformed PSUs, and invalid simultaneous-
+inference settings refuse. Base R 4.5.1 reproduces the hand estimate, influence vector, and
+HC1 standard error. The publication certificate runs 1,000 replications in balanced and
+unequal-period designs for both control rules; all 32 group/event/calendar/ESavg cells
+pass with coverage `0.928–0.958`, SE ratios `0.938–1.029`, maximum absolute bias `0.0159`,
+and zero refusals. Pinned R `did` 2.5.0 estimator-level parity passes every aligned point
+and SE after the declared HC0-to-HC1 mapping. A reviewed Stata 17 artifact independently
+reproduces the hand estimate and HC1 standard error at `1e-12`; the separate estimator-
+level `csdid` artifact passes all group-time estimates/analytical SEs and aggregate points
+with zero maximum aligned difference. Aggregate SEs remain explicitly non-comparable due
+to period-specific versus pooled estimated-share influence. The 100,000-row benchmark
+remains maintained.
+
+The pairwise composition-change score additionally passes official R `compdid` 0.1.0
+parity at commit `894bd65a952c30f01a4e0005efba4cb335065eb7`. The source-level harness
+verifies the relevant Git blobs, explicitly maps `(00,01,10,11)` CauseKit nuisance
+columns into `(11,10,01,00)`, and compares ATT, the HC1-equivalent standard error, and
+every ordered influence coordinate. Stata remains unavailable for this exact treated-
+target-period moment rather than being represented by a non-aligned command.
+Its separate pairwise promotion evidence verifies the official Sequeira source hash and
+derived analysis hash, fits all nuisances within five whole-PSU folds, records robust and
+stationary sensitivity jointly, passes a 100,000-row performance gate, and completes
+8,000 publication-scale estimator fits plus 72,000 nuisance fold fits with zero refusals.
+All eight observation/PSU pointwise coverage cells pass.
+The promoted longer path adds shared-fold masked multiclass tasks, zero-padded pair
+influences, target-period share aggregation, conditional placebos, max-t bands, and the
+aligned robust-minus-stationary diagnostic. Official R diagnostic mapping passes under
+fixed influences; no official aligned longer estimator is available. Its hash-pinned
+hospital sensitivity, 120,000-row benchmark, and 4,000-fit publication certificate pass
+all observation/PSU bias, SE, pointwise/joint coverage, pretrend-size, diagnostic
+size/power, and zero-refusal gates.
+
+The repeated-section covariate path additionally reconstructs its normalized eight-term
+score and ratio influence, requires a shared observation/whole-PSU fold assignment, and
+refuses low probabilities without clipping or repair. Its 4,000-fit publication
+certificate covers 44 pointwise effect/placebo cells and four joint conditional-pretrend
+size cells. Simultaneous-band tests reconstruct seeded Rademacher max-t critical values
+from observation scores and PSU-summed scores. The separate fixed-seed publication
+certificate crosses two designs, both adjustment paths, both sampling units, and both
+control rules: all 16 event-vector joint-coverage cells pass at `0.931–0.961`, with zero
+refusals across 16,000 estimator fits and 480,000 fold-local nuisance fits.
 
 The recorded efficient reference is `david-loeb/edid` commit
 `f55a4a4aba14f0826f59ad7aa4af3bafaeba529b`. On the eight-entity orthogonal-score fixture,
@@ -68,6 +168,21 @@ the public R implementation returns candidate effects `(10, 10, 10)`, weights
 `(16/21, 4/21, 1/21)`, efficient ATT `10`, and HC1 standard error
 `0.46656947481584343`. `benchmarks/validate_edid_reference.R` reproduces the reference
 values, and the optional validation test compares them with the native result.
+
+Regression discontinuity has a separate continuity-based gate. Hand tests reconstruct a
+local-constant sharp mean difference and HC1 variance, a sharp assignment audit, and a
+fuzzy local-Wald ratio. Refusals cover cutoff support, local rank/unique values,
+mass-point policy, polynomial and bandwidth order, missing/index drift, fuzzy binary and
+positive-first-stage requirements, and cluster support. The fixed-bandwidth triangular
+`p=1`, `q=2`, HC1 fixture matches Python `rdrobust` 2.0.0 and R `rdrobust` 4.0.0 for
+conventional points, first-order ratio bias correction, robust standard errors, and the
+corrected fuzzy treatment jump. The native selector has a distinct 250-replication-per-
+design coverage gate and reports candidate-boundary selection rather than claiming CCT
+bandwidth parity. The hash-pinned Head Start sensitivity and 200,000-row performance
+record are generated without redistributing source data. Artifact hashes and exact results are
+listed in [Regression discontinuity promotion evidence](RD_PROMOTION_EVIDENCE.md).
+The reviewed Stata/IC 17 `rdrobust` 11.1.0 artifact passes all aligned fields at `1e-8`; its
+maximum absolute difference is `2.31e-14`.
 
 ## Claim boundary
 
@@ -193,6 +308,7 @@ passing only after its tests have executed successfully in the recorded environm
 | One-way CR1 | Unequal cluster sizes and within-cluster dependence | Cluster scores, CR1 multiplier, `G-1` reference degrees, cluster metadata |
 | First stages | Strong, weak, multiple-instrument, multiple-endogenous cases | R-squared, partial R-squared, classical F, covariance-aware joint test and metadata |
 | Overidentification | Just identified, overidentified, every covariance label | Sargan only for overidentified unadjusted fit; correct statistic, p-value, and `q-m` df |
+| Fixed-effects Panel IV | Entity/two-way effects; balanced/unbalanced; homoskedastic, HC1, and entity/higher-level CR1 | Hand within/CR1/first-stage identities, explicit-dummy parity, absorption/connectivity/cluster refusals, real-data sensitivity, serial-error coverage, compact scaling |
 | Data contract | NumPy and pandas, missing/non-finite, misaligned indices, duplicate names | Stable success behavior or precise refusal; never silent sample drift |
 | Post-estimation | In-sample and new-data prediction, tables, Markdown | Schema enforcement, index preservation, numerical alignment |
 | Integrations | Optional dependency present and absent | Stable adapter output or actionable optional-dependency error |
@@ -202,7 +318,13 @@ passing only after its tests have executed successfully in the recorded environm
 | Conventional DiD | Single/staggered cohorts, never/not-yet controls, anticipation | Hand `ATT(g,t)`, event/calendar/ESavg targets, uncontaminated controls, influence identities |
 | Efficient DiD | Multiple pre-periods and auxiliary cohorts under PT-All | Candidate effects, inverse-covariance weights, efficient influence, singular refusal, R parity |
 | Covariate-efficient DiD | Multiple moments, valid/invalid overlap and covariance systems | OOF alignment, equation (4.4) scores, equation (3.12) weights, exact refusal boundaries |
-| DiD inference | Entity and higher-level clustered sampling | HC1/cluster score identities, pointwise metadata, robust/cluster max-t band identities |
+| DiD inference | Panel entities, repeated-section observations, and declared higher-level clusters/PSUs | HC1/CR1 score identities, pointwise metadata, sampling-unit max-t identities, seeded reproduction, and strict configuration/degeneracy refusals |
+| DiD diagnostics | Clean/no-clean/singular pre-period paths; aligned/misaligned PT-All and PT-Post | Placebo influence/covariance identities, anticipation exclusion, strict Hausman difference-IF/refusal contract |
+| Repeated-cross-section DiD | Balanced/unequal periods, never/not-yet controls, covariate/no-covariate scores | Group/aggregate/placebo identities, HC1/CR1, leakage and overlap refusals, 32-cell unadjusted and 44-cell adjusted publication coverage, conditional pre-trend size |
+| Partially linear DML | Binary/continuous treatment, native/custom nuisance, robust/clustered inference | DML2 score, OOF fold alignment, native ridge-GCV, fold tuning audit, direct GCV identity, influence/Jacobian identities, strict weak-signal refusal |
+| Honest R-learner | Binary treatment, row/cluster honesty, native/custom learners, overlap, robust/clustered calibration | Leakage/refusals, exact R-objective, held-out loss/constant gain, HC1/CR1 differential calibration, tie-preserving group moments/influence/max-t bands, simulations, R/Stata fixed-evaluation parity, real-data comparator record |
+| Causal-ML performance | One hash-verified real dataset, one identically folded run per model | Estimate, standard error, OOF outcome/treatment RMSE, elapsed time, Python peak memory, versions, no runtime comparator dependency |
+| Regression discontinuity | Sharp/fuzzy, fixed/native bandwidth, nonlinear support, mass points, robust/clustered inference | Hand point/HC1/local-Wald identities, ratio RBC, support/refusal tests, Python/R/Stata fixed-bandwidth parity, real-data sensitivity, coverage, performance |
 
 ## Cross-software parity matrix
 
@@ -213,10 +335,11 @@ tolerances, and observed discrepancy. “Unavailable” and “non-comparable”
 when a platform lacks the estimator or implements different identifying moments; neither
 state is a pass.
 
-The maintained no-covariate efficient DiD row currently pins the public R `edid`
-implementation. Covariate-efficient DiD parity and the repository-wide Python/R/Stata
-matrix remain open. Adding an arbitrary regression that happens to return a similar
-number does not satisfy this gate.
+The maintained no-covariate efficient DiD row pins the public R `edid` implementation.
+The published `edid` reference has no covariate-adjusted estimator, and the reviewed
+Stata estimators target different identifying moments; those covariate-efficient cells
+are therefore recorded as unavailable rather than fabricated parity. Adding an arbitrary
+regression that happens to return a similar number does not satisfy this gate.
 
 The live status and completion rule are maintained in [Cross-software parity
 register](PARITY.md).
@@ -265,14 +388,73 @@ python -m pytest -m simulation
 python benchmarks/benchmark_matching.py --scenario balanced_ate --n 100000 --measure-memory
 python benchmarks/benchmark_matching.py --scenario known_score_ate_inference --n 100000 --measure-memory
 python benchmarks/benchmark_matching.py --scenario estimated_score_ate_inference --n 100000 --measure-memory
-python benchmarks/validate_matching_limiteddepkit.py
 python benchmarks/benchmark_did.py --scenario all --n-entities 20000
+python benchmarks/benchmark_ml.py --models all
+python benchmarks/benchmark_ml.py --dataset nsw_mixtape --models all
+python benchmarks/benchmark_rlearner.py --models all
+python benchmarks/benchmark_rlearner_hillstrom.py --data /path/to/reviewed/hillstrom.csv
+Rscript benchmarks/validate_dml_reference.R
+Rscript benchmarks/validate_rd_reference.R
+python benchmarks/validate_rd_real_data.py
+python benchmarks/validate_rd_promotion.py
+python benchmarks/benchmark_rd.py
+python benchmarks/validate_panel_iv_real_data.py
+python benchmarks/validate_panel_iv_promotion.py
+python benchmarks/benchmark_panel_iv.py
+Rscript benchmarks/validate_panel_iv_reference.R
 ```
+
+The ML/R-learner commands are separate one-run real-data records, not benchmark
+repetitions. Their frozen results and interpretation limits are documented in
+[Causal-ML real-data performance](ML_BENCHMARK.md),
+[NSW honest R-learning](R_LEARNER_BENCHMARK.md), and
+[Hillstrom honest R-learning](R_LEARNER_HILLSTROM_BENCHMARK.md).
+
+Stata is manual: from the repository root run
+`do "benchmarks/validate_dml_stata.do"`. The harness persists
+`benchmarks/validate_dml_stata_output.txt` before any parity assertion.
+
+RD Stata parity is also manual: run `do "benchmarks/validate_rd_stata.do"`. If the
+official comparator is absent, use the versioned installation command in the do-file
+header. If Stata's Java certificate store refuses GitHub, run
+`python benchmarks/prepare_rd_stata.py` and install from its printed, hash-verified local
+Stata site instead. If Stata cannot load the distributed Mata library, pass that local
+site as the do-file's first argument; the harness compiles the pinned official Mata source
+with the running Stata version inside the cache. The harness writes
+`benchmarks/validate_rd_stata_output.txt` before assertions.
+
+Panel IV Stata parity is manual. Prepare the hash-verified real-data fixture and run the
+official explicit-dummy reference from the repository root:
+
+```text
+python benchmarks/prepare_panel_iv_stata.py --download
+do "benchmarks/validate_panel_iv_stata.do"
+```
+
+The do-file writes `benchmarks/validate_panel_iv_stata_output.txt` before assertions.
+The reviewed Stata/IC 17 artifact passes all six estimate/standard-error fields with a
+maximum absolute difference of `1.2146e-12` at tolerance `1e-8`; its SHA-256 is
+`1ac883346889ff0d9c651864b8fdf17570cb663d392fc56e883d832961f70704`.
+
+Prepare and run the pinned real-data certificate against the exact R reference checkouts:
+
+```bash
+python benchmarks/prepare_real_data.py --download
+CAUSEKIT_REAL_DATA_DIR=/path/to/prepared/data \
+CAUSEKIT_EDID_REFERENCE=/path/to/edid \
+CAUSEKIT_MATCHING_REFERENCE=/path/to/Matching \
+python -m pytest tests/validation/test_real_data_parity.py
+```
+
+Stata is a manual final gate. From the repository root, run
+`do "benchmarks/validate_real_data_stata.do"`; it writes a machine-readable result before
+asserting. Dataset provenance, comparator boundaries, and exact commands are recorded in
+[Real-data validation](REAL_DATA_VALIDATION.md).
 
 Run pinned R `edid` parity from a checkout at the recorded commit:
 
 ```bash
-CAUSALKIT_EDID_REFERENCE=/path/to/edid python -m pytest tests/validation/test_edid_parity.py
+CAUSEKIT_EDID_REFERENCE=/path/to/edid python -m pytest tests/validation/test_edid_parity.py
 Rscript benchmarks/validate_edid_reference.R /path/to/edid
 ```
 
@@ -280,7 +462,7 @@ Run pinned R `Matching` parity from the CRAN mirror checkout at tag 4.10-15, the
 run the Stata script manually when Stata is available:
 
 ```bash
-CAUSALKIT_MATCHING_REFERENCE=/path/to/Matching python -m pytest tests/validation/test_matching_parity.py
+CAUSEKIT_MATCHING_REFERENCE=/path/to/Matching python -m pytest tests/validation/test_matching_parity.py
 Rscript benchmarks/validate_matching_reference.R /path/to/Matching
 stata -b do benchmarks/validate_matching_stata.do
 stata -b do benchmarks/validate_matching_estimated_stata.do
@@ -289,15 +471,20 @@ stata -b do benchmarks/validate_matching_estimated_stata.do
 The Stata harness uses one opposite-arm effect match and two same-arm variance
 neighbors. This is the smallest robust-variance contract accepted by Stata and maps to
 `NearestNeighborMatch(..., variance_neighbors=2)`; the R harness separately validates
-CausalKit's supported one-neighbor conditional-variance contract. The reviewed
+CauseKit's supported one-neighbor conditional-variance contract. The reviewed
 Stata/MP 17 result is preserved in
 `benchmarks/validate_matching_stata_17_output.txt`; its maximum absolute standard-error
-difference from CausalKit is `4.440892098500626e-16`.
+difference from CauseKit is `4.440892098500626e-16`.
 
-The estimated-score Stata harness maps raw fitted propensity distance, one effect match,
-two robust-variance/local-covariance neighbors, and the default one-neighbor local
-regression/covariate derivative contract. Do not record it as a pass until its printed
-`parity_status=pass` and all ATT/ATC/ATE values have been reviewed.
+The estimated-score Stata harness maps raw fitted propensity distance and one effect
+match. Stata's `vce(robust, nn(2))` local set includes the focal observation: its
+`nocorrection` variance maps to CauseKit `variance_neighbors=1`, while the first-step
+moments use two-observation local covariances, two leave-own-out outcome-regression
+neighbors, and one opposite-arm covariate neighbor. The reviewed Stata/IC 17 artifact is
+`benchmarks/validate_matching_estimated_stata_output.txt`; all point-estimate,
+known-variance, first-step-adjustment, and final-standard-error statuses pass at the
+declared `1e-8` tolerance. Its maximum absolute standard-error difference is
+`2.62713550913674e-9`.
 
 Run the README example in a clean installation and inspect both wheel and source
 distribution before release. Archive the commands, operating system, Python version,

@@ -18,7 +18,7 @@ future task can resume without reconstructing intent from chat history.
    fractional ties, effect/reuse weights, balance, strict refusals, deterministic recovery
    tests, and a reproducible benchmark harness.
 
-## Active milestone
+## Continued completed milestones
 
 6. `0.6.0a1` DiD alpha: conventional DiD remains a separate first-class estimator with
    never-treated or not-yet-treated comparisons. The Chen–Sant'Anna–Xie efficient
@@ -56,27 +56,347 @@ future task can resume without reconstructing intent from chat history.
    in linear memory without a distance matrix.
 
 9. `0.6.0a4` matching estimated-Logit inference promotion: the public
-   `FittedPropensityMLEProtocol` consumes a regular full-sample unpenalized Logit result
-   such as `limiteddepkit.BinaryLogitResult`. CausalKit validates fit/sample/schema/score/
-   information identities and applies separate Abadie–Imbens ATE/ATT/ATC first-step
+   `FittedPropensityMLEProtocol` consumes a provider-neutral regular full-sample
+   unpenalized Logit result. CauseKit validates fit/sample/schema/score/information
+   identities and applies separate Abadie–Imbens ATE/ATT/ATC first-step
    corrections. Hand contracts, strict refusals, independent `statsmodels` parity,
-   direct sibling-result interoperability, seeded coverage smoke, OutputHub audit fields,
-   and a 100,000-row 85.20 MiB benchmark are implemented. A Stata `teffects psmatch`
-   harness is written but still needs a manual recorded run.
+   seeded coverage smoke, OutputHub audit fields, and a 100,000-row 85.20 MiB benchmark
+   are implemented. Reviewed Stata/IC 17 parity
+   establishes that `vce(robust, nn(2))` maps to CauseKit's one-neighbor known-score
+   variance and two leave-own-out local first-step regression neighbors. ATT/ATC/ATE
+   point estimates, variance components, and final standard errors pass at `1e-8`.
+
+10. `0.6.0a4` ownership and real-data release gate: the unreleased distribution/import
+    identity is now `causekit`, with no shim under the occupied `causalkit` name. CauseKit
+    owns all migrated causal models and has no LimitedDepKit runtime or validation
+    dependency. Four opt-in HTTPS datasets are pinned by SHA-256, a runnable example covers
+    every model family, and the real-data Python/R certificate passes 14 estimand-aligned
+    comparisons. The reviewed Stata/IC 17 saved-output certificate also passes every
+    comparable family; efficient PT-All DiD remains explicitly unavailable in Stata.
+
+11. `0.7.0a1` native causal-ML alpha: `PartiallyLinearDML` implements the pooled DML2
+    score with shared `CrossFitter` folds, a CauseKit-owned standardized ridge-GCV default
+    fitted separately inside every outer training fold, HC1/one-way CR1 inference, strict
+    residual-treatment identification, full OOF audit records, OutputHub adaptation, and
+    a hash-verified Cattaneo real-data workflow. Hand, refusal, simulation, Statsmodels,
+    base-R 4.5.1, and manually executed Stata/IC 17 contracts pass. A one-run real-data
+    performance comparison records native and optional external learner results without
+    adding an ML dependency.
+
+12. `0.7.0a2` ridge audit and heterogeneous-effect design: the native GCV path now uses
+    SVD shrinkage identities without fitted-vector reconstruction. A denser grid lowered
+    training GCV but slightly worsened the same real-data OOF errors and was rejected as
+    the default. `NuisanceDiagnosticsProtocol` carries scalar per-task/fold
+    tuning records through CrossFitter, DML results, and OutputHub. The five-fold Cattaneo
+    smoke was revalidated without rerunning external comparators. The honest R-learner
+    construction/evaluation, R-loss, calibration, grouping, uncertainty, graphing, and
+    refusal contract is recorded; no placeholder estimator is exported.
+
+    A separate one-run NSW job-training benchmark now exercises the same scalar DML path
+    on 445 observations and eight pre-treatment covariates. CauseKit native ridge-GCV had
+    the lowest outcome OOF RMSE (6608.467270), runtime (0.0456 seconds), and
+    Python-managed peak memory (0.210 MiB); fold-local standardized scikit-learn RidgeCV
+    had a 0.180% lower treatment OOF RMSE. Histogram boosting and random forest were worse
+    on both nuisance targets. This supports keeping native ridge-GCV as the efficient
+    default, not a universal superiority or CATE claim. The Cattaneo rows were not rerun.
+
+13. `0.7.0a2` R-learner prerequisites: public `WeightedCATEEstimatorProtocol` and
+    `CATEResultProtocol` define the provider-neutral weighted-fit/prediction boundary.
+    Internal native components implement standardized ridge-penalized binary Logit with
+    deterministic stratified training-only CV, plus weighted ridge-GCV whose transformed
+    loss is exactly the direct R-objective. Both retain construction indices and tuning
+    diagnostics. Hand score/objective, integration, leakage-audit, weight, schema, index,
+    malformed-provider, and prediction refusals pass. No `RLearner` placeholder is
+    exported; honest splitting and every evaluation/promotion gate remain open.
+
+14. `0.7.0a2` honest R-construction layer: deterministic treatment-stratified row roles
+    and balanced whole-cluster roles are retained behind immutable copy-out accessors.
+    Cluster-aware outer folds keep every cluster intact and retain both treatment arms.
+    Outcome and propensity nuisances are cross-fitted on identical construction-only
+    folds; fresh full-construction refits provide evaluation nuisance predictions, and the
+    weighted CATE model is fit only on construction. The direct R-objective and transformed
+    `u/v`, `v^2` objective pass an exact identity contract. This remains internal: honest
+    R-loss, calibration, group inference, graphs, and all promotion evidence are open.
+
+15. `0.7.0a2` public honest R-learner alpha: `RLearner` consumes the immutable evaluation
+    role once for held-out R-loss against a construction-fitted constant, differential
+    calibration, and tie-preserving overlap-weighted groups. HC1/CR1 covariance, seeded
+    max-t group bands, influence records, exact graph data, optional plots, OutputHub,
+    and future-data prediction are integrated. Linear/null/power/band-coverage simulations,
+    base-R fixed-evaluation parity, a manual Stata HC1 fixture, and a 2,000-row/500-cluster
+    smoke are maintained. A one-run NSW comparison changed only the weighted CATE learner:
+    external RidgeCV narrowly minimized R-loss but improved on constant by just 0.0034%;
+    native ridge-GCV was 0.99% worse than constant, both tree learners were materially
+    worse, and no differential calibration test supported heterogeneity. The earlier
+    scalar-DML records were not rerun.
+
+16. `0.7.0a2` native nonlinear CATE stage and final evaluation parity:
+    `NativeSplineRidgeCATE` is an opt-in, dependency-free additive linear-spline stage.
+    Construction-only weighted GCV selects zero/one/three knots and the ridge penalty;
+    exact basis data, selected complexity, candidate path, schema, and a strict feature
+    ceiling are public. A known piecewise CATE recovery/refusal contract passes. The new
+    NSW row was 1.43% worse than constant and was added without rerunning old rows. On the
+    42,613-customer hash-pinned Hillstrom randomized-email contrast, spline and linear
+    stages had identical displayed honest metrics and a 0.0334% gain over constant. The
+    reviewed Stata/IC 17 fixed-evaluation artifact passes at `1e-8` with maximum absolute
+    difference `1.55e-15`. Linear ridge remains the default.
+
+17. `0.7.0a3` separately contracted honest DR learner: `DRLearner` cross-fits propensity
+    and both arm-specific outcome regressions inside immutable construction roles, forms
+    the canonical augmented inverse-probability score without clipping, and fits a
+    separate unweighted `CATEEstimatorProtocol`. Fresh full-construction nuisances and the
+    construction CATE model predict the untouched evaluation role. HC1/CR1 differential
+    calibration, tie-preserving mean-score groups, seeded max-t bands, graph data,
+    OutputHub, future-data prediction, score/loss/influence audit records, exact hand and
+    double-robustness simulations, base-R parity, and a hash-verified NSW comparison are
+    implemented. Native ridge-GCV exactly matched optional scikit-learn RidgeCV on that
+    split while using less Python-managed peak memory; boosting and forest were worse.
+    The reviewed Stata/IC 17 fixed-evaluation artifact passes every field at `1e-8`; the
+    maximum absolute difference is `4.44e-16`.
+
+18. `0.7.0a4` matching evidence promotion: the maintained known-score and regular
+    full-sample unpenalized Logit-MLE analytical paths are unchanged, but now carry a
+    preregistered publication-scale certificate. One thousand replications in each of
+    favorable and stressed overlap exercise ATT, ATC, and ATE for both contracts (12,000
+    fits); every cell passes with coverage `0.943–0.955`, maximum absolute bias `0.0073`,
+    analytical-SE/empirical-SD ratios `0.963–1.019`, zero refusals, and coverage Monte
+    Carlo SE at most `0.0073`. A separate 15-row, hash-verified Cattaneo grid compares no
+    support rule, intersection support, and `0.1`/`0.2`/`0.3` logit-score-SD calipers with
+    `inference="none"`. It retains every target relabel and attrition count; support removes
+    10 controls and the narrow caliper removes three more control focal units. Settled
+    R/Stata parity and 100,000-row performance artifacts were not rerun.
+
+19. `0.7.0a5` DiD diagnostic contract: no-covariate panel results now expose adjacent
+    uncontaminated cohort-period pre-trend placebos, complete entity influence/covariance
+    records, and robust chi-square or cluster-summed finite-cluster F joint tests. No-lead
+    and singular cases are explicit and receive no numerical repair. The public Hausman
+    diagnostic compares the common post-treatment event-study vector under aligned
+    never-treated PT-Post and no-covariate PT-All fits, using the covariance of the
+    difference influence function and strict design fingerprints. A separate repeated-
+    cross-section contract freezes observation/PSU scores, stationary-composition
+    semantics, refusals, phased CrossFitter integration, parity targets, coverage, and
+    performance gates without exporting a placeholder estimator. A nonlinear-only
+    Hillstrom real-data smoke was rerun without the settled linear row: the adaptive spline
+    stage reproduced the frozen honest metrics and explicitly selected the zero-knot
+    linear submodel. A new conversion-outcome comparison selected one knot but had 0.0019%
+    higher honest R-loss than linear ridge; neither stage beat the construction-fitted
+    constant, so no nonlinear performance gain is claimed.
+
+20. `0.7.0a6` repeated-cross-section DiD first slice: public
+    `RepeatedCrossSectionDiD` is separate from both balanced-panel classes and implements
+    conventional no-covariate cohort-time effects under declared stationary composition.
+    Four independent group-period means, fixed comparison membership, unequal cell sizes,
+    pooled estimated-share aggregation, full observation influences, HC1/CR1 inference,
+    independent-cell placebos, cell audits, and OutputHub are integrated. Hand/refusal
+    tests were observed failing before implementation; staggered, permutation,
+    anticipation, covariance, aggregation, base-R 4.5.1 hand parity, small coverage,
+    public-data, and 100,000-row smokes pass. The reviewed Stata 17 hand artifact also
+    passes the estimate and HC1 standard error at `1e-12`. A 1,000-replication-per-
+    design promotion certificate now passes all 32 group/event/calendar/ESavg cells for
+    both control rules, and pinned R `did` 2.5.0 estimator-level parity passes after the
+    explicit HC0-to-HC1 finite-sample mapping. The reviewed Stata/IC 17 `csdid` artifact
+    exactly matches all 16 point estimates and all six group-time analytical standard
+    errors. Its aggregate standard errors remain explicitly non-comparable because Stata
+    propagates period-specific cell-share influence while CauseKit/R use pooled cohort
+    shares. Covariates, compositional-change robustness, survey weights, and simultaneous
+    bands remain open.
+
+21. `0.7.0a6` covariate repeated-cross-section DiD promotion: the same separate public
+    surface now accepts covariates only with an explicit provider-neutral `CrossFitter`.
+    One propensity and four group-period outcome regressions are fitted out of fold on a
+    shared cohort-period-stratified observation/whole-PSU split for every group-time and
+    conditional-placebo comparison. The normalized eight-component Sant'Anna-Zhao locally
+    efficient score, ratio influence terms, pooled-share aggregation, HC1/CR1 inference,
+    strict overlap refusal, diagnostics, and OutputHub are integrated. Hand tests were
+    observed failing first. Both double-robustness legs, row/PSU leakage, staggered
+    never/not-yet-treated identities, conditional pre-trends, seeded reproducibility, a
+    40-replication bias/coverage smoke, independent base-R score parity, and a hash-
+    verified 7,368-row hospital/PSU covariate smoke pass. A separate 100,000-row,
+    six-period, 100-fit benchmark completes in 1.270 seconds with 244.743 MiB Python-
+    managed peak memory on the recorded environment. The hospital source is artificial
+    and is execution evidence, not a substantive causal result.
+
+22. `0.7.0a6` covariate repeated-cross-section publication promotion: a hash-bound,
+    deterministic 1,000-replication certificate exercises favorable balanced and
+    stressed-overlap unequal-period designs under both control rules. All 44
+    group/aggregate/conditional-placebo pointwise cells pass with coverage `0.940–0.964`,
+    mean-SE/empirical-SD ratios `0.954–1.048`, maximum absolute bias `0.0089`, and zero
+    refusals across 4,000 estimator and 240,000 fold-local nuisance fits. All four joint
+    conditional-pre-trend size cells pass at `0.049–0.057`. The initial one-third-size
+    stress design exposed 11 fold-support refusals; the promoted design holds conditional
+    probabilities, unequal-period ratio, targets, seed, and gates fixed while requiring
+    at least 32 expected observations per period-X-cohort cell. No estimator or
+    simultaneous-band code changed.
+
+23. `0.7.0a6` repeated-cross-section simultaneous-band alpha: opt-in
+    `inference="multiplier_bootstrap"` reuses the retained event-study influence matrix and
+    draws one Rademacher multiplier per observation or per indivisible declared PSU after
+    cluster summation. HC1/CR1 finite-sample factors, studentization, higher-quantile max-t
+    critical values, endpoints, seed/configuration metadata, and OutputHub transport are
+    public. Observation and PSU hand identities, repeat-seed equality, invalid-setting and
+    zero-SE refusals, covariate no-refit integration, and a 100-replication two-event joint-
+    coverage smoke pass. The bounded-batch 100,000-row/four-event/999-draw benchmark takes
+    2.117 seconds and 208.581 MiB Python-managed peak memory on the recorded environment.
+    No panel entity or ordinary row-resampling bootstrap is reused.
+
+24. `0.7.0a6` repeated-cross-section simultaneous-inference promotion: a hash-bound
+    fixed-seed certificate crosses two designs, unadjusted and genuinely cross-fitted
+    covariate scores, observation and indivisible-PSU sampling, and both control rules.
+    All 16 complete event-vector cells pass joint coverage at `0.931–0.961`, with Monte
+    Carlo SE at most `0.0081` and zero refusals across 16,000 estimator fits, 480,000
+    nuisance fold fits, and 15,984,000 default-setting max-t draws. Every band metadata,
+    coordinate, cluster-count, and whole-PSU fold-role audit passes; minimum realized PSU
+    cell support is 31. No estimator code or public default changed.
+
+25. `0.7.0a6` pairwise composition-change-robust repeated-section alpha: explicit
+    `composition="robust"` now targets the treated target-period population for exactly
+    one treated cohort and two periods. It cross-fits one ordered four-cell generalized
+    propensity plus `m00`, `m01`, and `m10` on identical immutable row/whole-PSU folds,
+    retains the four normalized cell weights, and reuses HC1/CR1 and multiplier inference.
+    Four failing-first tests now pass the exact hand estimate, EIF, HC1, overlap, scope,
+    leakage, PSU-role, nuisance-schema, and OutputHub contracts. No `m11` nuisance is fit.
+    A later 32-row composition-shift gate recovers target ATT `5` while the stationary
+    score targets pooled-treated value `4`. Two additional failing-first protocol gaps
+    were closed: class predictions now refuse missing, extra, duplicate, or unlabeled
+    schemas, safely realign labelled permutations, and the complete robust result is row-
+    permutation invariant. Official R `compdid` 0.1.0 point, standard-error, and all 16
+    influence-coordinate comparisons pass at pinned commit
+    `894bd65a952c30f01a4e0005efba4cb335065eb7`; the relevant R source blobs, nuisance
+    column mappings, fixture, and saved output are pinned and audited.
+    Hash-pinned Sequeira robust/stationary sensitivity, the 100,000-row eight-task
+    performance gate, and eight observation/PSU publication-scale coverage cells now
+    pass. The certificate records 8,000 estimator fits, 72,000 fold-level nuisance fits,
+    zero refusals, stationary efficiency costs, and the analytical shift bias. At that
+    checkpoint, staggered
+    aggregation, longer-design conditional pre-trends/bands, the composition diagnostic,
+    and survey combinations remain open. The diagnostic and longer-design fold/pair/
+    influence/share contract is now frozen in
+    `docs/DID_RCS_COMPOSITION_DIAGNOSTIC_ALIGNMENT_CONTRACT.md`; no placeholder is public.
+    The repaired project-scoped `python -m pip_audit .` now completes and reports no
+    known vulnerabilities; the broader host environment separately flags Pillow and
+    Starlette versions that are not CauseKit project dependencies.
+
+26. `0.7.0a6` composition diagnostic and longer/staggered promotion: public
+    `did_rcs_composition_test` now compares aligned robust-minus-stationary influence
+    records under HC1/PSU-CR1 and never selects an estimator. Official R 4.5.1
+    `drdid_stationarity_test()` mapping passes at the pinned `compdid` commit. Reusable
+    masked multiclass `CrossFitter` tasks drive one global row/whole-PSU fold plan across
+    pair-specific four-class and three-outcome nuisances. Longer robust effects use fixed
+    comparison membership, full-sample zero-padded/scaled pair influences, target-period
+    treated-cell aggregation shares with share influence, conditional placebos, and
+    fixed-seed simultaneous bands. Both control rules, multiple cohorts, row/PSU
+    permutations, overlap/refusal gates, and OutputHub audits pass. Hash-pinned hospital
+    sensitivity, a 120,000-row/64-fit performance certificate, and a four-cell 4,000-fit/
+    108,000-nuisance-fit publication certificate pass with zero refusals. Diagnostic size
+    is `0.060–0.068` under stationarity and power is `1.000` under composition shift;
+    simultaneous coverage is `0.930–0.950`. Official longer `compdid` and Stata comparator
+    cells remain unavailable rather than being manufactured.
+
+27. `0.7.0a6` survey-population repeated-section promotion: immutable
+    `RepeatedCrossSectionSurveyDesign` declares inverse-inclusion or calibrated analysis
+    weights, PSU/stratum roles, and strict singleton handling. Stationary-composition
+    effects use component-wise Hájek means, survey target-period treated aggregation shares
+    with share linearization, and one-stage with-replacement stratified-PSU Taylor
+    covariance with design degrees of freedom. Public `WeightedNuisanceEstimatorProtocol`
+    and weighted `CrossFitTask` inputs keep survey covariate nuisances training-only, retain
+    fold weight hashes/sums/effective sizes, and refuse unweighted providers. Hand score,
+    variance, scale, row/PSU role, concentration, leakage, and combination refusals pass.
+    Independent base-R, R `survey` 4.5, and reviewed Stata/IC 17
+    `svy: total`/`nlcom` point/Taylor/df parity passes. A hash-pinned 60,084-
+    row YRBS sensitivity exactly reproduces the authors' sampling-weight-only four-mean
+    point mapping. Its processed source omits PSUs, so its reported survey SE is explicitly
+    an independent-observation-within-stratum sensitivity rather than paper-bootstrap
+    parity. All 8,000 observation/PSU publication fits pass with zero refusals, coverage
+    `0.939–0.954`, SE ratios `0.956–1.003`, and maximum absolute bias `0.019`. The
+    100,000-row/2,500-PSU/20-stratum performance gate completes in `0.168` seconds with
+    `22.23` MiB Python peak. This evidence remains separate from the model-based
+    multiplier-band path.
+
+28. `0.7.0a6` regression-discontinuity alpha: public `RegressionDiscontinuity`
+    implements separately declared sharp cutoff and fuzzy local-Wald complier effects with
+    separate side-specific local-polynomial point/bias fits, robust bias correction,
+    HC1/one-way CR1 score inference, deterministic bounded native-MSE bandwidth selection,
+    support/rank/mass-point/first-stage refusals, a separately labelled boundary-density
+    diagnostic, graph data, post-estimation, and OutputHub. Hand identities and refusals,
+    official Python `rdrobust` 2.0.0, R `rdrobust` 4.0.0, and reviewed Stata/IC 17
+    `rdrobust` 11.1.0 fixed-bandwidth parity pass. The Stata maximum absolute difference is
+    `2.31e-14` at tolerance `1e-8`; the reviewed output SHA-256 is
+    `29591cdf4a4ea3c4269838aafb02fec7942df8b870774c3aa221e04fbf429a0d`.
+    Hash-pinned Head Start sensitivity, 2,500 nonlinear sharp/fuzzy coverage fits with zero
+    refusals, and a 200,000-row performance certificate also pass. Covariate, discrete,
+    local-randomization, kink/multi-cutoff, official density-test, and survey RD remain
+    separately unavailable rather than being inferred from this contract.
+
+29. `0.7.0a6` fixed-effects Panel IV candidate: public `PanelIV2SLS` now implements
+    mandatory entity and optional time absorption, connected unbalanced alternating
+    projections, strict within-variation/order/rank refusals, full absorbed-rank
+    homoskedastic/HC1/one-way-CR1 inference, fixed-effect-adjusted first stages, variation
+    audits, level/within result reconstruction, post-estimation, OutputHub, and a real-data
+    example. Hand/refusal tests, 12-cell explicit-dummy `linearmodels` parity, official R
+    `AER`/`sandwich` parity, hash-pinned wage-panel sensitivity, 1,500 serial-error
+    promotion fits with zero refusals, and a 200,000-row performance gate pass. Reviewed
+    Stata/IC 17 `ivregress 2sls` explicit-dummy parity passes all six estimate/standard-
+    error fields with maximum absolute difference `1.22e-12` at tolerance `1e-8`; the
+    saved-output SHA-256 is
+    `1ac883346889ff0d9c651864b8fdf17570cb663d392fc56e883d832961f70704`.
+    A sibling ownership audit found no active CauseKit estimator under
+    `limiteddepkit/src`; its stale `_out_of_scope/treatment_effect.py` snapshot and test
+    were deleted and LimitedDepKit's ownership documentation was updated. Panel IV
+    ownership is separated by public contract: CauseKit owns `PanelIV2SLS` and its causal
+    identification/refusal/diagnostic boundary; SystemGMMKit owns the established
+    `PanelIVSpec`/`run_panel_2sls` orchestration API within its broader panel suite.
+    CauseKit neither imports nor mirrors those sibling symbols, enforced by API-surface
+    tests, and has no sibling runtime dependency.
 
 ## Open promotion gates
 
+- Fixed-effects Panel IV has passed its native, Python, R, Stata, real-data, coverage, and
+  performance gates. Dynamic-panel GMM, generated lags, multiway covariance,
+  weak-IV-robust confidence sets, and random-effects IV remain separate contracts.
+
 - Matching still defaults to `inference="none"`. Known-score reuse-aware inference and a
-  separately validated full-sample Logit-MLE correction are implemented. Generic,
-  cross-fitted, penalized, and unsupported-link scores still refuse. Fixed-score R/Stata
-  parity is recorded; the estimated-score Stata harness remains pending and R `Matching`
-  is non-comparable. Do not substitute a generic sandwich, ordinary bootstrap, or cluster
-  wrapper.
+  separately validated full-sample Logit-MLE correction now pass hand, parity,
+  publication-scale coverage, real-data sensitivity, and performance gates. Generic,
+  cross-fitted, penalized, unsupported-link, target-selected, tie-expanded, and clustered
+  paths still refuse. R `Matching` remains non-comparable for the first-step correction
+  because it conditions on the supplied score. Do not substitute a generic sandwich,
+  ordinary bootstrap, or cluster wrapper.
 - Efficient DiD owns no nuisance model classes. The implemented covariate path must keep
-  consuming public cross-fitting factories; direct density-ratio regression remains a
-  possible future stability enhancement over ratios of multiclass probabilities.
-- Pre-trend/Hausman diagnostics, repeated-cross-section DiD, publication-scale coverage,
-  covariate-path external parity, and a larger covariate benchmark remain open.
+  consuming public cross-fitting factories. Its direct cohort-odds alternative to
+  multiclass probability ratios now passes hand/refusal, non-identity `Omega_tilde`,
+  HC1/CR1, base-R, hash-pinned hospital, 100,000-entity performance, and 1,000-replication
+  nonlinear/weak-overlap pointwise/max-t gates. Preserve calibrated pair orientation,
+  immutable folds, no fallback, and the PT-All score. It is not reusable in repeated-
+  section, survey, matching, or causal-ML scores.
+- Repeated-cross-section DiD's no-covariate and explicit CrossFitter covariate-adjusted
+  stationary-composition paths are public. Publication-scale no-covariate and covariate
+  pointwise coverage and
+  available estimator-level R `did`/Stata `csdid` parity pass, with Stata aggregate SEs
+  recorded as non-comparable. The covariate score has independent fixed-OOF base-R parity;
+  pinned R/Stata estimator-level cells remain unavailable because their maintained public
+  paths do not implement the same score. Observation/PSU multiplier mechanics and the
+  16-cell publication-scale joint-band certificate pass. The composition-robust score now
+  passes pairwise and longer/staggered hand/refusal contracts, official R `compdid`
+  point/influence and diagnostic mapping, hash-pinned real-data sensitivity, fixed-size
+  performance, target-share aggregation, conditional-placebo, pointwise, and simultaneous
+  publication coverage. The separate stationary-composition survey design now supports
+  no-covariate and explicitly weighted CrossFitter nuisance paths with design-based
+  pointwise Taylor inference. Finite-population corrections, replicate weights,
+  composition-robust survey combinations, singleton adjustments, and survey-valid
+  simultaneous bands remain unavailable.
+- The R-learner alpha is public with honest evaluation, calibration, groups, bands, graph
+  data, simulations, base-R/Stata parity, performance, native nonlinear support, and two
+  real-data CATE records. The next native nonlinear stage is frozen as a separate
+  construction-cross-fitted orthogonal-stack contract; no placeholder is exported and the
+  current linear default is unchanged. Repeated splits, unit-level intervals, RATE, policy
+  evaluation, and deployment refitting remain separate future contracts. The partially linear
+  DML residual-stage parity row passes in Python, base R 4.5.1, and reviewed Stata/IC 17.
+- The DR-learner alpha is a separate public estimator, not an R-learner alias. Its Python
+  hand/simulation gates and base-R fixed-evaluation parity pass. One-run NSW evidence is
+  recorded without rerunning settled R-learner comparators. Repeated splits, unit-level
+  intervals, RATE, policy evaluation, deployment refitting, and publication-scale coverage
+  remain separate gates. The Python/base-R/reviewed-Stata fixed-evaluation parity row
+  passes.
 
 ## Required implementation patterns
 
@@ -87,9 +407,12 @@ future task can resume without reconstructing intent from chat history.
 - A fold loop is permitted where model fitting is inherently fold-specific. Each fold must
   receive fresh nuisance estimators from factories, and every reported nuisance prediction
   must be out of fold.
-- Do not copy binary, count, censoring, duration, or ordinal estimators from
-  `limiteddepkit`. Integrate their public fit/predict results through protocols or explicit
-  prediction adapters. Move model ownership only through a separately reviewed migration.
+- Do not copy binary, count, censoring, duration, or ordinal estimators into CauseKit.
+  General nuisance integration stays provider-neutral through protocols or explicit
+  prediction adapters. The small native ridge-GCV learner is owned only as the default
+  component of `PartiallyLinearDML` and the R-learner, not as a general regression surface.
+- LimitedDepKit is owned by a separate agent/location. Do not inspect, edit, test, build,
+  commit, clean, or release that repository from this CauseKit worktree.
 - Do not claim that overlap diagnostics prove exchangeability, that AIPW repairs unmeasured
   confounding, or that clipping is an innocuous numerical operation.
 - Every model addition requires analytical identities, deterministic recovery,
@@ -98,16 +421,14 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Finish matching promotion from `docs/MATCHING_CONTRACT.md`: manually run and retain the
-   estimated-Logit Stata parity output, then extend publication-scale sensitivity/coverage
-   evidence without weakening either analytical refusal boundary.
-2. Return to DiD for pre-trend/Hausman diagnostics, repeated cross-sections,
-   publication-scale coverage, direct-ratio nuisance support if justified, and broader
-   reference evidence.
-3. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
-   manipulation checks, bias correction, and local estimand.
-4. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
-   effects, and clustered covariance contracts.
+1. The scheduled fixed-effects Panel IV milestone is complete. Do not begin another
+   estimator family until its estimand, identification boundary, covariance, diagnostics,
+   failure behavior, and independent promotion gates have been frozen separately.
+
+The stationary repeated-section survey and balanced-panel direct-ratio gates are
+complete. Raw survey weights, composition combinations, FPCs, replicate weights, and
+survey-valid simultaneous bands continue to refuse. Do not rerun settled composition,
+survey, or direct-ratio publication certificates for unrelated work.
 
 Continue to preserve the matching tie/inference, target-population, and no-quadratic-
 matrix decisions. For DiD, preserve the conventional/efficient separation, PT-All label,

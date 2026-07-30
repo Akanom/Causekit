@@ -1,0 +1,36 @@
+{
+  "artifact": "causekit_panel_iv_performance_v1",
+  "generated_on": "2026-07-30",
+  "generator": "benchmarks/benchmark_panel_iv.py",
+  "reproduction_command": "python benchmarks/benchmark_panel_iv.py",
+  "causekit_version": "0.7.0a6",
+  "python_version": "3.14.6",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "design": {
+    "nobs": 200000,
+    "n_entities": 20000,
+    "n_periods": 10,
+    "effects": [
+      "entity",
+      "time"
+    ],
+    "covariance": "entity-clustered CR1",
+    "truth": 1.5
+  },
+  "result": {
+    "elapsed_seconds": 0.5029708999936702,
+    "peak_memory_mib": 52.661654472351074,
+    "estimate": 1.503988573637507,
+    "standard_error": 0.0021702662438343313,
+    "absolute_error": 0.003988573637506931,
+    "within_iterations": 1
+  },
+  "gates": {
+    "maximum_seconds": 8.0,
+    "maximum_peak_mib": 350.0,
+    "maximum_absolute_error": 0.03,
+    "no_fixed_effect_dummy_matrix": true,
+    "no_observation_projection_matrix": true
+  },
+  "status": "pass"
+}

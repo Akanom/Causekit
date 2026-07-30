@@ -1,0 +1,1207 @@
+"""Optional Universal Output Hub adapter."""
+
+from __future__ import annotations
+
+from typing import Any
+
+import pandas as pd
+
+from ..did import DiDResult
+from ..did_rcs import (
+    RepeatedCrossSectionCompositionDiagnostic,
+    RepeatedCrossSectionDiDResult,
+)
+from ..iv import IV2SLSResult
+from ..matching import NearestNeighborMatchResult
+from ..ml import DRLearnerResult, PartiallyLinearDMLResult, RLearnerResult
+from ..observational import ObservationalATEResult
+from ..panel_iv import PanelIV2SLSResult
+from ..randomized import RandomizedATEResult
+from ..rd import RegressionDiscontinuityResult
+
+
+def _regression_model_class() -> Any:
+    try:
+        from universal_output_hub import RegressionModel
+    except ImportError as error:
+        raise ImportError(
+            "Universal Output Hub is required for this integration. "
+            "Install causekit with the 'outputhub' extra."
+        ) from error
+    return RegressionModel
+
+
+def _first_stage_table(result: IV2SLSResult | PanelIV2SLSResult) -> pd.DataFrame:
+    return pd.DataFrame.from_records(
+        [diagnostic.to_dict() for diagnostic in result.first_stage.values()]
+    ).set_index("endogenous")
+
+
+def to_outputhub_model(
+    result: (
+        IV2SLSResult
+        | PanelIV2SLSResult
+        | RandomizedATEResult
+        | ObservationalATEResult
+        | DiDResult
+        | RepeatedCrossSectionCompositionDiagnostic
+        | RepeatedCrossSectionDiDResult
+        | NearestNeighborMatchResult
+        | PartiallyLinearDMLResult
+        | DRLearnerResult
+        | RLearnerResult
+        | RegressionDiscontinuityResult
+    ),
+    *,
+    name: str | None = None,
+) -> Any:
+    """Convert a fitted causal result into Output Hub's canonical regression model."""
+
+    if not isinstance(
+        result,
+        (
+            IV2SLSResult,
+            PanelIV2SLSResult,
+            RandomizedATEResult,
+            ObservationalATEResult,
+            DiDResult,
+            RepeatedCrossSectionCompositionDiagnostic,
+            RepeatedCrossSectionDiDResult,
+            NearestNeighborMatchResult,
+            PartiallyLinearDMLResult,
+            DRLearnerResult,
+            RLearnerResult,
+            RegressionDiscontinuityResult,
+        ),
+    ):
+        raise TypeError(
+            "result must be an IV2SLSResult, PanelIV2SLSResult, RandomizedATEResult, "
+            "ObservationalATEResult, DiDResult, RepeatedCrossSectionDiDResult, "
+            "RepeatedCrossSectionCompositionDiagnostic, "
+            "NearestNeighborMatchResult, or "
+            "PartiallyLinearDMLResult, DRLearnerResult, RLearnerResult, or "
+            "RegressionDiscontinuityResult."
+        )
+    RegressionModel = _regression_model_class()
+    if isinstance(result, RepeatedCrossSectionCompositionDiagnostic):
+        return RegressionModel(
+            name=name or "RCS composition equality diagnostic",
+            depvar="robust_minus_stationary_att",
+            params=result.params,
+            std_errors=result.standard_errors.rename("se"),
+            pvalues=result.pvalues.rename("pvalue"),
+            statistics={
+                "Observations": result.nobs,
+                "Restrictions": result.n_restrictions,
+            },
+            diagnostics={
+                "Joint equality statistic": result.statistic,
+                "Joint equality p-value": result.pvalue,
+                "Reject equality": result.reject,
+            },
+            metadata={
+                "estimator": "rcs_composition_equality_diagnostic",
+                "contrast": "robust_minus_stationary",
+                "covariance_type": result.covariance_type,
+                "distribution": result.distribution,
+                "df_num": result.df_num,
+                "df_denom": result.df_denom,
+                "n_clusters": result.n_clusters,
+                "level": result.level,
+                "estimator_selection": False,
+                "null_hypothesis": result.null_hypothesis,
+                "official_hc0_mapping": result.official_hc0_mapping,
+            },
+            source="causekit",
+        )
+    if isinstance(result, NearestNeighborMatchResult):
+        return RegressionModel(
+            name=name or "Nearest-neighbor matching",
+            depvar="outcome",
+            params=result.params.rename("coef"),
+            std_errors=result.standard_errors.rename("se"),
+            pvalues=result.pvalues.rename("pvalue"),
+            statistics={
+                "N": result.nobs,
+                "Treated": result.n_treated,
+                "Control": result.n_control,
+                "Matched focal observations": result.n_matched_focal,
+                "Converged": result.converged,
+            },
+            diagnostics={
+                "Matched focal fraction": result.matched_focal_fraction,
+                "Maximum comparison reuse": result.maximum_reuse_count,
+                "Boundary tie events": result.boundary_tie_events,
+                "Known-score variance": result.known_score_variance,
+                "First-step variance adjustment": result.first_step_variance_adjustment,
+                "Propensity likelihood score norm": result.propensity_model_score_norm,
+                **{
+                    f"{name.replace('_', ' ').title()}": value
+                    for name, value in result.balance_summary.items()
+                },
+            },
+            metadata={
+                "estimator": "nearest_neighbor_match",
+                "backend": result.backend,
+                "requested_estimand": result.requested_estimand,
+                "realized_estimand": result.realized_estimand,
+                "target_population": result.target_population,
+                "metric": result.metric,
+                "neighbors": result.neighbors,
+                "replacement": result.replacement,
+                "ties": result.ties,
+                "caliper": result.requested_caliper,
+                "common_support": result.common_support,
+                "propensity_provenance": result.propensity_provenance,
+                "propensity_score_status": result.propensity_score_status,
+                "inference": result.inference,
+                "variance_neighbors": result.variance_neighbors,
+                "first_step_covariance_neighbors": result.first_step_covariance_neighbors,
+                "first_step_regression_neighbors": result.first_step_regression_neighbors,
+                "first_step_covariate_neighbors": result.first_step_covariate_neighbors,
+                "propensity_model": result.propensity_model_name,
+                "propensity_link": result.propensity_link,
+                "inference_distribution": result.inference_distribution,
+                "causal_interpretation_requires_assumptions": True,
+                "assumptions": list(result.assumptions),
+            },
+            source="causekit",
+        )
+    if isinstance(result, RepeatedCrossSectionDiDResult):
+        return RegressionModel(
+            name=name or "Repeated-cross-section DiD",
+            depvar=result.outcome_name,
+            params=result.params.rename("coef"),
+            std_errors=result.standard_errors.rename("se"),
+            pvalues=result.pvalues.rename("pvalue"),
+            statistics={
+                "Observations": result.nobs,
+                "Periods": result.n_periods,
+                "Treated cohorts": len(result.cohort_sizes),
+                "Converged": result.converged,
+            },
+            diagnostics={
+                "Group-time effects": len(result.group_time),
+                "Event-time effects": len(result.event_study),
+                "Pre-trend restrictions": result.pretrend.n_restrictions,
+                **(
+                    {"Nuisance fold fits": len(result.nuisance_diagnostics)}
+                    if result.cross_fitted
+                    else {}
+                ),
+                **(
+                    {
+                        "Pre-trend joint statistic": result.pretrend.statistic,
+                        "Pre-trend joint p-value": result.pretrend.pvalue,
+                    }
+                    if result.pretrend.available
+                    else {}
+                ),
+            },
+            metadata={
+                "estimator": result.method,
+                "backend": result.backend,
+                "sampling_unit": result.sampling_unit,
+                "parallel_trends": result.parallel_trends,
+                "control_group": result.control_group,
+                "composition": result.composition,
+                "composition_verified": False,
+                "target_population": result.target_population,
+                "population_basis": result.population_basis,
+                "group_time_aggregation": result.group_time_aggregation,
+                "esavg_aggregation": result.esavg_aggregation,
+                "anticipation": result.anticipation,
+                "pre_periods": result.pre_periods,
+                "covariance_type": result.covariance_type,
+                "inference_distribution": result.inference_distribution,
+                "inference_method": result.inference_method,
+                "simultaneous_level": result.simultaneous_level,
+                "simultaneous_critical_value": result.simultaneous_critical_value,
+                "bootstrap_iterations": result.bootstrap_iterations,
+                "bootstrap_random_state": result.bootstrap_random_state,
+                "n_clusters": result.n_clusters,
+                "weight_type": result.weight_type,
+                "weight_normalization": result.weight_normalization,
+                "survey_weight_name": result.survey_weight_name,
+                "survey_psu_name": result.survey_psu_name,
+                "survey_strata_name": result.survey_strata_name,
+                "covariates": list(result.covariates),
+                "nuisance_cross_fitted": result.cross_fitted,
+                "nuisance_n_splits": result.n_splits,
+                "nuisance_probability_floor": result.nuisance_probability_floor,
+                "conditional_pretrend": result.pretrend.conditional,
+                "pretrend_available": result.pretrend.available,
+                "pretrend_unavailable_reason": result.pretrend.reason,
+                "causal_interpretation_requires_assumptions": True,
+                "assumptions": list(result.assumptions),
+            },
+            source="causekit",
+        )
+    if isinstance(result, DiDResult):
+        negative_weights = (
+            int((result.efficiency_weights["weight"] < 0).sum())
+            if not result.efficiency_weights.empty
+            else 0
+        )
+        return RegressionModel(
+            name=name
+            or (
+                "Efficient DiD"
+                if result.method.startswith("chen_santanna_xie_efficient")
+                else "Difference-in-Differences"
+            ),
+            depvar=result.outcome_name,
+            params=result.params.rename("coef"),
+            std_errors=result.standard_errors.rename("se"),
+            pvalues=result.pvalues.rename("pvalue"),
+            statistics={
+                "Entities": result.n_entities,
+                "Periods": result.n_periods,
+                "Treated cohorts": len(result.cohort_sizes),
+                "Converged": result.converged,
+            },
+            diagnostics={
+                "Group-time effects": len(result.group_time),
+                "Event-time effects": len(result.event_study),
+                "Negative efficiency weights": negative_weights,
+                "Pre-trend restrictions": result.pretrend.n_restrictions,
+                **(
+                    {
+                        "Pre-trend joint statistic": result.pretrend.statistic,
+                        "Pre-trend joint p-value": result.pretrend.pvalue,
+                    }
+                    if result.pretrend.available
+                    else {}
+                ),
+            },
+            metadata={
+                "estimator": result.method,
+                "backend": result.backend,
+                "parallel_trends": result.parallel_trends,
+                "control_group": result.control_group,
+                "anticipation": result.anticipation,
+                "pre_periods": result.pre_periods,
+                "covariance_type": result.covariance_type,
+                "inference_distribution": result.inference_distribution,
+                "inference_method": result.inference_method,
+                "simultaneous_level": result.simultaneous_level,
+                "simultaneous_critical_value": result.simultaneous_critical_value,
+                "n_clusters": result.n_clusters,
+                "covariates": list(result.covariates),
+                "nuisance_cross_fitted": result.cross_fitted,
+                "nuisance_weighting": result.nuisance_weighting,
+                "pretrend_available": result.pretrend.available,
+                "pretrend_unavailable_reason": result.pretrend.reason,
+                "causal_interpretation_requires_assumptions": True,
+                "assumptions": list(result.assumptions),
+            },
+            source="causekit",
+        )
+    if isinstance(result, ObservationalATEResult):
+        return RegressionModel(
+            name=name or result.estimator.upper(),
+            depvar="outcome",
+            params=result.params.rename("coef"),
+            std_errors=result.standard_errors.rename("se"),
+            pvalues=result.pvalues.rename("pvalue"),
+            statistics={
+                "N": result.nobs,
+                "Treated": result.n_treated,
+                "Control": result.n_control,
+                "Converged": result.converged,
+            },
+            diagnostics={
+                "Propensity minimum": result.overlap.propensity_min,
+                "Propensity maximum": result.overlap.propensity_max,
+                "Treated effective N": result.overlap.treated_effective_sample_size,
+                "Control effective N": result.overlap.control_effective_sample_size,
+                "Clipped observations": result.clipped_observations,
+            },
+            metadata={
+                "estimator": result.estimator,
+                "estimand": result.estimand,
+                "backend": result.backend,
+                "covariance_type": result.covariance_type,
+                "inference_distribution": result.inference_distribution,
+                "n_clusters": result.n_clusters,
+                "nuisance_predictions_supplied": True,
+                "causal_interpretation_requires_assumptions": True,
+                "assumptions": list(result.assumptions),
+            },
+            source="causekit",
+        )
+    if isinstance(result, PartiallyLinearDMLResult):
+        boundary_fits = (
+            int(result.nuisance_diagnostics["alpha_at_boundary"].sum())
+            if "alpha_at_boundary" in result.nuisance_diagnostics
+            else None
+        )
+        return RegressionModel(
+            name=name or "Partially linear DML",
+            depvar="outcome",
+            params=result.params.rename("coef"),
+            std_errors=result.standard_errors.rename("se"),
+            pvalues=result.pvalues.rename("pvalue"),
+            statistics={
+                "N": result.nobs,
+                "Outer folds": result.n_splits,
+                "Converged": result.converged,
+            },
+            diagnostics={
+                "Residual treatment second moment": (result.residual_treatment_second_moment),
+                "Residual treatment tolerance": result.residual_treatment_tolerance,
+                "Orthogonal score mean": result.orthogonal_score_mean,
+                "Nuisance alpha boundary fits": boundary_fits,
+            },
+            metadata={
+                "estimator": result.estimator,
+                "estimand": result.estimand,
+                "backend": result.backend,
+                "covariance_type": result.covariance_type,
+                "inference_distribution": result.inference_distribution,
+                "n_clusters": result.n_clusters,
+                "n_splits": result.n_splits,
+                "random_state": result.random_state,
+                "treatment_kind": result.treatment_kind,
+                "native_nuisance": result.native_nuisance,
+                "outcome_model": result.outcome_model_name,
+                "treatment_model": result.treatment_model_name,
+                "nuisance_cross_fitted": True,
+                "causal_interpretation_requires_assumptions": True,
+                "assumptions": list(result.assumptions),
+            },
+            source="causekit",
+        )
+    if isinstance(result, RLearnerResult):
+        return RegressionModel(
+            name=name or "Honest R-learner",
+            depvar="outcome",
+            params=result.params.rename("coef"),
+            std_errors=result.standard_errors.rename("se"),
+            pvalues=result.pvalues.rename("pvalue"),
+            statistics={
+                "N": result.nobs,
+                "Construction N": result.construction_nobs,
+                "Evaluation N": result.evaluation_nobs,
+                "Outer folds": result.n_splits,
+                "Calibration groups": result.calibration_groups,
+                "Converged": result.converged,
+            },
+            diagnostics={
+                "Honest R-loss": result.honest_r_loss,
+                "Honest constant R-loss": result.honest_constant_r_loss,
+                "R-loss gain": result.r_loss_gain,
+                "Construction constant effect": result.construction_constant_effect,
+                "Calibration center": result.calibration_center,
+                "Residual treatment second moment": result.residual_treatment_second_moment,
+            },
+            metadata={
+                "estimator": result.estimator,
+                "estimand": result.estimand,
+                "backend": result.backend,
+                "covariance_type": result.covariance_type,
+                "inference_distribution": result.inference_distribution,
+                "n_clusters": result.n_clusters,
+                "n_splits": result.n_splits,
+                "split_seed": result.split_seed,
+                "requested_evaluation_fraction": result.requested_evaluation_fraction,
+                "realized_evaluation_fraction": result.realized_evaluation_fraction,
+                "split_conditional": result.split_conditional,
+                "overlap_floor": result.overlap_floor,
+                "simultaneous_level": result.simultaneous_level,
+                "simultaneous_critical_value": result.simultaneous_critical_value,
+                "bootstrap_iterations": result.bootstrap_iterations,
+                "bootstrap_random_state": result.bootstrap_random_state,
+                "native_outcome": result.native_outcome,
+                "native_propensity": result.native_propensity,
+                "native_cate": result.native_cate,
+                "outcome_model": result.outcome_model_name,
+                "propensity_model": result.propensity_model_name,
+                "cate_model": result.cate_model_name,
+                "nuisance_cross_fitted": True,
+                "evaluation_used_for_fitting": False,
+                "unit_level_intervals": False,
+                "causal_interpretation_requires_assumptions": True,
+                "assumptions": list(result.assumptions),
+            },
+            source="causekit",
+        )
+    if isinstance(result, DRLearnerResult):
+        return RegressionModel(
+            name=name or "Honest DR learner",
+            depvar="outcome",
+            params=result.params.rename("coef"),
+            std_errors=result.standard_errors.rename("se"),
+            pvalues=result.pvalues.rename("pvalue"),
+            statistics={
+                "N": result.nobs,
+                "Construction N": result.construction_nobs,
+                "Evaluation N": result.evaluation_nobs,
+                "Outer folds": result.n_splits,
+                "Calibration groups": result.calibration_groups,
+                "Converged": result.converged,
+            },
+            diagnostics={
+                "Honest DR loss": result.honest_dr_loss,
+                "Honest constant DR loss": result.honest_constant_dr_loss,
+                "DR loss gain": result.dr_loss_gain,
+                "Construction constant effect": result.construction_constant_effect,
+                "Calibration center": result.calibration_center,
+                "Minimum propensity": result.minimum_propensity,
+                "Maximum propensity": result.maximum_propensity,
+            },
+            metadata={
+                "estimator": result.estimator,
+                "estimand": result.estimand,
+                "backend": result.backend,
+                "covariance_type": result.covariance_type,
+                "inference_distribution": result.inference_distribution,
+                "n_clusters": result.n_clusters,
+                "n_splits": result.n_splits,
+                "split_seed": result.split_seed,
+                "requested_evaluation_fraction": result.requested_evaluation_fraction,
+                "realized_evaluation_fraction": result.realized_evaluation_fraction,
+                "split_conditional": result.split_conditional,
+                "overlap_floor": result.overlap_floor,
+                "simultaneous_level": result.simultaneous_level,
+                "simultaneous_critical_value": result.simultaneous_critical_value,
+                "bootstrap_iterations": result.bootstrap_iterations,
+                "bootstrap_random_state": result.bootstrap_random_state,
+                "native_outcome": result.native_outcome,
+                "native_propensity": result.native_propensity,
+                "native_cate": result.native_cate,
+                "outcome_control_model": result.outcome_control_model_name,
+                "outcome_treated_model": result.outcome_treated_model_name,
+                "propensity_model": result.propensity_model_name,
+                "cate_model": result.cate_model_name,
+                "nuisance_cross_fitted": True,
+                "evaluation_used_for_fitting": False,
+                "unit_level_intervals": False,
+                "causal_interpretation_requires_assumptions": True,
+                "assumptions": list(result.assumptions),
+            },
+            source="causekit",
+        )
+    if isinstance(result, RegressionDiscontinuityResult):
+        rd_diagnostics: dict[str, Any] = {
+            "Conventional estimate": result.conventional_estimate,
+            "Conventional standard error": result.conventional_standard_error,
+            "Bias-corrected estimate": result.bias_corrected_estimate,
+            "Robust standard error": result.robust_standard_error,
+            "Outcome jump": result.outcome_jump,
+            "Treatment jump": result.treatment_jump,
+            "Mass points": result.mass_points_detected,
+        }
+        if result.manipulation.available:
+            rd_diagnostics.update(
+                {
+                    "Log-density jump": result.manipulation.log_density_jump,
+                    "Density diagnostic p-value": result.manipulation.pvalue,
+                }
+            )
+        if result.first_stage is not None:
+            rd_diagnostics.update(
+                {
+                    "First-stage standard error": result.first_stage["standard_error"],
+                    "First-stage p-value": result.first_stage["pvalue"],
+                    "Weak first-stage warning": result.first_stage["weak_first_stage_warning"],
+                }
+            )
+        return RegressionModel(
+            name=name or ("Sharp RD" if result.design == "sharp" else "Fuzzy RD"),
+            depvar=result.outcome_name,
+            params=result.params.rename("coef"),
+            std_errors=result.standard_errors.rename("se"),
+            pvalues=result.pvalues.rename("pvalue"),
+            statistics={
+                "N": result.nobs,
+                "Local N": result.n_effective,
+                "Left N": result.n_left,
+                "Right N": result.n_right,
+                "Converged": result.converged,
+            },
+            diagnostics=rd_diagnostics,
+            metadata={
+                "estimator": result.method,
+                "backend": result.backend,
+                "design": result.design,
+                "estimand": result.estimand,
+                "cutoff": result.cutoff,
+                "bandwidth_left": result.bandwidth_left,
+                "bandwidth_right": result.bandwidth_right,
+                "bias_bandwidth_left": result.bias_bandwidth_left,
+                "bias_bandwidth_right": result.bias_bandwidth_right,
+                "bandwidth_method": result.bandwidth_selection.method,
+                "bandwidth_selected_at_boundary": result.bandwidth_selection.selected_at_boundary,
+                "bandwidth_boundary_sides": list(result.bandwidth_selection.boundary_sides),
+                "polynomial_order": result.polynomial_order,
+                "bias_order": result.bias_order,
+                "kernel": result.kernel,
+                "primary_inference": result.primary_inference,
+                "covariance_type": result.covariance_type,
+                "inference_distribution": result.inference_distribution,
+                "n_clusters": result.n_clusters,
+                "manipulation_method": result.manipulation.method,
+                "causal_interpretation_requires_assumptions": True,
+                "assumptions": list(result.assumptions),
+            },
+            source="causekit",
+        )
+    if isinstance(result, RandomizedATEResult):
+        return RegressionModel(
+            name=name or "Randomized ATE",
+            depvar=result.y_name,
+            params=pd.Series({"ate": result.estimate}, name="coef"),
+            std_errors=pd.Series({"ate": result.standard_error}, name="se"),
+            pvalues=pd.Series({"ate": result.pvalue}, name="pvalue"),
+            statistics={
+                "N": result.nobs,
+                "Treated": result.n_treated,
+                "Control": result.n_control,
+                "Residual df": result.df_resid,
+                "Converged": result.converged,
+            },
+            diagnostics={
+                f"Absolute standardized difference ({item.covariate})": abs(
+                    item.standardized_difference
+                )
+                for item in result.balance
+            },
+            metadata={
+                "estimator": "randomized_ate",
+                "backend": result.backend,
+                "adjustment": result.adjustment,
+                "covariance_type": result.covariance_type,
+                "inference_distribution": result.inference_distribution,
+                "n_clusters": result.n_clusters,
+                "causal_interpretation_requires_assumptions": True,
+                "assumptions": list(result.assumptions),
+            },
+            source="causekit",
+        )
+    diagnostics: dict[str, Any] = {}
+    for endogenous, first_stage in result.first_stage.items():
+        diagnostics[f"First-stage F ({endogenous})"] = first_stage.classical_f_statistic
+        diagnostics[f"Partial R2 ({endogenous})"] = first_stage.partial_r_squared
+    if result.overidentification is not None:
+        diagnostics.update(
+            {
+                "Sargan statistic": result.overidentification.statistic,
+                "Sargan df": result.overidentification.df,
+                "Sargan p": result.overidentification.p_value,
+            }
+        )
+    is_panel_iv = isinstance(result, PanelIV2SLSResult)
+    panel_statistics: dict[str, Any] = {}
+    panel_metadata: dict[str, Any] = {}
+    if isinstance(result, PanelIV2SLSResult):
+        panel_statistics = {
+            "Entities": result.n_entities,
+            "Periods": result.n_periods,
+            "Balanced": result.balanced,
+            "Absorbed rank": result.absorbed_rank,
+        }
+        panel_metadata = {
+            "effects": list(result.effects),
+            "entity": result.entity_name,
+            "time": result.time_name,
+            "cluster": result.cluster_name,
+            "balanced": result.balanced,
+            "absorbed_rank": result.absorbed_rank,
+            "within_iterations": result.within_iterations,
+            "within_converged": result.within_converged,
+        }
+    return RegressionModel(
+        name=name or ("Panel IV/2SLS" if is_panel_iv else "IV/2SLS"),
+        depvar=result.y_name,
+        params=result.params.rename("coef"),
+        std_errors=result.standard_errors.rename("se"),
+        pvalues=result.pvalues.rename("pvalue"),
+        statistics={
+            "N": result.nobs,
+            "Residual df": result.df_resid,
+            "Converged": result.converged,
+            **panel_statistics,
+        },
+        diagnostics=diagnostics,
+        metadata={
+            "estimator": "panel_iv_2sls" if is_panel_iv else "iv_2sls",
+            "backend": result.backend,
+            "covariance_type": result.covariance_type,
+            "inference_distribution": result.inference_distribution,
+            "n_clusters": result.n_clusters,
+            "endogenous": list(result.endogenous_names),
+            "excluded_instruments": list(result.instrument_names),
+            **panel_metadata,
+            "causal_interpretation_requires_assumptions": True,
+            "assumptions": list(result.assumptions),
+        },
+        source="causekit",
+    )
+
+
+def add_to_outputhub(
+    hub: Any,
+    result: (
+        IV2SLSResult
+        | PanelIV2SLSResult
+        | RandomizedATEResult
+        | ObservationalATEResult
+        | DiDResult
+        | RepeatedCrossSectionCompositionDiagnostic
+        | RepeatedCrossSectionDiDResult
+        | NearestNeighborMatchResult
+        | PartiallyLinearDMLResult
+        | DRLearnerResult
+        | RLearnerResult
+        | RegressionDiscontinuityResult
+    ),
+    *,
+    name: str | None = None,
+) -> Any:
+    """Add a fitted causal model and any supported diagnostic tables to OutputHub."""
+
+    if not hasattr(hub, "add_model"):
+        raise TypeError("hub must provide an OutputHub-compatible add_model method.")
+    model_name = name or (
+        result.estimator.upper()
+        if isinstance(result, ObservationalATEResult)
+        else "Partially linear DML"
+        if isinstance(result, PartiallyLinearDMLResult)
+        else "Honest R-learner"
+        if isinstance(result, RLearnerResult)
+        else "Honest DR learner"
+        if isinstance(result, DRLearnerResult)
+        else "Nearest-neighbor matching"
+        if isinstance(result, NearestNeighborMatchResult)
+        else "Sharp RD"
+        if isinstance(result, RegressionDiscontinuityResult) and result.design == "sharp"
+        else "Fuzzy RD"
+        if isinstance(result, RegressionDiscontinuityResult)
+        else "Repeated-cross-section DiD"
+        if isinstance(result, RepeatedCrossSectionDiDResult)
+        else "RCS composition equality diagnostic"
+        if isinstance(result, RepeatedCrossSectionCompositionDiagnostic)
+        else "Efficient DiD"
+        if isinstance(result, DiDResult) and result.method.startswith("chen_santanna_xie_efficient")
+        else "Difference-in-Differences"
+        if isinstance(result, DiDResult)
+        else "Randomized ATE"
+        if isinstance(result, RandomizedATEResult)
+        else "Panel IV/2SLS"
+        if isinstance(result, PanelIV2SLSResult)
+        else "IV/2SLS"
+    )
+    model = to_outputhub_model(result, name=model_name)
+    hub.add_model(model)
+    if isinstance(result, RegressionDiscontinuityResult) and hasattr(hub, "add_table"):
+        table_metadata = {
+            "source": "causekit",
+            "estimator": result.method,
+            "design": result.design,
+            "estimand": result.estimand,
+        }
+        hub.add_table(
+            f"{model_name} bandwidth selection",
+            result.bandwidth_selection.candidates.copy(),
+            caption=(
+                "Bounded native design-conditional MSE grid or the single declared manual "
+                "bandwidth. Selection does not validate the RD identifying assumptions."
+            ),
+            metadata={
+                **table_metadata,
+                "method": result.bandwidth_selection.method,
+            },
+        )
+        hub.add_table(
+            f"{model_name} manipulation diagnostic",
+            pd.DataFrame(
+                {
+                    "available": [result.manipulation.available],
+                    "bandwidth": [result.manipulation.bandwidth],
+                    "density_left": [result.manipulation.density_left],
+                    "density_right": [result.manipulation.density_right],
+                    "log_density_jump": [result.manipulation.log_density_jump],
+                    "standard_error": [result.manipulation.standard_error],
+                    "statistic": [result.manipulation.statistic],
+                    "pvalue": [result.manipulation.pvalue],
+                    "reject": [result.manipulation.reject],
+                    "reason": [result.manipulation.reason],
+                }
+            ),
+            caption=(
+                "One-sided boundary-kernel density diagnostic. It is not the Cattaneo-Jansson-Ma "
+                "test and cannot by itself establish or refute RD validity."
+            ),
+            metadata={
+                **table_metadata,
+                "method": result.manipulation.method,
+            },
+        )
+    elif isinstance(result, RepeatedCrossSectionCompositionDiagnostic) and hasattr(
+        hub, "add_table"
+    ):
+        metadata = {
+            "source": "causekit",
+            "estimator": "rcs_composition_equality_diagnostic",
+            "estimator_selection": False,
+        }
+        hub.add_table(
+            f"{model_name} estimates",
+            result.summary_frame().reset_index(),
+            caption=(
+                "Aligned composition-robust and stationary group-time effects and the "
+                "maintained robust-minus-stationary contrast. No estimator is selected."
+            ),
+            metadata=metadata,
+        )
+        hub.add_table(
+            f"{model_name} joint test",
+            pd.DataFrame(
+                {
+                    "statistic": [result.statistic],
+                    "p_value": [result.pvalue],
+                    "reject": [result.reject],
+                    "level": [result.level],
+                    "distribution": [result.distribution],
+                    "df_num": [result.df_num],
+                    "df_denom": [result.df_denom],
+                }
+            ),
+            caption=(
+                "Joint equality diagnostic from the aligned difference influence. Failure "
+                "to reject does not verify stationary composition."
+            ),
+            metadata=metadata,
+        )
+    elif isinstance(result, (IV2SLSResult, PanelIV2SLSResult)) and hasattr(hub, "add_table"):
+        estimator_name = "panel_iv_2sls" if isinstance(result, PanelIV2SLSResult) else "iv_2sls"
+        hub.add_table(
+            f"{model_name} first-stage diagnostics",
+            _first_stage_table(result).reset_index(),
+            caption=(
+                "First-stage fit and excluded-instrument relevance diagnostics. "
+                "The classical F < 10 warning is a heuristic, not a universal "
+                "weak-identification test."
+            ),
+            metadata={"source": "causekit", "estimator": estimator_name},
+        )
+        if isinstance(result, PanelIV2SLSResult):
+            hub.add_table(
+                f"{model_name} instrument variation",
+                result.instrument_variation.reset_index(),
+                caption=(
+                    "Raw and fixed-effect-adjusted variation for endogenous regressors and "
+                    "excluded instruments. Variation does not establish exogeneity or exclusion."
+                ),
+                metadata={"source": "causekit", "estimator": estimator_name},
+            )
+            hub.add_table(
+                f"{model_name} panel design",
+                result.panel_summary().rename_axis("diagnostic").reset_index(name="value"),
+                caption="Retained panel, absorption, clustering, and within-transform audit.",
+                metadata={"source": "causekit", "estimator": estimator_name},
+            )
+    elif isinstance(result, NearestNeighborMatchResult) and hasattr(hub, "add_table"):
+        table_metadata = {"source": "causekit", "estimator": "nearest_neighbor_match"}
+        hub.add_table(
+            f"{model_name} matches",
+            result.match_table.copy(),
+            caption=(
+                "Focal-to-comparison design with distance, rank, tie group, and fractional "
+                "match weight; outcome values are intentionally excluded."
+            ),
+            metadata=table_metadata,
+        )
+        if not result.balance.empty:
+            hub.add_table(
+                f"{model_name} balance",
+                result.balance.reset_index(),
+                caption="Pre-treatment covariate balance before and after matching.",
+                metadata=table_metadata,
+            )
+    elif isinstance(result, PartiallyLinearDMLResult) and hasattr(hub, "add_table"):
+        hub.add_table(
+            f"{model_name} nuisance tuning",
+            result.nuisance_diagnostics.copy(),
+            caption=(
+                "Fold-local nuisance tuning and training diagnostics; every row was fitted "
+                "without its corresponding holdout fold."
+            ),
+            metadata={"source": "causekit", "estimator": result.estimator},
+        )
+    elif isinstance(result, RLearnerResult) and hasattr(hub, "add_table"):
+        table_metadata = {"source": "causekit", "estimator": result.estimator}
+        hub.add_table(
+            f"{model_name} honest loss",
+            pd.DataFrame(
+                {
+                    "value": [
+                        result.honest_r_loss,
+                        result.honest_constant_r_loss,
+                        result.r_loss_gain,
+                    ]
+                },
+                index=["r_loss", "constant_r_loss", "r_loss_gain"],
+            ).reset_index(names="metric"),
+            caption=(
+                "Held-out R-loss against a constant effect fitted only on construction; "
+                "the gain is not ordinary predictive R-squared."
+            ),
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} calibration tests",
+            result.calibration_tests.reset_index(names="hypothesis"),
+            caption="Split-conditional differential-calibration tests on honest evaluation data.",
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} calibration groups",
+            result.group_effects.reset_index(),
+            caption=(
+                "Tie-preserving overlap-weighted group effects with pointwise intervals and "
+                "studentized multiplier-bootstrap simultaneous bands."
+            ),
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} nuisance tuning",
+            result.nuisance_diagnostics.copy(),
+            caption="Construction-only outer-fold and full-construction nuisance diagnostics.",
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} CATE tuning",
+            result.cate_diagnostics.copy(),
+            caption="Construction-only weighted CATE learner diagnostics.",
+            metadata=table_metadata,
+        )
+    elif isinstance(result, DRLearnerResult) and hasattr(hub, "add_table"):
+        table_metadata = {"source": "causekit", "estimator": result.estimator}
+        hub.add_table(
+            f"{model_name} honest loss",
+            pd.DataFrame(
+                {
+                    "value": [
+                        result.honest_dr_loss,
+                        result.honest_constant_dr_loss,
+                        result.dr_loss_gain,
+                    ]
+                },
+                index=["dr_loss", "constant_dr_loss", "dr_loss_gain"],
+            ).reset_index(names="metric"),
+            caption=(
+                "Held-out DR-score loss against a constant fitted only on construction; "
+                "the pseudo-outcome is not observed unit-level effect truth."
+            ),
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} calibration tests",
+            result.calibration_tests.reset_index(names="hypothesis"),
+            caption="Split-conditional DR-score calibration tests on honest evaluation data.",
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} calibration groups",
+            result.group_effects.reset_index(),
+            caption=(
+                "Tie-preserving mean DR group scores with pointwise intervals and "
+                "studentized multiplier-bootstrap simultaneous bands."
+            ),
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} nuisance tuning",
+            result.nuisance_diagnostics.copy(),
+            caption="Construction-only arm outcome and propensity nuisance diagnostics.",
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} CATE tuning",
+            result.cate_diagnostics.copy(),
+            caption="Construction-only unweighted DR pseudo-outcome regression diagnostics.",
+            metadata=table_metadata,
+        )
+    elif isinstance(result, RandomizedATEResult) and result.balance and hasattr(hub, "add_table"):
+        hub.add_table(
+            f"{model_name} covariate balance",
+            pd.DataFrame([item.__dict__ for item in result.balance]),
+            caption="Unadjusted pre-treatment covariate balance by randomized arm.",
+            metadata={"source": "causekit", "estimator": "randomized_ate"},
+        )
+    elif isinstance(result, RepeatedCrossSectionDiDResult) and hasattr(hub, "add_table"):
+        table_metadata = {
+            "source": "causekit",
+            "estimator": result.method,
+            "population_basis": result.population_basis,
+            "target_population": result.target_population,
+        }
+        if result.cross_fitted:
+            hub.add_table(
+                f"{model_name} nuisance fitting diagnostics",
+                result.nuisance_diagnostics.copy(),
+                caption=(
+                    "Provider-neutral fold-local fits for the four-cell generalized propensity "
+                    "and three outcome regressions; every reported prediction is out of fold."
+                    if result.composition == "robust"
+                    else "Provider-neutral fold-local fits for the propensity and four "
+                    "group-period outcome regressions; every reported prediction is out of fold."
+                ),
+                metadata={
+                    **table_metadata,
+                    "n_splits": result.n_splits,
+                    "probability_floor": result.nuisance_probability_floor,
+                },
+            )
+        if not result.composition_weights.empty:
+            hub.add_table(
+                f"{model_name} composition weights",
+                result.composition_weights.copy(),
+                caption=(
+                    "Normalized target and generalized-propensity cell weights for the "
+                    "composition-change-robust efficient score."
+                ),
+                metadata={
+                    **table_metadata,
+                    "composition": result.composition,
+                    "target_population": result.target_population,
+                },
+            )
+        if not result.pair_ledger.empty:
+            hub.add_table(
+                f"{model_name} pair ledger",
+                result.pair_ledger.reset_index(),
+                caption=(
+                    "Complete robust pair support, target share, influence-embedding, overlap, "
+                    "weight, comparison-cohort, and nuisance-task audit records."
+                ),
+                metadata={
+                    **table_metadata,
+                    "composition": result.composition,
+                    "target_population": result.target_population,
+                },
+            )
+        if result.population_basis == "survey_population":
+            hub.add_table(
+                f"{model_name} survey-weight diagnostics",
+                result.survey_weight_diagnostics.reset_index(names="diagnostic"),
+                caption=(
+                    "Declared analysis-weight concentration and effective-sample-size audit; "
+                    "these diagnostics do not establish representativeness."
+                ),
+                metadata={
+                    **table_metadata,
+                    "weight_type": result.weight_type,
+                    "normalization": result.weight_normalization,
+                },
+            )
+            hub.add_table(
+                f"{model_name} survey-design diagnostics",
+                result.survey_design_diagnostics.rename_axis("diagnostic")
+                .rename("value")
+                .reset_index(),
+                caption=(
+                    "One-stage with-replacement stratified-PSU Taylor design audit and design "
+                    "degrees of freedom."
+                ),
+                metadata=table_metadata,
+            )
+            hub.add_table(
+                f"{model_name} survey-weighted cell counts",
+                result.weighted_cell_counts.reset_index(),
+                caption=(
+                    "Unweighted row/PSU support, design-weight mass, population share, Kish "
+                    "effective sample size, and maximum normalized weight by cohort-period cell."
+                ),
+                metadata=table_metadata,
+            )
+        if not result.pretrend.placebo_effects.empty:
+            hub.add_table(
+                f"{model_name} pre-trend placebos",
+                result.pretrend.placebo_effects.reset_index(),
+                caption=(
+                    "Adjacent conditional pre-period placebos. Failure to reject does not prove "
+                    "parallel trends or composition validity."
+                    if result.composition == "robust"
+                    else "Independent-cell adjacent pre-period placebos. Failure to reject "
+                    "does not prove parallel trends or stationary composition."
+                ),
+                metadata={
+                    **table_metadata,
+                    "joint_test_available": result.pretrend.available,
+                    "joint_test_statistic": result.pretrend.statistic,
+                    "joint_test_pvalue": result.pretrend.pvalue,
+                },
+            )
+        hub.add_table(
+            f"{model_name} cell counts",
+            result.cell_counts.reset_index(),
+            caption="Observed cohort-period support used to audit repeated samples.",
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} group-time effects",
+            result.group_time.reset_index(),
+            caption=(
+                "Four-component Hájek cohort-time effects with stratified-PSU Taylor inference."
+                if result.population_basis == "survey_population"
+                else (
+                    "Cross-fitted locally efficient doubly robust cohort-time effects with "
+                    "pointwise observation/PSU inference."
+                    if result.cross_fitted
+                    else "Four-cell cohort-time effects with pointwise observation/PSU inference."
+                )
+            ),
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} event study",
+            result.event_study.reset_index(),
+            caption=(
+                "Survey target-period-treated-share-weighted event-time effects with design-based pointwise inference."
+                if result.population_basis == "survey_population"
+                else (
+                    "Target-period-treated-share-weighted event-time effects with pointwise inference."
+                    if result.composition == "robust"
+                    else "Pooled-cohort-share-weighted event-time effects with pointwise inference."
+                )
+            ),
+            metadata=table_metadata,
+        )
+        if not result.simultaneous_event_study.empty:
+            hub.add_table(
+                f"{model_name} simultaneous event-study bands",
+                result.simultaneous_event_study.reset_index(),
+                caption=(
+                    "Studentized Rademacher multiplier max-t bands over the reported "
+                    "event-time path, drawn once per observation or declared PSU."
+                ),
+                metadata={
+                    **table_metadata,
+                    "sampling_unit": result.sampling_unit,
+                    "level": result.simultaneous_level,
+                    "critical_value": result.simultaneous_critical_value,
+                    "iterations": result.bootstrap_iterations,
+                    "random_state": result.bootstrap_random_state,
+                },
+            )
+        hub.add_table(
+            f"{model_name} calendar-time effects",
+            result.calendar_time.reset_index(),
+            caption=(
+                "Survey target-period-treated-share-weighted post-adoption calendar-time effects."
+                if result.population_basis == "survey_population"
+                else (
+                    "Target-period-treated-share-weighted post-adoption calendar-time effects."
+                    if result.composition == "robust"
+                    else "Pooled-cohort-share-weighted post-adoption calendar-time effects."
+                )
+            ),
+            metadata=table_metadata,
+        )
+    elif isinstance(result, DiDResult) and hasattr(hub, "add_table"):
+        table_metadata = {"source": "causekit", "estimator": result.method}
+        if not result.pretrend.placebo_effects.empty:
+            hub.add_table(
+                f"{model_name} pre-trend placebos",
+                result.pretrend.placebo_effects.reset_index(),
+                caption=(
+                    "Uncontaminated adjacent pre-period placebo effects. The joint test "
+                    "does not prove parallel trends when it fails to reject."
+                ),
+                metadata={
+                    **table_metadata,
+                    "joint_test_available": result.pretrend.available,
+                    "joint_test_statistic": result.pretrend.statistic,
+                    "joint_test_pvalue": result.pretrend.pvalue,
+                },
+            )
+        hub.add_table(
+            f"{model_name} group-time effects",
+            result.group_time.reset_index(),
+            caption="Cohort-time average treatment effects and pointwise inference.",
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} event study",
+            result.event_study.reset_index(),
+            caption="Cohort-share-weighted event-time effects with pointwise inference.",
+            metadata=table_metadata,
+        )
+        if not result.simultaneous_event_study.empty:
+            hub.add_table(
+                f"{model_name} simultaneous event-study bands",
+                result.simultaneous_event_study.reset_index(),
+                caption=(
+                    "Studentized multiplier-bootstrap max-t bands over the reported "
+                    "event-time path."
+                ),
+                metadata=table_metadata,
+            )
+        hub.add_table(
+            f"{model_name} calendar-time effects",
+            result.calendar_time.reset_index(),
+            caption="Cohort-share-weighted post-adoption calendar-time effects.",
+            metadata=table_metadata,
+        )
+        if not result.efficiency_weights.empty:
+            hub.add_table(
+                f"{model_name} efficiency weights",
+                result.efficiency_weights.copy(),
+                caption=(
+                    "Realized PT-All generated-outcome weights; negative values are "
+                    "permitted by the homogeneous-moment contract."
+                ),
+                metadata=table_metadata,
+            )
+        if not result.cohort_ratios.empty:
+            ratio_rows = pd.concat(
+                [
+                    pd.DataFrame(
+                        {
+                            result.entity_name: result.cohort_ratios.index,
+                            "numerator": numerator,
+                            "denominator": denominator,
+                            "odds_ratio": result.cohort_ratios[(numerator, denominator)].to_numpy(
+                                dtype=float
+                            ),
+                        }
+                    )
+                    for numerator, denominator in result.cohort_ratios.columns
+                ],
+                ignore_index=True,
+            )
+            hub.add_table(
+                f"{model_name} cohort odds",
+                ratio_rows,
+                caption=(
+                    "Ordered out-of-fold posterior cohort odds. Numerator and denominator "
+                    "orientation is part of the estimand contract."
+                ),
+                metadata={
+                    **table_metadata,
+                    "nuisance_weighting": result.nuisance_weighting,
+                },
+            )
+        if not result.cohort_ratio_diagnostics.empty:
+            hub.add_table(
+                f"{model_name} cohort-odds diagnostics",
+                result.cohort_ratio_diagnostics.copy(),
+                caption=(
+                    "Fold/pair support, tail, PSU, effective-size, concentration, and row-role audits."
+                ),
+                metadata=table_metadata,
+            )
+        if not result.cohort_ratio_candidate_uses.empty:
+            hub.add_table(
+                f"{model_name} cohort-odds candidate uses",
+                result.cohort_ratio_candidate_uses.copy(),
+                caption="Ordered cohort-odds nuisances mapped to each PT-All candidate score.",
+                metadata=table_metadata,
+            )
+    return model
+
+
+__all__ = ["add_to_outputhub", "to_outputhub_model"]

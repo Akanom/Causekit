@@ -1,0 +1,80 @@
+{
+  "artifact": "causekit_regression_discontinuity_real_data_v1",
+  "generated_on": "2026-07-30",
+  "generator": "benchmarks/validate_rd_real_data.py",
+  "reproduction_command": "python benchmarks/validate_rd_real_data.py",
+  "causekit_version": "0.7.0a6",
+  "python_version": "3.14.6",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "comparator": {
+    "package": "rdrobust",
+    "version": "2.0.0"
+  },
+  "source": {
+    "name": "Ludwig-Miller Head Start replication data",
+    "url": "https://raw.githubusercontent.com/rdpackages-replication/CT_2021_NBER/master/headstart.csv",
+    "sha256": "27e18a6ec3c15aa3a53aaa96c83024ce07841e9a6f21a7d850264d46711fd70b",
+    "rows_raw": 2809,
+    "outcome": "mort_age59_related_postHS",
+    "running": "povrate60",
+    "cutoff": 59.1984
+  },
+  "fixed_contract": {
+    "bandwidth": [
+      9.0,
+      9.0
+    ],
+    "bias_bandwidth": [
+      9.0,
+      9.0
+    ],
+    "polynomial_order": 1,
+    "bias_order": 2,
+    "kernel": "uniform",
+    "covariance": "HC1",
+    "causekit": {
+      "nobs": 2783,
+      "n_effective": 524,
+      "conventional_estimate": -1.8952353684711136,
+      "bias_corrected_estimate": -2.6229084099079705,
+      "robust_standard_error": 1.3140784117988775,
+      "mass_points_detected": 0
+    },
+    "rdrobust": {
+      "conventional_estimate": -1.895235368471103,
+      "bias_corrected_estimate": -2.6229084099078896,
+      "robust_standard_error": 1.3140784117988704
+    },
+    "absolute_differences": {
+      "conventional_estimate": 1.0658141036401503e-14,
+      "bias_corrected_estimate": 8.08242361927114e-14,
+      "robust_standard_error": 7.105427357601002e-15
+    },
+    "tolerance": 1e-09,
+    "parity_status": "pass"
+  },
+  "native_sensitivity": {
+    "method": "native_design_conditional_mse_grid",
+    "bandwidth": [
+      11.715874999999999,
+      6.181040000000004
+    ],
+    "bias_bandwidth": [
+      19.518121000000004,
+      14.487092999999996
+    ],
+    "bias_corrected_estimate": -2.568236752484947,
+    "robust_standard_error": 1.0672493878992593,
+    "n_effective": 1014,
+    "mass_points_detected": 0,
+    "manipulation_available": true,
+    "manipulation_log_density_jump": -0.1523435231404724,
+    "manipulation_pvalue": 0.2024204306530325,
+    "selected_grid_boundary": true,
+    "selected_grid_boundary_sides": [
+      "left"
+    ]
+  },
+  "interpretation": "Sensitivity and numerical parity only. The record does not establish smoothness, absence of sorting, exclusion of other cutoff changes, or a causal effect.",
+  "status": "pass"
+}

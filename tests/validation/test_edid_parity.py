@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from causalkit import EfficientDiD
+from causekit import EfficientDiD
 
 
 def _hand_panel() -> pd.DataFrame:
@@ -50,10 +50,10 @@ def _hand_panel() -> pd.DataFrame:
 
 @pytest.mark.validation
 def test_efficient_did_matches_pinned_r_edid_checkout() -> None:
-    reference_root = os.environ.get("CAUSALKIT_EDID_REFERENCE")
+    reference_root = os.environ.get("CAUSEKIT_EDID_REFERENCE")
     rscript = shutil.which("Rscript")
     if reference_root is None or rscript is None:
-        pytest.skip("set CAUSALKIT_EDID_REFERENCE and install Rscript for R edid parity")
+        pytest.skip("set CAUSEKIT_EDID_REFERENCE and install Rscript for R edid parity")
 
     repository_root = Path(__file__).resolve().parents[2]
     completed = subprocess.run(

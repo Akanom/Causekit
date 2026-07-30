@@ -1,6 +1,6 @@
 # Architecture
 
-`causalkit` is organized around small, auditable estimation paths. The `0.6.0a4`
+`causekit` is organized around small, auditable estimation paths. The `0.7.0a6`
 architecture keeps causal assumptions visible, separates numerical estimation from
 inference and diagnostics, and returns frozen labelled result containers suitable for
 reporting. The pandas objects stored inside a result should be treated as read-only; helper
@@ -72,21 +72,26 @@ The installed source tree assigns one primary responsibility to each module:
 
 | Module | Responsibility |
 | --- | --- |
-| `causalkit.__init__` | Stable root exports and package version |
-| `causalkit._data` | Input coercion, labels, exact pandas alignment, joint missing-data policy, and prediction schema |
-| `causalkit._covariance` | Homoskedastic, HC1, and one-way CR1 covariance kernels and inference metadata |
-| `causalkit.diagnostics` | First-stage diagnostic records and homoskedastic Sargan testing |
-| `causalkit.iv` | Public `IV2SLS`, 2SLS execution path, and fitted `IV2SLSResult` |
-| `causalkit.randomized` | Two-arm difference-in-means and Lin-adjusted ATE execution path, balance records, and fitted result |
-| `causalkit.observational` | Supplied-nuisance IPW/AIPW scores, overlap diagnostics, vectorized influence-function and cluster inference |
-| `causalkit.crossfit` | Public nuisance protocols, deterministic stratified fold orchestration, binary/multiclass probabilities, masked scalar tasks, fresh-model fitting, prediction adaptation, and aligned out-of-fold records |
-| `causalkit.matching` | Supplied-score ATT/ATC/ATE matching, sorted scalar neighbor search, support/caliper rules, fractional ties, weights, reuse, balance, and separate fixed-score or validated Logit-MLE analytical inference |
-| `causalkit.did` | Balanced-panel validation, conventional group-time DiD, cross-fitted covariate PT-All scores/conditional weights, pointwise and simultaneous influence inference, and cohort/event/calendar aggregation |
-| `causalkit.postestimation` | Summary, covariance, confidence interval, prediction, residual, fitted-value, linear-combination, and Wald helpers |
-| `causalkit.integrations.outputhub` | Lazy optional conversion and insertion into Universal Output Hub |
+| `causekit.__init__` | Stable root exports and package version |
+| `causekit._data` | Input coercion, labels, exact pandas alignment, joint missing-data policy, and prediction schema |
+| `causekit._covariance` | Homoskedastic, HC1, and one-way CR1 covariance kernels and inference metadata |
+| `causekit.diagnostics` | First-stage diagnostic records and homoskedastic Sargan testing |
+| `causekit.iv` | Public `IV2SLS`, 2SLS execution path, and fitted `IV2SLSResult` |
+| `causekit.panel_iv` | Long-panel validation, compact fixed-effect absorption, Panel 2SLS, absorbed-rank HC1/CR1 inference, and fixed-effect-adjusted diagnostics |
+| `causekit.randomized` | Two-arm difference-in-means and Lin-adjusted ATE execution path, balance records, and fitted result |
+| `causekit.observational` | Supplied-nuisance IPW/AIPW scores, overlap diagnostics, vectorized influence-function and cluster inference |
+| `causekit.crossfit` | Public nuisance protocols, deterministic stratified fold orchestration, binary/multiclass probabilities, masked scalar tasks, fresh-model fitting, prediction adaptation, and aligned out-of-fold records |
+| `causekit.matching` | Supplied-score ATT/ATC/ATE matching, sorted scalar neighbor search, support/caliper rules, fractional ties, weights, reuse, balance, and separate fixed-score or validated Logit-MLE analytical inference |
+| `causekit.did` | Balanced-panel validation, conventional group-time DiD, cross-fitted covariate PT-All scores/conditional weights, pointwise and simultaneous influence inference, and cohort/event/calendar aggregation |
+| `causekit.did_rcs` | Stationary repeated-section validation, marginal/cross-fitted doubly robust scores, observation/PSU pointwise and multiplier max-t inference, conditional placebos, and cohort/event/calendar aggregation |
+| `causekit.ml` | Native ridge-GCV nuisance fitting, shared-fold partially linear DML2 score, influence inference, fold-level tuning diagnostics, and fitted result |
+| `causekit.rd` | Sharp/fuzzy local-polynomial RD, bounded native bandwidth selection, robust bias correction, local score inference, support/manipulation diagnostics, and fitted result |
+| `causekit.postestimation` | Summary, covariance, confidence interval, prediction, residual, fitted-value, linear-combination, and Wald helpers |
+| `causekit.integrations.outputhub` | Lazy optional conversion and insertion into Universal Output Hub |
+| `causekit.datasets` | Opt-in HTTPS-only, SHA-256-pinned real-data cache used by examples and parity; source datasets are not redistributed |
 
 Underscored modules are internal. Users should import estimators, result types, diagnostics,
-and post-estimation helpers from `causalkit`; internal module paths may change during the
+and post-estimation helpers from `causekit`; internal module paths may change during the
 alpha series.
 
 ## Layer responsibilities
@@ -108,6 +113,14 @@ The public model stores covariance, intercept, and missing-data choices. Validat
 Validation produces a normalized internal bundle rather than making downstream layers
 repeat coercion. `missing="drop"` is the only row-removal path: it applies one mask to every
 input and records the removal count. No downstream component may drop or reorder rows.
+
+Panel IV owns a separate long-form bundle because entity/time identity is part of its
+estimand and covariance contract. It sorts one unique entity-time index, applies one joint
+complete-case mask, factors entity/time/cluster labels once, checks two-way graph
+connectivity, and residualizes the outcome plus every structural and excluded-instrument
+column together. Balanced two-way data use double demeaning; connected unbalanced data use
+deterministic alternating projections with an explicit convergence audit. The estimator
+never constructs fixed-effect dummies or an observation projection matrix.
 
 ### 2SLS core
 
@@ -164,7 +177,7 @@ preserves a valid pandas index.
 
 ### Optional integrations
 
-Reporting adapters live below `causalkit.integrations` and translate a fitted result into
+Reporting adapters live below `causekit.integrations` and translate a fitted result into
 the external reporting contract. `universal-output-hub` is optional; importing and fitting
 the core estimator must not require it. When unavailable, the adapter should raise an
 actionable installation error only when called.
@@ -176,7 +189,7 @@ truth.
 ## Compatibility strategy
 
 `systemgmmkit` and `limiteddepkit` established useful conventions for labelled econometric
-results. `causalkit` follows compatible meanings for parameters, covariance, standard
+results. `causekit` follows compatible meanings for parameters, covariance, standard
 errors, test statistics, p-values, observation counts, confidence intervals, prediction,
 and table/report adapters.
 
@@ -187,10 +200,20 @@ Compatibility is structural rather than inheritance-based:
 - no result class is promised to be interchangeable where estimator semantics differ; and
 - shared conventions are verified through public fields and adapter behavior.
 
+`PanelIV2SLS` follows the reviewed SystemGMMKit panel-validation, indexing, compact-within,
+and clustering meanings without importing sibling code. CauseKit strengthens the causal
+boundary with excluded-instrument-only roles, strict absorbed/rank refusals, full
+absorbed-rank covariance corrections, fixed-effect-adjusted first stages, and no silent
+column dropping. It is static Panel IV, not a second dynamic-panel GMM implementation.
+An ownership audit confirmed that LimitedDepKit exposes no active causal estimator to
+migrate. Its stale archived 2SLS snapshot and test were removed after CauseKit's maintained
+IV contract passed promotion. Historical cross-package comparison text is not part of
+either package's executable API.
+
 Limited-outcome estimators are not copied into this package. `CrossFitter` targets a
-documented fit/predict protocol so public `limiteddepkit` estimators can participate
-optionally without becoming a core dependency. The causal procedure still owns sample
-splitting, estimand construction, diagnostics, and valid uncertainty propagation.
+provider-neutral fit/predict protocol with no sibling-package import or validation
+dependency. The causal procedure owns sample splitting, estimand construction,
+diagnostics, and valid uncertainty propagation.
 
 The current observational fast path performs one strict alignment pass, constructs the
 IPW/AIPW score with vectorized array operations, and aggregates clustered influence sums
@@ -209,12 +232,12 @@ Matching uncertainty is intentionally separate from generic covariance code. The
 defaults to `inference="none"`. Its maintained Abadie–Imbens path estimates same-arm
 conditional variances, applies estimand-specific comparison-reuse formulas, and is exposed
 only for a declared fixed score without support/caliper selection or expanded ties.
-The separate `FittedPropensityMLEProtocol` consumes a public fitted result such as
-`limiteddepkit.BinaryLogitResult`; it does not fit or copy a binary model. The estimated-
-score path validates the full-sample unpenalized Logit score and normalized Fisher
-information, then applies the Abadie–Imbens first-step correction. Generic, cross-fitted,
-penalized, or unverifiable predictions still refuse analytical inference. The matcher does
-not reuse IV/ATE sandwich or CR1 kernels merely to populate standard-error fields.
+The separate `FittedPropensityMLEProtocol` consumes a provider-neutral public fitted
+result; it does not fit or copy a binary model. The estimated-score path validates the
+full-sample unpenalized Logit score and normalized Fisher information, then applies the
+Abadie–Imbens first-step correction. Generic, cross-fitted, penalized, or unverifiable
+predictions still refuse analytical inference. The matcher does not reuse IV/ATE sandwich
+or CR1 kernels merely to populate standard-error fields.
 
 The DiD path performs one long-to-wide balanced-panel validation and keeps the entity as
 the sampling unit. `DifferenceInDifferences` and `EfficientDiD` share this panel bundle,
@@ -225,6 +248,53 @@ efficient class constructs the PT-All generated outcomes and solves their covari
 system. Fixed-T cohort/period loops are permitted; all entity-level arithmetic is
 vectorized and cluster scores are aggregated after one factorization of the labels.
 
+Panel pre-trend diagnostics reuse the validated wide outcome bundle but build a separate
+matrix of adjacent changes that end before the anticipation boundary. Joint covariance is
+formed from the complete influence matrix, with cluster vector sums performed once.
+`did_hausman_test` aligns common post-treatment event-study coordinates and tests the
+PT-All minus PT-Post influence vector; a result fingerprint prevents comparisons across
+different outcomes, samples, timing, or cluster designs.
+
+Repeated cross sections do not enter this panel bundle. `did_rcs.py` owns their separate
+four-cell means, observation-level influence records, pooled cohort-share aggregation,
+cell audit table, and observation/PSU inference. It accepts unequal period and cell sizes,
+requires an explicit composition declaration, and never synthesizes a panel entity. Only
+the generic score-covariance and joint-Wald kernels are shared with `did.py`; the panel
+validator, within-entity changes, and panel pre-trend helper are not reused.
+
+Its covariate path plans every group-time and conditional-placebo comparison together,
+then sends one propensity and four masked group-period outcome tasks per comparison through
+one public `CrossFitter` call. A single cohort-period-stratified fold vector is therefore
+shared across tasks; declared PSUs remain whole. `did_rcs.py` owns the normalized locally
+efficient doubly robust score, ratio influence contributions, overlap refusal,
+aggregation, and uncertainty. It does not own a nuisance learner, import the panel
+outcome-change machinery, clip probabilities, or expose irrelevant comparison-row
+predictions as meaningful values.
+
+The composition-robust branch preserves the pairwise score instead of building one
+design-wide multinomial. `CrossFitter.fit_predict_class_probability_tasks` plans every
+`(cohort, baseline, target)` task on one immutable global row/PSU fold vector, trains only
+the pair-masked four-class rows, and predicts only relevant held-out pair rows. Coordinated
+masked outcome tasks fit `m_00`, `m_01`, and `m_10`; `m_11` is not unused work. The class-
+probability boundary realigns labelled permutations but refuses missing, extra,
+duplicate, or unlabelled schemas.
+
+`did_rcs.py` hard-refuses overlap failures, constructs normalized pair weights, embeds
+each pair influence on the full sample with exact zeros outside the pair, and retains the
+support/scale/task audit in a pair ledger. Event and calendar aggregation use target-
+period treated-cell shares plus their estimated-share influence. The public composition
+diagnostic subtracts aligned robust and stationary influence matrices before covariance
+assembly; marginal covariance subtraction, pair-local resplitting, numerical rank repair,
+and diagnostic-driven estimator selection are prohibited.
+
+Survey support remains outside the runtime architecture and requires an explicit design
+object, weighted nuisance protocol, and design-based variance. The balanced-panel direct-
+ratio route replaces `EfficientDiD` multiclass probability ratios with calibrated ordered
+pairwise cohort odds and refactors its conditional covariance only by a scale that cancels
+in normalized efficient weights. `CrossFitter` owns fresh pair/fold fitting, all-holdout
+prediction, immutable fold reuse, alignment, and support audits; `did.py` owns the PT-All
+candidate graph, score, `Omega_tilde` assembly, thresholds, and cross-score refusals.
+
 No nuisance learner lives in `did.py`. The covariate-adjusted efficient path expresses
 cohort classification, group-specific outcome changes, and conditional residual products
 as public `CrossFitter` operations. `did.py` owns the causal score, equation (3.12)
@@ -232,10 +302,63 @@ conditional covariance assembly, normalized solve, aggregation, and uncertainty.
 cohort probability or singular weight system refuses rather than silently applying
 clipping, a ridge, or a pseudoinverse.
 
-The historical `limiteddepkit.TreatmentEffect` snapshot is provenance for migration, not a
-code dependency. `IV2SLS` was designed around the explicit excluded-instrument contract and
-new package-owned layers. Migration details belong in the README and package-scope guide,
-not in compatibility shims that preserve an ambiguous full-`Z` API.
+The specialized causal-ML path lives in `ml.py`. `PartiallyLinearDML` sends outcome and
+treatment conditional-mean tasks through the same `CrossFitter` plan, residualizes once,
+and evaluates the pooled DML2 orthogonal score with vectorized arrays. When no factories
+are supplied, every fold receives a fresh CauseKit-native standardized ridge learner; its
+penalty is selected by generalized cross-validation using only that fold's training rows.
+The SVD path evaluates candidate residual sums of squares without reconstructing fitted
+vectors. A denser candidate grid did not improve the recorded real-data out-of-fold errors,
+so the original six-point default remains. The optional public
+`NuisanceDiagnosticsProtocol` carries scalar tuning diagnostics through `CrossFitter` into
+the DML result and OutputHub.
+The residual second stage reuses the one-column HC1/CR1 covariance kernel, for which the
+linear score and influence-function formulas coincide exactly. Zero or numerically weak
+residual treatment variation refuses before inference rather than receiving ridge repair.
+
+The public honest R-learner reuses the same provider-neutral boundary. Its
+`WeightedCATEEstimatorProtocol` requires genuine
+`sample_weight` support and a separate `CATEResultProtocol` prediction surface. Internal
+native prerequisites provide stratified training-only-CV penalized Logit probabilities
+and weighted ridge-GCV for the algebraically exact R-loss transformation. Both retain
+training indices and tuning diagnostics.
+
+`NativeSplineRidgeCATE` extends only the weighted-CATE stage. It builds bounded additive
+linear-spline candidates from construction-only quantiles and selects knot count plus
+ridge penalty by weighted GCV. The zero-knot candidate is always available by default,
+pairwise interactions require explicit opt-in, and a hard basis-size ceiling prevents
+quadratic feature growth from becoming an implicit runtime path. It remains a specialized
+R-learner component rather than a general regression API.
+
+The internal construction layer deterministically assigns treatment-stratified rows or
+whole clusters to construction and evaluation, and clustered outer folds never split a
+cluster. Role state is retained in immutable tuple storage and exposed only through copies.
+Only construction data enter cross-fitted nuisance and weighted-CATE fitting; fresh
+full-construction nuisance refits and the construction-fitted CATE model provide evaluation
+predictions. Direct and transformed weighted R-objectives are retained as an exact identity.
+`RLearner` then consumes the locked evaluation role once for R-loss, differential
+calibration, and tie-preserving overlap-weighted group moments. Calibration uses the
+shared HC1/CR1 OLS covariance kernel; group max-t draws use the corresponding observation-
+or cluster-summed influence matrix. `RLearnerResult` owns OutputHub tables, exact graph
+data, optional plotting, and future-data prediction through the construction-fitted CATE
+model. Unit-level intervals, repeated-split aggregation, RATE, and policy evaluation stay
+outside this alpha.
+
+The honest DR learner reuses role assignment, shared cluster-preserving outer folds,
+fresh-state auditing, covariance, tie grouping, multiplier bands, and result/reporting
+conventions, while keeping a separate statistical objective. Two masked `CrossFitter`
+tasks fit control and treated outcome regressions only on their arms; a third task fits the
+propensity on the same fold plan. Construction OOF predictions form the augmented
+inverse-probability score. The public `CATEEstimatorProtocol` then fits an unweighted
+construction-only regression, distinct from the R-learner's weighted protocol. Fresh
+full-construction nuisance refits and the construction CATE model predict evaluation rows.
+`DRLearner` consumes evaluation outcomes/treatments once for fixed score loss, calibration,
+and group inference and never feeds them back into selection.
+
+The historical `limiteddepkit.TreatmentEffect` migration is complete. `IV2SLS` owns the
+replacement and a maintained numerical migration contract; the obsolete source snapshot
+has been removed from LimitedDepKit. Migration details belong in the README and package-
+scope guide, not in compatibility shims that preserve an ambiguous full-`Z` API.
 
 ## Dependencies
 
@@ -282,6 +405,10 @@ architecture.
   `cKDTree` for ATT/ATC covariate-neighbor derivatives; do not allocate pairwise matrices.
 - Avoid unnecessary copies of large designs and residual arrays.
 - Aggregate cluster scores in one pass over normalized cluster codes.
+- Keep DML nuisance selection inside each outer training fold and pool only aligned
+  out-of-fold scores; never tune against an outer held-out row.
+- Keep nuisance diagnostics scalar and fold-labelled; do not expose raw training rows or
+  fitted provider objects through the result surface.
 - Fail before expensive factorization when shapes, missing data, or exact rank make the
   model invalid.
 - Never log raw observations, instrument values, or cluster identifiers by default.

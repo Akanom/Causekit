@@ -23,7 +23,7 @@ Identification requires consistency, no interference, conditional exchangeabilit
 the pre-treatment information used by the nuisance functions, and positivity. These are
 substantive assumptions; fitted propensity support cannot detect omitted confounders.
 
-Supplied nuisance predictions preserve ownership boundaries with `limiteddepkit` and make
+Supplied nuisance predictions preserve provider-neutral ownership boundaries and make
 data leakage auditable. Adaptive nuisance fits should be cross-fitted. The AIPW score has
 the usual double-robust property only under regularity conditions and valid inference also
 depends on nuisance convergence rates or justified low-complexity fitting. Clipping limits
@@ -278,9 +278,80 @@ Analytic intervals are pointwise. Robust inference treats the panel entity as th
 sampling unit; higher-level clustered inference assumes independent clusters and many
 clusters. The optional multiplier max-t path supplies a simultaneous band across the
 reported event-study coordinates, with multipliers drawn at the declared sampling level.
-It does not validate PT-All or turn a pre-trend plot into an identification test. The
-current alpha has no pre-trend test, Hausman test, or repeated-cross-section
-interpretation, and refuses those unsupported paths.
+
+The no-covariate panel results expose adjacent, uncontaminated cohort-period pre-trend
+placebos and a joint test. A two-period design can have no testable placebo, and a singular
+joint covariance is reported as unavailable without repairing or dropping moments.
+Failure to reject is not evidence that parallel trends holds. The separate
+`did_hausman_test` compares aligned no-covariate PT-All and PT-Post post-treatment
+event-study vectors using the influence function of their difference. Rejection weighs
+against the additional PT-All restrictions; non-rejection does not prove them or justify
+mechanical estimator selection.
+
+Neither panel class has a repeated-cross-section interpretation. The separate
+`RepeatedCrossSectionDiD` surface targets cohort-time ATT from independent period samples.
+Its unadjusted path uses treated target minus treated baseline, less fixed-comparison target
+minus fixed-comparison baseline. Its adjusted path replaces those marginal means with the
+cross-fitted locally efficient doubly robust repeated-cross-section score and tests
+pre-trends with the aligned conditional score. Both require stationary composition of the
+relevant cohort populations, enough support in every used cell, consistency, no
+interference, overlap, no anticipation, and the declared marginal or conditional parallel-
+trends restriction. Stationarity is recorded as an assumption, not inferred from cell
+counts, nuisance fit, or a pre-trend test. Observation-level HC1 or declared-PSU CR1 scores
+replace entity-level panel changes. Composition-change robustness is not approximated by
+either stationary-composition path.
+
+The explicit `composition="robust"` path instead targets
+`E[Y_t(1)-Y_t(0) | G=g,T=t]` for each treated cohort-target-period pair. It requires
+measured baseline covariates, conditional parallel trends, no anticipation, and strict
+support for all four pair cells given those covariates. Pair-specific cross-fitted
+four-class generalized propensities and the `m_00`, `m_01`, and `m_10` outcome regressions
+form the Sant'Anna-Xu score; full-sample pair influences aggregate with target-period
+treated-cell shares. It permits the measured `(G,X)` distribution to change by period but
+does not repair unmeasured composition changes. The aligned robust-minus-stationary
+diagnostic reports sensitivity and does not verify stationarity or select an estimator.
+
+The opt-in repeated-section multiplier path leaves those point estimates and analytical
+standard errors unchanged. It draws Rademacher multipliers once per observation under
+HC1, or once per declared indivisible PSU after summing observation influences under CR1,
+and studentizes every reported event coordinate before taking the maximum absolute draw.
+It does not resample rows, reconstruct synthetic panels, or refit cross-fitted nuisances.
+
+## Honest heterogeneous effects
+
+`RLearner` targets `tau(x) = E[Y(1)-Y(0) | X=x]` for an exact binary treatment. A causal
+interpretation requires consistency, no interference, conditional exchangeability given
+the declared pre-treatment covariates, overlap, and adequate nuisance rates. These are
+assumptions, not conclusions from a flexible learner or a wide CATE distribution.
+
+CauseKit assigns observations—or whole declared clusters—to immutable construction and
+evaluation roles. Only construction outcomes and treatments enter nuisance or CATE
+fitting. Evaluation is used once for residual R-loss, differential calibration, and
+tie-preserving groups. The R-loss gain compares against a constant effect fitted on
+construction and is not predictive R-squared. The differential heterogeneity coefficient
+tests whether the held-out proxy contains effect-ranking signal and whether its scale is
+near one; it does not establish pointwise CATE truth.
+
+Group effects solve `sum(v_i u_i) / sum(v_i^2)` inside fixed score groups. They are overlap-
+weighted residual-moment effects, not automatically ordinary group ATEs. HC1 or one-way
+CR1 inference is conditional on the recorded split, and the multiplier max-t band covers
+the complete reported group path under the declared sampling assumptions. The alpha does
+not provide unit-level CATE intervals, repeated-split aggregation, RATE, targeting curves,
+or policy value.
+
+`DRLearner` targets the same binary-treatment CATE through the augmented
+inverse-probability score. Its conditional score mean identifies `tau(x)` when the
+propensity is correct or both treatment-arm outcome regressions are correct, subject to
+the same consistency, no-interference, conditional-exchangeability, overlap, and
+nuisance-rate conditions. “Doubly robust” does not cover unmeasured confounding, overlap
+failure, a single correct arm regression, or arbitrary final-stage approximation error.
+
+Construction-only cross-fitting and full-construction refits preserve the immutable honest
+boundary. Evaluation DR-score loss is a noisy model-comparison signal, not observed
+unit-level effect error. Calibration regresses the fixed evaluation score on an intercept
+and centered CATE prediction; tie-preserving groups average the DR score and therefore
+target score-defined group ATEs under the declared assumptions. Their HC1/CR1 and max-t
+uncertainty remains split-conditional and does not imply unit-level CATE intervals.
 
 ## Missing values, indices, and sample definition
 
@@ -317,7 +388,7 @@ At minimum, an IV analysis should report:
 8. the Sargan result only when its homoskedastic conditions apply, with its limitations;
 9. sensitivity to instrument sets, controls, functional form, influential observations,
    and clustering choices; and
-10. the exact `causalkit` version and reproduction command.
+10. the exact `causekit` version and reproduction command.
 
 Use phrases such as “the 2SLS coefficient is consistent under the stated relevance,
 independence, and exclusion assumptions,” not “the package proves a causal effect.”

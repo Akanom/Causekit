@@ -1,12 +1,14 @@
 # Nearest-neighbor matching contract
 
-Status (2026-07-28): point estimation plus separate fixed/known-score and validated
+Status (2026-07-30): point estimation plus separate fixed/known-score and validated
 full-sample Logit-MLE Abadie–Imbens analytical paths are implemented. Fixed-score parity
 is recorded for Python, R, and Stata. The estimated-score path has hand identities,
-independent `statsmodels` first-step parity, direct `limiteddepkit.BinaryLogitResult`
-interoperability, deterministic coverage smoke, and 100,000-row performance evidence;
-its manual Stata comparator is written but not yet recorded. This document is normative
-for both the implemented slice and explicitly deferred gates.
+independent `statsmodels` first-step parity, deterministic coverage smoke, 100,000-row
+performance evidence, and a reviewed Stata/IC 17 `teffects psmatch` pass. A preregistered
+12,000-fit certificate now covers ATT/ATC/ATE under favorable and stressed overlap for
+both analytical paths; a separate hash-verified Cattaneo grid records support/caliper
+sensitivity without attaching unsupported inference. This document remains normative for
+the implemented slice and explicitly deferred gates.
 
 ## Problem and claim boundary
 
@@ -40,7 +42,7 @@ NearestNeighborMatch(
     inference="none",
     variance_neighbors=1,
     first_step_covariance_neighbors=2,
-    first_step_regression_neighbors=1,
+    first_step_regression_neighbors=2,
     first_step_covariate_neighbors=1,
 ).fit(
     y,
@@ -68,7 +70,7 @@ NearestNeighborMatch(
     caliper=None,
     common_support=None,
     inference="abadie_imbens_estimated",
-    variance_neighbors=2,
+    variance_neighbors=1,
 ).fit(
     y,
     treatment=...,
@@ -80,9 +82,8 @@ NearestNeighborMatch(
 ```
 
 `FittedPropensityMLEProtocol` requires public `params`, `converged`, `nobs`,
-`feature_names`, and `predict_proba`. `limiteddepkit.BinaryLogitResult` satisfies this
-protocol directly. CausalKit validates the fitted result rather than trusting a provenance
-label or importing the nuisance package.
+`feature_names`, and `predict_proba`. CauseKit validates the fitted result rather than
+trusting a provenance label or importing a nuisance-estimation package.
 
 ## Estimand and target population
 
@@ -226,7 +227,7 @@ unit-level observed-minus-imputed contrasts, with sign normalized as `Y(1) - Y(0
 `bias_correction="none"` is the stable initial default. Abadie–Imbens regression bias
 correction may be added only with a separate supplied/fitted outcome-regression protocol,
 cross-fitting or a justified fixed-complexity contract, and independent recovery tests.
-The matcher must not import or duplicate regression estimators from `limiteddepkit`.
+The matcher must not import or duplicate a nuisance-regression estimator.
 
 ## Uncertainty
 
@@ -270,8 +271,15 @@ For ATE, the paper-scale correction is `-c' I^-1 c`. For ATT it is
 `-c_t' I^-1 c_t + d_t' I^-1 d_t`, where `d_t` is the propensity-parameter derivative
 of the treated target; ATC is implemented by treatment-label reversal. Local conditional
 covariances use `first_step_covariance_neighbors>=2`, local outcome regressions default to
-one leave-own-out score neighbor, and ATT/ATC derivatives default to one opposite-arm
-covariate neighbor. All neighbor counts are public result metadata.
+two leave-own-out same-arm score neighbors, and ATT/ATC derivatives default to one
+opposite-arm covariate neighbor. All neighbor counts are public result metadata.
+
+For Stata `teffects psmatch`, `vce(robust, nn(2))` counts the focal observation in its
+local variance set. Its `nocorrection` component therefore maps to CauseKit
+`variance_neighbors=1`; its first-step component maps to two local covariance observations
+and two leave-own-out outcome-regression neighbors. A frozen-score `teffects nnmatch`
+variance is a different finite-sample contract and must not be subtracted from `teffects
+psmatch` to infer the first-step correction.
 
 The result exposes the normalized information matrix, fitted scores, adjustment vector,
 target derivative, model/link metadata, likelihood-score norm, known-score variance,
@@ -281,7 +289,7 @@ sample variance refuses instead of being clipped.
 
 `first_step_asymptotic_adjustment` is on the paper's root-`N` variance scale and
 `first_step_variance_adjustment` divides it by full sample size `N` before adding it to
-`known_score_variance`. The `normalized_variance` fields retain CausalKit's target-size
+`known_score_variance`. The `normalized_variance` fields retain CauseKit's target-size
 normalization and therefore are not aliases for the root-`N` scale for ATT or ATC.
 
 A generic fitted or cross-fitted prediction does not expose the parametric score and
@@ -349,8 +357,8 @@ matches)` memory. Tie and caliper logic must operate on sorted local neighborhoo
 
 Estimated-score local moments reuse the sorted scalar search. ATT/ATC target derivatives
 use `scipy.spatial.cKDTree`, querying only the requested local covariate neighbors rather
-than allocating an `n_treated x n_control` matrix. On 2026-07-28, the seeded 100,000-row
-ATE estimated-score scenario completed the uninstrumented fit in 19.80 seconds and used
+than allocating an `n_treated x n_control` matrix. On 2026-07-29, the seeded 100,000-row
+ATE estimated-score scenario completed the uninstrumented fit in 18.20 seconds and used
 85.20 MiB peak Python memory under a separate tracemalloc pass on Python 3.14.6, NumPy
 2.4.6, pandas 3.0.3, and Windows 11. This is a smoke result, not a universal guarantee.
 
@@ -387,10 +395,23 @@ the model plus outcome-free match and balance tables. `benchmark_matching.py` in
 Stata/MP 17 `teffects nnmatch` pass in
 `benchmarks/validate_matching_stata_17_output.txt`. The estimated-score Python comparator
 uses `statsmodels.Logit`, and the public protocol has been exercised directly with
-`limiteddepkit.BinaryLogitResult`. Its Stata `teffects psmatch` harness is
-`benchmarks/validate_matching_estimated_stata.do` and remains pending manual execution.
-R `Matching` conditions on its supplied score and is non-comparable for this first-step
-correction. This alpha is not a completed general matching release.
+an independent `statsmodels.Logit` result. Its reviewed Stata `teffects psmatch` harness
+is `benchmarks/validate_matching_estimated_stata.do`; the retained output records a pass
+for ATT, ATC, and ATE components. R `Matching` conditions on its supplied score and is
+non-comparable for this first-step correction.
+
+The publication-scale runner is `benchmarks/validate_matching_promotion.py`; its saved
+certificate is `benchmarks/matching_promotion_evidence.json`. Across 1,000 replications
+per overlap design, all 12 contract/estimand cells passed: empirical coverage was
+`0.943–0.955`, maximum absolute bias was `0.0073`, mean analytical SE divided by empirical
+sampling SD was `0.963–1.019`, and coverage Monte Carlo SE was at most `0.0073`. The
+hash-verified 4,642-row Cattaneo sensitivity grid reports all 15 no-support/intersection/
+caliper rows with `inference="none"`; support restriction removed 10 control focal units
+and the narrow caliper removed three more, so ATC/ATE rows retain matched-support labels.
+See [Matching inference promotion evidence](MATCHING_PROMOTION_EVIDENCE.md).
+
+This alpha is not a completed general matching release. The passing evidence does not
+authorize generic score, selected-target, tie-expanded, clustered, or bootstrap inference.
 
 ## Pre-mortem
 

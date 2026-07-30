@@ -1,15 +1,24 @@
-# causalkit
+# CauseKit
 
-`causalkit` is an identification-aware Python package for causal inference and
-instrumental-variable workflows. The `0.6.0a4` surface provides linear two-stage least
-squares, randomized-experiment effects, reusable nuisance cross-fitting, IPW/AIPW ATE,
+CauseKit (installed and imported as `causekit`) is an identification-aware Python package for causal inference and
+instrumental-variable workflows. The `0.7.0a6` surface provides cross-sectional and
+fixed-effects panel two-stage least squares, randomized-experiment effects, reusable
+nuisance cross-fitting, IPW/AIPW ATE,
 ATT, and ATC, scalar propensity-score matching with separate fixed- and estimated-score
-analytical inference paths, conventional staggered DiD, and cross-fitted covariate-adjusted
-Chen-Sant'Anna-Xie efficient DiD for short panels.
+analytical inference paths, conventional staggered panel and repeated-cross-section DiD,
+cross-fitted covariate-adjusted Chen-Sant'Anna-Xie efficient DiD for short panels,
+CauseKit-native partially linear double machine learning, and separately contracted honest
+heterogeneous-effect R- and DR-learning. It also provides sharp and fuzzy continuity-based
+regression discontinuity with explicit bandwidth, bias-correction, manipulation-diagnostic,
+and local-estimand contracts.
 
 This is alpha research software. A successful fit is not evidence that an instrument is
 valid, and an IV coefficient is not automatically an average treatment effect. State the
 estimand and defend the identifying assumptions before using causal language.
+
+The project was renamed before its first release because the intended `causalkit`
+distribution name is already used by an unrelated project. CauseKit does not install a
+`causalkit` compatibility namespace; use `pip install causekit` and `import causekit`.
 
 ## Current scope
 
@@ -25,6 +34,31 @@ The retained IV API provides:
 - Sargan's overidentification test only for overidentified fits using
   `covariance="unadjusted"`.
 
+The fixed-effects Panel IV alpha adds mandatory entity absorption, optional time effects,
+and entity-clustered inference by default. It consumes a long-form DataFrame, requires
+excluded instruments to retain within variation, and does not construct dynamic-panel
+lags or import SystemGMMKit at runtime.
+
+```python
+from causekit import PanelIV2SLS
+
+panel_result = PanelIV2SLS().fit(
+    panel_data,
+    outcome="outcome",
+    endogenous="treatment",
+    instruments="encouragement",
+    exogenous=["control"],
+    entity="unit",
+    time="period",
+)
+```
+
+The compact implementation absorbs effects without fixed-effect dummy matrices, supports
+connected unbalanced two-way panels through deterministic alternating projections, and
+exposes fixed-effect-adjusted first stages plus instrument-variation audits. See the
+[Panel IV contract](docs/PANEL_IV_CONTRACT.md). Fixed effects do not validate an instrument
+or remove time-varying confounding.
+
 The `0.2.0a1` randomized-experiment layer adds:
 
 - `RandomizedATE(adjustment="none")` for the raw difference in arm means;
@@ -33,11 +67,11 @@ The `0.2.0a1` randomized-experiment layer adds:
   and explicit causal-assumption metadata.
 
 The `0.3.0a1` observational layer adds `IPWATE` and `AIPWATE`. It deliberately accepts
-propensity and potential-outcome predictions rather than duplicating the binary and
-limited-outcome estimators already maintained by `limiteddepkit`.
+propensity and potential-outcome predictions through provider-neutral public boundaries
+rather than owning nuisance-model likelihoods.
 
 ```python
-from causalkit import AIPWATE
+from causekit import AIPWATE
 
 result = AIPWATE().fit(
     outcome,
@@ -57,14 +91,13 @@ reporting because it changes the estimating equation.
 
 ### Reusable cross-fitting
 
-`CrossFitter` accepts factories so every fold receives fresh models. A model may follow
-the `limiteddepkit` convention (`fit` returns a fitted result) or the scikit-learn
-convention (`fit` returns the estimator). Default fitted results expose `predict_proba`
-for propensity models and `predict` for outcome models; explicit adapters support other
-public APIs.
+`CrossFitter` accepts factories so every fold receives fresh models. A model may return
+an immutable fitted result or follow the scikit-learn convention where `fit` returns the
+estimator. Default fitted results expose `predict_proba` for propensity models and
+`predict` for outcome models; explicit adapters support other public APIs.
 
 ```python
-from causalkit import AIPWATE, CrossFitter
+from causekit import AIPWATE, CrossFitter
 
 nuisance = CrossFitter(
     propensity_factory=make_propensity_model,
@@ -84,24 +117,163 @@ att = AIPWATE(estimand="att").fit(
 
 Folds are stratified by treatment, predictions retain the original index, and each arm
 must contain at least `n_splits` observations. Fold assignment is deterministic when
-`random_state` is fixed.
+`random_state` is fixed. Supplying `clusters=` keeps every cluster wholly within one fold
+and refuses any allocation that cannot retain every treatment stratum in every fold.
 
-The same orchestrator exposes multiclass class-probability prediction and masked scalar
-regression tasks. Those operations let panel estimators request cohort-specific outcome
-changes and conditional second moments without owning or copying model implementations.
+The same orchestrator exposes multiclass class-probability prediction, task-masked
+multiclass prediction on one global fold plan, and masked scalar regression tasks. Those
+operations let estimators request cohort/pair-specific probabilities, outcome changes, and
+conditional second moments without owning or copying model implementations.
 Every task receives a fresh model per fold. A separate `second_moment_factory=` is
-optional; when omitted, the outcome factory is reused.
+optional; when omitted, the outcome factory is reused. Multiclass DataFrame outputs must
+have exactly one labelled column per observed class. Labelled column permutations are
+realigned safely; missing, extra, duplicate, or unlabeled array order refuses.
+
+### Native causal machine learning
+
+`PartiallyLinearDML` estimates the DML2 orthogonal-score coefficient for a binary or
+continuous scalar treatment. Its default nuisance path is CauseKit's own dependency-free,
+standardized ridge learner with generalized-cross-validation selection nested separately
+inside each outer training fold.
+
+```python
+from causekit import PartiallyLinearDML
+
+dml = PartiallyLinearDML(
+    n_splits=5,
+    random_state=2026,
+    covariance="robust",
+).fit(
+    outcome,
+    treatment=treatment,
+    covariates=baseline_covariates,
+)
+
+print(dml.summary_frame())
+print(dml.nuisance_predictions)
+print(dml.nuisance_diagnostics)
+print(dml.residual_treatment_second_moment)
+```
+
+CauseKit imports no third-party ML implementation for this path. Optional outcome and
+treatment factories can replace either native nuisance learner when substantively
+necessary, while `CrossFitter` retains the shared out-of-fold plan. The reported `theta`
+is an ATE only under a credible constant-effect partially linear model, consistency, no
+interference, conditional exchangeability, residual treatment variation, and the DML
+nuisance-rate/regularity conditions. See the [causal-ML contract](docs/ML_CONTRACT.md).
+The native learner reports one tuning row per task and outer fold, including its selected
+penalty, effective degrees of freedom, GCV score, training RMSE, numerical rank, grid size,
+and whether selection reached a grid boundary.
+
+`RLearner` estimates heterogeneous effects through the residualized R-objective while
+keeping construction and evaluation roles honest. Rows are split within treatment arms;
+with `covariance="clustered"`, whole clusters are assigned to roles and outer folds. Only
+construction data tune or fit the outcome, propensity, and weighted CATE learners.
+
+```python
+from causekit import RLearner
+
+rlearner = RLearner(
+    n_splits=5,
+    evaluation_fraction=0.5,
+    random_state=2026,
+    calibration_groups=5,
+    bootstrap_iterations=999,
+).fit(
+    outcome,
+    treatment=treated,
+    covariates=X,
+)
+
+print(rlearner.summary_frame())  # differential calibration
+print(rlearner.honest_r_loss)
+print(rlearner.honest_constant_r_loss)
+print(rlearner.calibration_plot_data())  # pointwise and simultaneous group bands
+```
+
+The R-loss gain compares the CATE learner with a constant effect fitted only on
+construction; it is not predictive R-squared. Calibration groups preserve score ties and
+report overlap-weighted residual-moment effects, not ordinary group ATEs. The first public
+contract provides no unit-level CATE interval, RATE, policy value, or repeated-split
+aggregation. `plot_calibration()` and `plot_cate_distribution()` are available through the
+optional `plot` extra; both use the exact retained honest tables.
+
+The R-loss is an established method, not a new CauseKit model. CauseKit's differentiation
+is its integrated honest-role, audit, refusal, cluster, calibration, and simultaneous-band
+contract; the [full contract](docs/R_LEARNER_CONTRACT.md) avoids unsupported claims of
+global algorithmic novelty.
+
+For nonlinear CATEs, `NativeSplineRidgeCATE` is an opt-in weighted final stage:
+
+```python
+from causekit import NativeSplineRidgeCATE
+
+nonlinear = RLearner(
+    cate_factory=NativeSplineRidgeCATE,
+    random_state=2026,
+).fit(outcome, treatment=treated, covariates=X)
+
+print(nonlinear.cate_diagnostics)  # selected knots, basis size, alpha, weighted GCV
+```
+
+It selects zero-, one-, or three-knot additive linear-spline bases and the ridge penalty
+using construction-only weighted GCV, then evaluates once on the honest role. Linear
+ridge-GCV remains the default: the nonlinear learner recovers a known piecewise effect in
+simulation, matches linear performance on the Hillstrom visit outcome through its zero-
+knot fallback, is slightly worse after selecting one knot for Hillstrom conversion, and is
+worse on the separate NSW split. Pairwise interactions are explicit opt-in and a strict
+basis-size ceiling prevents accidental feature explosion.
+
+The next nonlinear stage is design-only: a construction-cross-fitted orthogonal stack of
+constant, linear, feature-adaptive additive, and strong-heredity interaction candidates.
+It will not replace the default until it passes the frozen correctness, leakage,
+semisynthetic known-truth, real randomized-outcome, comparator, and performance gates in
+the [native nonlinear CATE promotion contract](docs/NONLINEAR_CATE_PROMOTION_CONTRACT.md).
+
+`DRLearner` is a separately contracted heterogeneous-effect estimator. It cross-fits the
+propensity and both treatment-arm outcome regressions inside construction, forms the
+augmented inverse-probability pseudo-outcome without clipping, and fits an unweighted CATE
+regression. The evaluation role remains untouched by every fit and tuning operation.
+
+```python
+from causekit import DRLearner
+
+drlearner = DRLearner(
+    n_splits=5,
+    evaluation_fraction=0.5,
+    random_state=2026,
+    calibration_groups=5,
+    bootstrap_iterations=999,
+).fit(outcome, treatment=treated, covariates=X)
+
+print(drlearner.summary_frame())
+print(drlearner.honest_dr_loss, drlearner.honest_constant_dr_loss)
+print(drlearner.calibration_plot_data())
+```
+
+The score is doubly robust only in the precise sense that its conditional mean is correct
+when the propensity is correct or both arm outcome regressions are correct, alongside the
+documented identification and rate conditions. It does not repair unmeasured confounding.
+HC1/CR1 calibration, tie-preserving mean-score groups, and max-t group bands are
+split-conditional; no unit-level interval, RATE, or policy-value claim is exposed. See the
+[honest DR-learner contract](docs/DR_LEARNER_CONTRACT.md).
+
+On one hash-verified NSW split, native ridge-GCV and optional scikit-learn RidgeCV produced
+the same displayed CATE predictions and honest DR loss; the native path used less
+Python-managed peak memory, while RidgeCV was slightly faster. Boosting and random forest
+were worse than the construction-fitted constant. Ridge-GCV is therefore the auditable,
+dependency-free default, not a claimed novel ridge method or universal winner.
 
 ### Nearest-neighbor matching
 
-`NearestNeighborMatch` consumes a supplied propensity rather than copying a binary model
-from `limiteddepkit`. The implemented slice supports ATT, ATC, and bidirectional-imputation
-ATE; logit-propensity distance; replacement; inclusive numeric or automatic calipers;
-intersection common support; deterministic fractional boundary ties; effect/reuse
-weights; and before/after covariate balance.
+`NearestNeighborMatch` consumes a supplied propensity through a provider-neutral boundary.
+The implemented slice supports ATT, ATC, and bidirectional-imputation ATE;
+logit-propensity distance; replacement; inclusive numeric or automatic calipers;
+intersection common support; deterministic fractional boundary ties; effect/reuse weights;
+and before/after covariate balance.
 
 ```python
-from causalkit import NearestNeighborMatch
+from causekit import NearestNeighborMatch
 
 matched = NearestNeighborMatch(
     estimand="att",
@@ -142,32 +314,31 @@ print(fixed_score_match.summary_frame())
 print(fixed_score_match.conditional_variances)
 ```
 
-For a regular full-sample unpenalized Logit MLE, use the separate fitted-result protocol.
-For example, `limiteddepkit.BinaryLogitResult` satisfies it directly:
+For a regular full-sample unpenalized Logit MLE, use the separate provider-neutral
+fitted-result protocol:
 
 ```python
-from limiteddepkit import BinaryLogit
-
-propensity_fit = BinaryLogit().fit(propensity_design, treated)
 estimated_score_match = NearestNeighborMatch(
     estimand="att",
     metric="propensity",
     caliper=None,
     common_support=None,
     inference="abadie_imbens_estimated",
-    variance_neighbors=2,
+    variance_neighbors=1,
 ).fit(
     outcome,
     treatment=treated,
     propensity_model=propensity_fit,
     propensity_design=propensity_design,
     propensity_score_status="estimated",
-    propensity_provenance="limiteddepkit.BinaryLogit full-sample MLE",
+    propensity_provenance="full_sample_unpenalized_logit_mle",
 )
 ```
 
-CausalKit validates convergence, sample size, feature/parameter order, fitted Logit
-probabilities, the likelihood first-order condition, and Fisher-information conditioning.
+CauseKit does not fit `propensity_fit`. It requires public `params`, `converged`, `nobs`,
+`feature_names`, and `predict_proba`, then validates sample size, feature/parameter order,
+fitted Logit probabilities, the likelihood first-order condition, and Fisher-information
+conditioning.
 It then reports the known-score variance and Abadie–Imbens first-step adjustment separately.
 Cross-fitted, penalized, probit, or otherwise unverifiable scores do not satisfy this
 contract and must retain `inference="none"`.
@@ -180,6 +351,14 @@ score status is separate. Ordinary bootstrap, matching without replacement, arbi
 selection, clustered uncertainty, and unimplemented bias correction also refuse. See the
 [matching contract](docs/MATCHING_CONTRACT.md) before publication-facing use.
 
+The `0.7.0a4` promotion certificate adds 1,000-replication favorable- and stressed-
+overlap coverage evidence for ATT/ATC/ATE under both maintained analytical contracts.
+All 12 cells passed their preregistered bias, coverage, and SE-calibration gates. A
+separate hash-verified Cattaneo grid compares no support restriction, intersection
+support, and `0.1`/`0.2`/`0.3` logit-score-SD calipers with `inference="none"`, retaining
+every changed target label and attrition count. See
+[matching inference promotion evidence](docs/MATCHING_PROMOTION_EVIDENCE.md).
+
 ### Conventional and efficient difference-in-differences
 
 The conventional estimator remains first-class. It reports cohort-time effects using a
@@ -190,7 +369,7 @@ inverse-covariance weights. It is not a silent default because PT-All is stronge
 conventional post-treatment parallel-trends contract.
 
 ```python
-from causalkit import DifferenceInDifferences, EfficientDiD
+from causekit import DifferenceInDifferences, EfficientDiD, did_hausman_test
 
 conventional = DifferenceInDifferences(
     control_group="never_treated",
@@ -203,8 +382,28 @@ conventional = DifferenceInDifferences(
     treatment_time="first_treated",
 )
 
+pt_all_no_covariates = EfficientDiD(pre_periods="all").fit(
+    panel,
+    outcome="outcome",
+    entity="unit",
+    time="period",
+    treatment_time="first_treated",
+)
+hausman = did_hausman_test(conventional, pt_all_no_covariates)
+
 cross_fitter = CrossFitter(
     propensity_factory=make_multiclass_cohort_model,
+    outcome_factory=make_outcome_model,
+    second_moment_factory=make_second_moment_model,
+    n_splits=5,
+    random_state=2026,
+)
+
+# Alternative nuisance route: each fresh pairwise model receives y=1 for the
+# numerator cohort and y=0 for the denominator cohort, and its fitted result exposes
+# predict_odds_ratio(X) for calibrated posterior cohort odds.
+direct_ratio_cross_fitter = CrossFitter(
+    cohort_ratio_factory=make_pairwise_cohort_odds_model,
     outcome_factory=make_outcome_model,
     second_moment_factory=make_second_moment_model,
     n_splits=5,
@@ -228,8 +427,24 @@ efficient = EfficientDiD(
 
 print(conventional.group_time)
 print(conventional.event_study)
+print(conventional.pretrend.placebo_effects)
+print(conventional.pretrend.pvalue)
+print(hausman.event_study)
+print(hausman.pvalue)
 print(efficient.efficiency_weights)
 print(efficient.simultaneous_event_study)
+
+direct_sensitivity = EfficientDiD(pre_periods="all").fit(
+    panel,
+    outcome="outcome",
+    entity="unit",
+    time="period",
+    treatment_time="first_treated",
+    covariates=["baseline_outcome", "age"],
+    cross_fitter=direct_ratio_cross_fitter,
+)
+print(direct_sensitivity.nuisance_weighting)
+print(direct_sensitivity.cohort_ratio_diagnostics)
 ```
 
 The data must be a balanced long panel with one row per entity-period, an absorbing first
@@ -238,15 +453,219 @@ treatment time, and an explicit never-treated sentinel (positive infinity by def
 periods. Robust inference treats the panel entity as the sampling unit; higher-level
 one-way clustering is available through `covariance="clustered"` and `cluster=`.
 
-The covariate-efficient path forms cohort-density ratios from cross-fitted multiclass
-probabilities, estimates group-specific conditional outcome changes and residual-product
-conditional covariances through `CrossFitter`, and solves the observation-specific
-covariance systems without hidden regularization. Probabilities below
-`nuisance_probability_floor` and singular systems refuse rather than clip or repair.
+The pre-trend diagnostic uses only adjacent changes ending before the declared treatment
+or anticipation boundary and jointly tests the retained cohort-period placebos. Failure
+to reject does not validate parallel trends. `did_hausman_test` compares the common
+post-treatment event-study path under aligned no-covariate PT-Post and PT-All results;
+it refuses mismatched samples and singular difference covariance rather than changing
+rank or applying a pseudoinverse.
+
+The covariate-efficient path accepts exactly one cohort-weighting route. It either forms
+cohort odds from cross-fitted multiclass probabilities or consumes directly fitted,
+ordered posterior cohort odds through the public `CohortOddsRatioResultProtocol`.
+Direct ratios are not raw group-conditional density ratios: they retain the numerator-to-
+denominator cohort prior odds. `CrossFitter` fits each requested pair only on its two
+outer-training cohorts, predicts every held-out entity, and records pair/fold tail,
+effective-size, concentration, PSU-support, and row-role audits. `EfficientDiD` exposes
+the selected `nuisance_weighting`, either `cohort_probabilities` or `cohort_ratios`, and
+the mapping from ordered ratios to PT-All candidates. Ambiguous routes, support-threshold
+failures, and singular systems refuse rather than clip, trim, rescale, fall back, or
+repair.
 The efficiency claim is conditional on PT-All and the paper's nuisance regularity
-conditions. Repeated cross-sections and sampling weights remain unsupported. See the
+conditions. These two panel classes do not accept repeated cross sections or sampling
+weights. See the
 [DiD contract](docs/DID_CONTRACT.md) for formulas, assumptions, target populations, and
-promotion gates.
+promotion gates, and the
+[direct cohort-odds evidence](docs/DID_DIRECT_RATIO_PROMOTION_EVIDENCE.md) for calibration,
+parity, real-data, performance, and publication-scale results.
+
+### Repeated-cross-section difference-in-differences
+
+`RepeatedCrossSectionDiD` is a separate observation-level estimator. Without covariates it
+compares four independent cohort-period cell means. With covariates it uses the locally
+efficient doubly robust repeated-cross-section score with one propensity and four group-
+period outcome regressions per comparison. Both paths hold the eligible comparison rule
+fixed at target and baseline and permit unequal period and cell sizes. The current surface
+also offers `composition="robust"` for pairwise, longer, and staggered designs. Every
+cohort-target pair cross-fits an ordered four-cell generalized propensity and three
+outcome regressions on one immutable global row/PSU fold plan, then zero-pads its scaled
+influence on the full analysis index. The path targets treated observations in each
+target-period population and aggregates with estimated target-period treated-cell shares.
+The separate survey-population path below cannot yet be combined with composition
+robustness. HC1 observation or one-way CR1 PSU inference applies to both sample-population
+composition contracts.
+
+```python
+from causekit import RepeatedCrossSectionDiD
+
+repeated = RepeatedCrossSectionDiD(
+    control_group="not_yet_treated",
+    composition="stationary",
+    covariance="clustered",
+    inference="multiplier_bootstrap",
+    bootstrap_iterations=999,
+    random_state=20260730,
+).fit(
+    repeated_samples,
+    outcome="outcome",
+    time="period",
+    treatment_time="first_treated",
+    cluster="sampling_psu",
+)
+
+print(repeated.group_time)
+print(repeated.cell_counts)
+print(repeated.event_study)
+print(repeated.simultaneous_event_study)
+print(repeated.pretrend.placebo_effects)
+```
+
+Covariate adjustment is explicit and provider-neutral. Each factory must return a fresh
+fit-capable model; propensity results expose `predict_proba`, outcome results expose
+`predict`, and custom adapters can be configured on `CrossFitter`.
+
+```python
+from causekit import CrossFitter, RepeatedCrossSectionDiD
+
+cross_fitter = CrossFitter(
+    propensity_factory=propensity_factory,
+    outcome_factory=outcome_factory,
+    n_splits=5,
+    random_state=20260730,
+)
+
+adjusted = RepeatedCrossSectionDiD(covariance="clustered").fit(
+    repeated_samples,
+    outcome="outcome",
+    time="period",
+    treatment_time="first_treated",
+    cluster="sampling_psu",
+    covariates=["baseline_risk", "age"],
+    cross_fitter=cross_fitter,
+)
+
+print(adjusted.group_time)
+print(adjusted.pretrend.placebo_effects)  # the aligned conditional score
+print(adjusted.nuisance_diagnostics)  # task-by-fold audit; no refitting
+```
+
+Survey-population transport requires an immutable design object; a bare weight vector still
+refuses because it cannot declare weight meaning, PSU/stratum roles, or the population
+target. The implemented design is one-stage, with-replacement, stratified-PSU Taylor
+linearization with strict singleton-stratum refusal. Every mean uses component-wise Hájek
+normalization; event/calendar aggregation uses survey-weighted treated target-period shares
+and includes their estimated-share linearization. Multiplying all weights by one positive
+constant leaves the result unchanged.
+
+```python
+from causekit import RepeatedCrossSectionDiD, RepeatedCrossSectionSurveyDesign
+
+survey_design = RepeatedCrossSectionSurveyDesign(
+    weights="analysis_weight",
+    psu="sampling_psu",  # use None only to explicitly declare independent rows
+    strata="sampling_stratum",
+    weight_type="inverse_inclusion",  # or calibrated_analysis
+)
+
+survey_result = RepeatedCrossSectionDiD().fit(
+    repeated_samples,
+    outcome="outcome",
+    time="period",
+    treatment_time="first_treated",
+    survey_design=survey_design,
+    target_population="survey_population",
+)
+
+print(survey_result.weighted_cell_counts)
+print(survey_result.survey_weight_diagnostics)
+print(survey_result.survey_design_diagnostics)
+```
+
+Survey covariates use the same `CrossFitter` fold plan, but every factory must satisfy
+`WeightedNuisanceEstimatorProtocol.fit(X, y, *, sample_weight=...)`. CauseKit passes only
+aligned training weights, retains their fold-level hashes, sums, and Kish effective sizes,
+and never retries an unweighted fit. Composition robustness, finite-population corrections,
+replicate weights, singleton adjustment, and survey-valid simultaneous bands remain
+separately unavailable. See the
+[survey-design contract](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md) and the runnable
+[hash-pinned YRBS example](examples/survey_repeated_cross_section_did.py). The exact R,
+simulation, real-data, and performance results are recorded in the
+[survey promotion evidence](docs/DID_RCS_SURVEY_PROMOTION_EVIDENCE.md).
+
+Composition-change robustness is an explicit alternative estimand and score:
+
+```python
+robust_composition = RepeatedCrossSectionDiD(
+    composition="robust",
+    inference="multiplier_bootstrap",
+    bootstrap_iterations=999,
+    random_state=20260730,
+).fit(
+    repeated_samples,
+    outcome="outcome",
+    time="period",
+    treatment_time="first_treated",
+    covariates=["baseline_risk", "age"],
+    cross_fitter=CrossFitter(
+        propensity_factory=multiclass_probability_factory,
+        outcome_factory=outcome_factory,
+        n_splits=5,
+        random_state=20260730,
+    ),
+)
+
+print(robust_composition.target_population)  # treated_target_period
+print(robust_composition.pair_ledger)  # pair support, overlap, shares, task keys
+print(robust_composition.composition_weights)  # pair-labelled w_00, w_01, w_10, w_11
+print(robust_composition.event_study)
+print(robust_composition.simultaneous_event_study)
+```
+
+Each pair's generalized-propensity result must expose all four `(group, period)` class
+probabilities with exact, unique class labels. The robust path refuses empty covariates,
+unsupported global or fold-local four-cell support, weak overlap, survey combinations, and any
+clipping or fallback. Its deterministic composition-shift contract recovers target-period
+ATT `5` while the deliberately miss-targeted stationary score equals the pooled-treated
+value `4`; row, PSU, pair, and labelled probability-column permutations preserve aligned
+results. Runnable provider-neutral examples are
+[`examples/composition_robust_repeated_cross_section_did.py`](examples/composition_robust_repeated_cross_section_did.py)
+and [`examples/longer_composition_robust_repeated_cross_section_did.py`](examples/longer_composition_robust_repeated_cross_section_did.py).
+The exact point estimate, HC1-equivalent standard error, and all 16 influence coordinates
+also match the official R `compdid` 0.1.0 `drdid_nonstationary()` source at pinned commit
+`894bd65a952c30f01a4e0005efba4cb335065eb7`. Reproduce that source-level comparator with
+`Rscript benchmarks/validate_did_rcs_compdid_reference.R PATH_TO_COMPDID_CHECKOUT`.
+The pairwise [promotion evidence](docs/DID_RCS_COMPOSITION_PROMOTION_EVIDENCE.md) records
+the hash-pinned Sequeira robust/stationary sensitivity, a 100,000-row performance gate,
+and eight passing publication-scale pointwise-coverage cells across observation and PSU
+inference. These runs do not select between targets after inspecting the data.
+The longer/staggered [promotion evidence](docs/DID_RCS_COMPOSITION_LONGER_PROMOTION_EVIDENCE.md)
+records the public robust-minus-stationary equality diagnostic, official R diagnostic
+mapping, conditional placebos, fixed-seed simultaneous bands, a 120,000-row performance
+gate, hash-pinned hospital-data sensitivity, and four passing observation/PSU coverage,
+size, and power cells. `did_rcs_composition_test(robust, stationary)` computes covariance
+from the aligned difference influence and never selects an estimator.
+
+There is intentionally no `entity=` role and no `panel=False` switch. Every result records
+that stationary composition is an identifying assumption rather than a verified
+diagnostic. Adjusted placebos use the same cross-fitted conditional score as the reported
+effects; failure to reject proves neither parallel trends nor stable composition. Strict
+overlap failures refuse without clipping or dropping rows. The opt-in simultaneous path
+draws one Rademacher multiplier per observation or declared PSU and reports a studentized
+max-t band over the retained event-time path. The implemented survey Taylor path remains
+separate from these model-based multiplier bands, and raw sampling weights refuse. See the
+[repeated-cross-section contract](docs/DID_REPEATED_CROSS_SECTION_CONTRACT.md).
+
+The covariate publication certificate covers 4,000 estimator fits and 240,000 fold-local
+nuisance fits. All 44 group/aggregate/conditional-placebo coverage cells and four joint
+conditional-pre-trend size cells pass with zero refusals. This promotes pointwise
+inference evidence. Simultaneous-band mechanics pass independent observation/PSU
+identities, seeded reproduction, strict refusals, covariate integration, and a
+100-replication joint-coverage smoke. The separate hash-bound simultaneous certificate
+then exercises 1,000 replications in each of 16 observation/PSU, unadjusted/cross-fitted,
+control-rule, and design cells at the public 999-draw setting. All event-vector joint-
+coverage cells pass at `0.931–0.961`, with zero refusals across 16,000 estimator fits and
+480,000 nuisance fold fits. This promotes internal coverage evidence; it does not create
+cross-software random-stream parity or relax the stationary-composition assumption.
 
 There is no formula API yet. Prepare numeric arrays, `Series`, or `DataFrame` objects
 explicitly, including categorical encoding and transformations. `add_constant=True` is
@@ -259,15 +678,55 @@ See [Package scope](docs/PACKAGE_SCOPE.md),
 [Architecture](docs/ARCHITECTURE.md). The package-wide Python/R/Stata evidence status is
 tracked in the [cross-software parity register](docs/PARITY.md).
 
+### Regression discontinuity
+
+`RegressionDiscontinuity` estimates a cutoff-local sharp effect or fuzzy local-Wald
+complier effect using separate local polynomials on each side. Local linear point fits,
+local quadratic robust bias correction, triangular weights, and the bounded native MSE
+grid are defaults. Manual left/right point and bias bandwidths remain available for
+preregistered analysis and cross-software reproduction.
+
+```python
+from causekit import RegressionDiscontinuity
+
+sharp = RegressionDiscontinuity(
+    design="sharp",
+    cutoff=0.0,
+    bandwidth="native_mse",
+).fit(outcome, running=score)
+
+fuzzy = RegressionDiscontinuity(
+    design="fuzzy",
+    cutoff=0.0,
+    bandwidth=(1.2, 1.4),
+    bias_bandwidth=(1.6, 1.7),
+).fit(outcome, running=score, treatment=take_up)
+
+print(sharp.summary_frame())
+print(sharp.bandwidth_selection.candidates)
+print(sharp.manipulation)
+print(fuzzy.first_stage)
+```
+
+The primary result is the robust bias-corrected effect; the conventional estimate and
+standard error remain separately labelled. A fuzzy design refuses nonbinary treatment or
+a nonpositive local first stage. The density statistic is a screening diagnostic rather
+than proof of no sorting, and a native bandwidth selected at a grid boundary is flagged
+by side. Optional `result.plot()` uses the retained local data through the `plot` extra.
+See the [RD contract](docs/RD_CONTRACT.md) and runnable
+[`examples/regression_discontinuity.py`](examples/regression_discontinuity.py). Frozen simulation,
+real-data, performance, and comparator records are indexed in the
+[RD promotion evidence](docs/RD_PROMOTION_EVIDENCE.md).
+
 ## Randomized-experiment example
 
 ```python
-from causalkit import RandomizedATE
+from causekit import RandomizedATE
 
 result = RandomizedATE(adjustment="lin", covariance="robust").fit(
     outcome,
-    treatment=assigned,       # exactly 0/1 with both arms present
-    covariates=baseline_data, # pre-treatment covariates only
+    treatment=assigned,  # exactly 0/1 with both arms present
+    covariates=baseline_data,  # pre-treatment covariates only
 )
 print(result.summary_frame())
 print(result.balance)
@@ -286,6 +745,12 @@ attrition correction, or multi-arm experiments.
 
 ## Installation
 
+From PyPI after publication:
+
+```bash
+python -m pip install causekit==0.7.0a6
+```
+
 From a source checkout:
 
 ```bash
@@ -300,6 +765,27 @@ python -m pip install -e ".[dev]"
 
 Python 3.10 through 3.13 is supported by the package metadata.
 
+## Real-world workflow
+
+The runnable workflow covers IV, randomized effects, cross-fitted IPW/AIPW, matching,
+native partially linear DML, conventional DiD, and efficient DiD on four pinned real
+datasets. The project does not redistribute the source files: downloads are opt-in,
+HTTPS-only, cached outside the repository, and checked against release-pinned SHA-256
+digests.
+
+```bash
+python -m pip install -e ".[validation]"
+python examples/real_world_causal_workflow.py --download
+```
+
+The output keeps identification boundaries visible: numerical IV diagnostics cannot
+validate exclusion, observational estimates require exchangeability and positivity,
+cross-fitted matching receives no unsupported analytical standard error, and efficient
+DiD is reported beside—not instead of—the conventional estimator.
+
+See [real-data validation](docs/REAL_DATA_VALIDATION.md) for source provenance, pinned
+digests, cross-language comparator mappings, and reproduction commands.
+
 ## Runnable example
 
 The following example creates an endogenous treatment, fits 2SLS with one excluded
@@ -309,7 +795,7 @@ instrument, and requests HC1 inference. All pandas objects share the same index.
 import numpy as np
 import pandas as pd
 
-from causalkit import IV2SLS
+from causekit import IV2SLS
 
 rng = np.random.default_rng(20260722)
 nobs = 800
@@ -318,12 +804,7 @@ index = pd.RangeIndex(nobs, name="observation")
 instrument = rng.normal(size=nobs)
 baseline = rng.normal(size=nobs)
 confounder = rng.normal(size=nobs)
-treatment = (
-    0.9 * instrument
-    + 0.4 * baseline
-    + 0.7 * confounder
-    + rng.normal(size=nobs)
-)
+treatment = 0.9 * instrument + 0.4 * baseline + 0.7 * confounder + rng.normal(size=nobs)
 outcome = 2.0 * treatment + 0.5 * baseline + confounder + rng.normal(size=nobs)
 
 result = IV2SLS(covariance="robust").fit(
@@ -425,7 +906,7 @@ require additional conditions such as monotonicity for a local average treatment
 interpretation. The resulting local estimand need not equal the population average
 treatment effect.
 
-`causalkit` reports numerical evidence relevant to some implications of the design. It
+`causekit` reports numerical evidence relevant to some implications of the design. It
 cannot learn exclusion or independence from the observed covariance matrix, and it does
 not turn observational association into causation. See
 [Identification and interpretation](docs/IDENTIFICATION.md) for the formal contract and a
@@ -435,13 +916,14 @@ reporting checklist.
 
 The historical `limiteddepkit.TreatmentEffect` was an ordinary homoskedastic linear 2SLS
 estimator, not a limited-dependent-variable model. `limiteddepkit` therefore removed it
-from its public namespaces and retained a non-installable snapshot under its
-`_out_of_scope/` migration area.
+from its public namespaces. The migration is complete and its obsolete source snapshot
+has also been removed from that repository.
 
-`causalkit.IV2SLS` is the supported destination. Its design was informed by the migration
+`causekit.IV2SLS` is the supported destination. Its design was informed by the migration
 requirements and the public econometric definition of 2SLS; no private implementation
-code was copied into this package. `causalkit` has its own validation, covariance,
-diagnostic, and result contracts.
+code was copied into this package. `causekit` has its own validation, covariance,
+diagnostic, and result contracts, including a numerical test that reconstructs the old
+homoskedastic matrix result after explicitly mapping the full instrument matrix.
 
 The migration is not a drop-in rename:
 
@@ -473,18 +955,24 @@ drop-in interchangeability across estimators.
 
 The packages remain separated by estimand:
 
-- `causalkit` owns identification-aware causal and cross-sectional IV workflows;
+- `causekit` owns identification-aware causal workflows, including cross-sectional
+  `IV2SLS` and the explicitly contracted fixed-effects `PanelIV2SLS`;
 - `limiteddepkit` owns limited-outcome and observation-rule models; and
-- `systemgmmkit` owns panel-data and dynamic-panel GMM workflows.
+- `systemgmmkit` owns its general static/dynamic panel suite, including the established
+  `PanelIVSpec`/`run_panel_2sls` orchestration API and dynamic-panel GMM.
+
+This is an API ownership boundary, not two names for one implementation. CauseKit does
+not import, wrap, or re-export SystemGMMKit's Panel IV API, and it does not expose
+`PanelIVSpec` or `run_panel_2sls`. SystemGMMKit does not own CauseKit's causal
+identification, refusal, diagnostic, or promotion contract.
 
 Applicable validation, indexing, covariance, diagnostics, and reporting conventions are
 reused conceptually without importing private source or coupling the packages at runtime.
-Existing `limiteddepkit` binary, count, censoring, duration, and ordinal estimators are
-not duplicated here. The supplied-nuisance IPW/AIPW and matching APIs let their
-out-of-sample predictions participate while keeping causal identification inside
-`causalkit`; the narrow estimated-score matching path additionally consumes the public
-`BinaryLogitResult` directly for its full-sample first-step correction. `CrossFitter` owns
-only reusable fold orchestration and prediction adaptation.
+Limited-outcome likelihoods are not duplicated here. The supplied-nuisance IPW/AIPW and
+matching APIs accept provider-neutral predictions while keeping causal identification
+inside `causekit`; the narrow estimated-score matching path consumes only the public
+`FittedPropensityMLEProtocol`. `CrossFitter` owns reusable fold orchestration and
+prediction adaptation, not nuisance estimators.
 
 ## Roadmap
 
@@ -492,11 +980,39 @@ The matching alpha follows the
 [nearest-neighbor matching contract](docs/MATCHING_CONTRACT.md). Known-score analytical
 inference, R reference parity, OutputHub adaptation, and 100,000-row fixed- and estimated-
 score inference smokes are implemented, with fixed-score parity against pinned R `Matching`
-4.10-15 and Stata/MP 17. Full-sample Logit-MLE first-step adjustment is implemented and
-independently checked against `statsmodels`; its Stata harness awaits a manual run. DiD promotion includes
-cross-fitted covariate nuisances and simultaneous
-event-study bands; pre-trend/Hausman diagnostics, repeated cross-sections, and broader
-parity remain. Later releases may add regression discontinuity and panel IV. Each family
+4.10-15 and Stata/MP 17. Full-sample Logit-MLE first-step adjustment is independently
+checked against `statsmodels` and a reviewed Stata/IC 17 `teffects psmatch` fixture. The
+publication-scale ATT/ATC/ATE coverage and real-data sensitivity certificate passes
+without widening either analytical boundary. DiD
+promotion includes cross-fitted covariate nuisances, simultaneous event-study bands,
+uncontaminated pre-trend placebos, and a PT-All/PT-Post Hausman diagnostic. The separate
+[repeated-cross-section contract](docs/DID_REPEATED_CROSS_SECTION_CONTRACT.md) now has an
+implemented no-covariate stationary-composition first slice with observation/PSU scores,
+cell audits, pre-trend placebos, OutputHub, a 32-cell publication-scale coverage
+certificate, pinned estimator-level R `did` parity, reviewed aligned Stata `csdid` parity,
+a public-data workflow, and a 100,000-row smoke. Its cross-fitted covariate path also has
+a separate 44-cell pointwise coverage and four-cell conditional-pre-trend-size
+certificate. Stata aggregate standard errors are explicitly non-comparable because their
+estimated-share influence differs. Repeated-cross-section observation/PSU multiplier
+bands now pass hand identities, a seeded coverage smoke, and a hash-bound 16-cell
+publication-scale joint-coverage certificate under both no-covariate and genuinely
+cross-fitted covariate paths. Composition-change robustness now includes pairwise and
+longer/staggered target-period effects, target-share aggregation, aligned equality
+diagnostics, conditional placebos, and simultaneous bands with publication evidence.
+The separate [survey design](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md) path now implements
+stationary-composition survey-population targets, weighted nuisance fitting, and
+stratified-PSU Taylor pointwise inference; bare weights and unsupported design
+combinations still refuse. The balanced-panel PT-All path separately freezes
+[direct cohort-ratio nuisances](docs/DID_DIRECT_RATIO_CONTRACT.md) without a placeholder.
+The causal-ML alpha includes native partially linear DML and separately contracted public
+[honest R-learner](docs/R_LEARNER_CONTRACT.md) and
+[honest DR-learner](docs/DR_LEARNER_CONTRACT.md) paths, with immutable
+construction/evaluation roles, held-out loss/calibration, group inference, and graph data.
+Available aligned Python/R/Stata parity rows are recorded, while unavailable comparator
+cells remain explicit. The sharp/fuzzy [RD contract](docs/RD_CONTRACT.md) is now public
+with reviewed Python/R/Stata parity. The [Panel IV contract](docs/PANEL_IV_CONTRACT.md)
+now passes hand/refusal, Python/R/Stata, real-data, recovery/coverage, and performance
+gates. Each family
 must define its estimand, assumptions, failure behavior, diagnostics, and independent
 validation evidence before promotion.
 
@@ -531,4 +1047,4 @@ has passed them.
 - Changes are recorded in [CHANGELOG.md](CHANGELOG.md).
 - The active milestone sequence and reuse rules are recorded in [HANDOVER.md](HANDOVER.md).
 
-`causalkit` is distributed under the [MIT License](LICENSE).
+`causekit` is distributed under the [MIT License](LICENSE).

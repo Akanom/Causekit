@@ -1,0 +1,275 @@
+{
+  "schema_version": 1,
+  "causekit_version": "0.7.0a6",
+  "generator": "benchmarks/validate_did_rcs_survey_promotion.py",
+  "generator_sha256": "81ca2d62e3b331e193dc0171be7cb46521b550d04b076df12ef47e0fe4251c10",
+  "python": "3.14.6",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "seed": 20260730,
+  "estimator_contract": {
+    "point": "component_hajek_survey_population_did",
+    "variance": "one_stage_with_replacement_stratified_psu_taylor",
+    "degrees_of_freedom": "number_of_psus_minus_number_of_strata",
+    "weight_types": [
+      "inverse_inclusion",
+      "calibrated_analysis"
+    ],
+    "singleton_policy": "raise",
+    "simultaneous_inference": "unavailable"
+  },
+  "coverage_simulation": {
+    "replications_per_cell": 1000,
+    "total_estimator_fits": 8000,
+    "nominal_coverage": 0.95,
+    "cells": [
+      {
+        "sampling_unit": "observation",
+        "weights": "noninformative",
+        "wave_sizes": "balanced",
+        "replications": 1000,
+        "successful_fits": 1000,
+        "refusals": 0,
+        "truth": 1.1,
+        "mean_estimate": 1.0963411589442253,
+        "bias": -0.003658841055774742,
+        "empirical_sd": 0.1578291272646928,
+        "mean_standard_error": 0.15736953413374347,
+        "standard_error_ratio": 0.9970880335023423,
+        "coverage": 0.951,
+        "coverage_mcse": 0.006826346021115546,
+        "minimum_design_df": 762,
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "absolute_bias_gate": 0.08,
+        "status": "pass"
+      },
+      {
+        "sampling_unit": "observation",
+        "weights": "noninformative",
+        "wave_sizes": "unequal",
+        "replications": 1000,
+        "successful_fits": 1000,
+        "refusals": 0,
+        "truth": 1.1,
+        "mean_estimate": 1.0946682978515112,
+        "bias": -0.005331702148488882,
+        "empirical_sd": 0.15904587516307936,
+        "mean_standard_error": 0.15227162086726906,
+        "standard_error_ratio": 0.9574069161563339,
+        "coverage": 0.939,
+        "coverage_mcse": 0.007568289106528638,
+        "minimum_design_df": 858,
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "absolute_bias_gate": 0.08,
+        "status": "pass"
+      },
+      {
+        "sampling_unit": "observation",
+        "weights": "informative",
+        "wave_sizes": "balanced",
+        "replications": 1000,
+        "successful_fits": 1000,
+        "refusals": 0,
+        "truth": 1.24025,
+        "mean_estimate": 1.240246267670696,
+        "bias": -3.7323293040625316e-06,
+        "empirical_sd": 0.23186123317595003,
+        "mean_standard_error": 0.2299768478091134,
+        "standard_error_ratio": 0.9918727881283774,
+        "coverage": 0.94,
+        "coverage_mcse": 0.007509993342207438,
+        "minimum_design_df": 762,
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "absolute_bias_gate": 0.08,
+        "status": "pass"
+      },
+      {
+        "sampling_unit": "observation",
+        "weights": "informative",
+        "wave_sizes": "unequal",
+        "replications": 1000,
+        "successful_fits": 1000,
+        "refusals": 0,
+        "truth": 1.24025,
+        "mean_estimate": 1.2386395067306035,
+        "bias": -0.0016104932693965512,
+        "empirical_sd": 0.23019057394664563,
+        "mean_standard_error": 0.2199947039999323,
+        "standard_error_ratio": 0.9557068312055359,
+        "coverage": 0.948,
+        "coverage_mcse": 0.007021111023192843,
+        "minimum_design_df": 858,
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "absolute_bias_gate": 0.08,
+        "status": "pass"
+      },
+      {
+        "sampling_unit": "psu",
+        "weights": "noninformative",
+        "wave_sizes": "balanced",
+        "replications": 1000,
+        "successful_fits": 1000,
+        "refusals": 0,
+        "truth": 1.1,
+        "mean_estimate": 1.1038042057019002,
+        "bias": 0.0038042057019000985,
+        "empirical_sd": 0.2023677418140166,
+        "mean_standard_error": 0.19973645226002057,
+        "standard_error_ratio": 0.9869974852196834,
+        "coverage": 0.954,
+        "coverage_mcse": 0.006624499981130654,
+        "minimum_design_df": 42,
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "absolute_bias_gate": 0.08,
+        "status": "pass"
+      },
+      {
+        "sampling_unit": "psu",
+        "weights": "noninformative",
+        "wave_sizes": "unequal",
+        "replications": 1000,
+        "successful_fits": 1000,
+        "refusals": 0,
+        "truth": 1.1,
+        "mean_estimate": 1.0998359793842907,
+        "bias": -0.00016402061570941484,
+        "empirical_sd": 0.1958019134724712,
+        "mean_standard_error": 0.19639444760586156,
+        "standard_error_ratio": 1.0030261917408365,
+        "coverage": 0.951,
+        "coverage_mcse": 0.006826346021115546,
+        "minimum_design_df": 42,
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "absolute_bias_gate": 0.08,
+        "status": "pass"
+      },
+      {
+        "sampling_unit": "psu",
+        "weights": "informative",
+        "wave_sizes": "balanced",
+        "replications": 1000,
+        "successful_fits": 1000,
+        "refusals": 0,
+        "truth": 1.24025,
+        "mean_estimate": 1.233032133560194,
+        "bias": -0.007217866439806153,
+        "empirical_sd": 0.2619593495476689,
+        "mean_standard_error": 0.26072804547160355,
+        "standard_error_ratio": 0.9952996368398704,
+        "coverage": 0.942,
+        "coverage_mcse": 0.007391616873188169,
+        "minimum_design_df": 42,
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "absolute_bias_gate": 0.08,
+        "status": "pass"
+      },
+      {
+        "sampling_unit": "psu",
+        "weights": "informative",
+        "wave_sizes": "unequal",
+        "replications": 1000,
+        "successful_fits": 1000,
+        "refusals": 0,
+        "truth": 1.24025,
+        "mean_estimate": 1.2212978410634485,
+        "bias": -0.018952158936551555,
+        "empirical_sd": 0.26131986680635266,
+        "mean_standard_error": 0.2542694376369265,
+        "standard_error_ratio": 0.9730199266684504,
+        "coverage": 0.941,
+        "coverage_mcse": 0.007451107300260817,
+        "minimum_design_df": 42,
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "absolute_bias_gate": 0.08,
+        "status": "pass"
+      }
+    ],
+    "status": "pass"
+  },
+  "real_data_sensitivity": {
+    "dataset": "yrbs_beverage_tax",
+    "source_commit": "d0e1959d1e0dcc27f30b38a38f31d31fb3959799",
+    "source_sha256": "7aa7b27284d3a1108bd4d7334470b2825bd68e72470f7347e8dac0d9ea3bd58f",
+    "provenance_url": "https://github.com/kerryqwq/DiD-Survey-Data",
+    "n_observations": 60084,
+    "n_strata": 57,
+    "psu_mapping": "independent_observation_because_processed_public_file_omits_psu",
+    "estimand_mapping": "authors_sampling_weight_only_four_component_hajek_did",
+    "survey_estimate": -0.9226631515407981,
+    "survey_standard_error": 0.2551806933716691,
+    "published_code_point_mapping": -0.9226631515407986,
+    "point_absolute_difference": 4.440892098500626e-16,
+    "sample_estimate": -0.5892322561247982,
+    "survey_minus_sample": -0.3334308954159999,
+    "status": "pass",
+    "interpretation": "Execution sensitivity only: the public processed file omits PSU identifiers, so the standard error uses the explicitly declared independent-observation-within-stratum design and is not claimed to reproduce the paper's bootstrap inference."
+  },
+  "performance": {
+    "n_observations": 100000,
+    "n_psus": 2500,
+    "n_strata": 20,
+    "elapsed_seconds": 0.1682139999975334,
+    "peak_python_mib": 22.226102828979492,
+    "estimate": 1.0284550917209847,
+    "standard_error": 0.016562050392704964,
+    "elapsed_gate_seconds": 10.0,
+    "memory_gate_mib": 350.0,
+    "status": "pass"
+  },
+  "overall_status": "pass"
+}

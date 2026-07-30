@@ -1,0 +1,121 @@
+{
+  "bootstrap_iterations": 199,
+  "causekit_version": "0.7.0a6",
+  "designs": {
+    "nonlinear_favorable": {
+      "folds_identical": true,
+      "maximum_direct_multiclass_paired_estimate_difference": 4.801702147005926e-09,
+      "maximum_direct_multiclass_paired_se_difference": 3.181590463308126e-09,
+      "refusals": 0,
+      "routes": {
+        "direct": {
+          "absolute_bias": 0.002406352115559951,
+          "empirical_sd": 0.10267174907068366,
+          "empirical_sd_to_mean_se": 1.0055567747464584,
+          "fits": 1000,
+          "mean_estimate": 2.00240635211556,
+          "mean_standard_error": 0.10210437804128103,
+          "pointwise_coverage": 0.947,
+          "rmse": 0.10264860982828876,
+          "simultaneous_coverage": 0.944
+        },
+        "multiclass": {
+          "absolute_bias": 0.00240635208615414,
+          "empirical_sd": 0.10267174905843468,
+          "empirical_sd_to_mean_se": 1.0055567745955152,
+          "fits": 1000,
+          "mean_estimate": 2.002406352086154,
+          "mean_standard_error": 0.10210437804442654,
+          "pointwise_coverage": 0.947,
+          "rmse": 0.1026486098153599,
+          "simultaneous_coverage": 0.944
+        },
+        "oracle": {
+          "absolute_bias": 0.0017685581885373836,
+          "empirical_sd": 0.09643808875340515,
+          "empirical_sd_to_mean_se": 0.9940630278598832,
+          "fits": 1000,
+          "mean_estimate": 2.0017685581885374,
+          "mean_standard_error": 0.09701405851601438,
+          "pointwise_coverage": 0.946,
+          "rmse": 0.09640608100899799,
+          "simultaneous_coverage": 0.946
+        }
+      },
+      "slope": 0.45,
+      "status": "pass"
+    },
+    "nonlinear_weak_overlap": {
+      "folds_identical": true,
+      "maximum_direct_multiclass_paired_estimate_difference": 3.787145175238038e-08,
+      "maximum_direct_multiclass_paired_se_difference": 2.1537374994551328e-08,
+      "refusals": 0,
+      "routes": {
+        "direct": {
+          "absolute_bias": 0.0001934735107838037,
+          "empirical_sd": 0.15443988163407663,
+          "empirical_sd_to_mean_se": 1.014339121213841,
+          "fits": 1000,
+          "mean_estimate": 2.000193473510784,
+          "mean_standard_error": 0.15225665500238347,
+          "pointwise_coverage": 0.951,
+          "rmse": 0.15436276362551893,
+          "simultaneous_coverage": 0.943
+        },
+        "multiclass": {
+          "absolute_bias": 0.00019347349062792674,
+          "empirical_sd": 0.15443988152976545,
+          "empirical_sd_to_mean_se": 1.0143391202417706,
+          "fits": 1000,
+          "mean_estimate": 2.000193473490628,
+          "mean_standard_error": 0.15225665504545882,
+          "pointwise_coverage": 0.951,
+          "rmse": 0.15436276352123474,
+          "simultaneous_coverage": 0.943
+        },
+        "oracle": {
+          "absolute_bias": 0.00169982966200255,
+          "empirical_sd": 0.13388132735443714,
+          "empirical_sd_to_mean_se": 0.9906857685567048,
+          "fits": 1000,
+          "mean_estimate": 2.0016998296620025,
+          "mean_standard_error": 0.13514005308614066,
+          "pointwise_coverage": 0.933,
+          "rmse": 0.13382516588912413,
+          "simultaneous_coverage": 0.93
+        }
+      },
+      "slope": 1.0,
+      "status": "pass"
+    }
+  },
+  "elapsed_seconds": 499.1889394999962,
+  "entities_per_replication": 600,
+  "fixed_seed_base": 20260730,
+  "folds": 3,
+  "generated_on": "2026-07-30",
+  "generator": "benchmarks/validate_did_direct_ratio_promotion.py",
+  "gates": {
+    "coverage_lower": 0.89,
+    "coverage_upper": 0.99,
+    "maximum_absolute_bias": 0.08,
+    "maximum_direct_multiclass_paired_estimate_difference": 1e-07,
+    "maximum_direct_multiclass_paired_se_difference": 1e-07,
+    "se_ratio_lower": 0.78,
+    "se_ratio_upper": 1.22,
+    "zero_refusals": true
+  },
+  "numerical_stability_benefit": {
+    "benefit_gate": "covered_by_unit_refusal_and_recovery_test",
+    "design": "irrelevant-class softmax underflow",
+    "direct_pair_result": "The binary restricted-cohort posterior odds remain finite because the irrelevant class cancels before prediction.",
+    "multiclass_issue": "Two score-relevant cohort probabilities underflow to zero when an irrelevant third-class logit dominates; their finite ratio is no longer recoverable from the probability matrix."
+  },
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python_version": "3.14.6",
+  "replications_per_design": 1000,
+  "reproduction_command": "python benchmarks/validate_did_direct_ratio_promotion.py",
+  "schema": "causekit_did_direct_ratio_promotion_v1",
+  "status": "pass",
+  "true_effect": 2.0
+}

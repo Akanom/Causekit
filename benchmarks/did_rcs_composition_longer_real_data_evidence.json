@@ -1,0 +1,380 @@
+{
+  "causekit_version": "0.7.0a6",
+  "design_note": "Recurring hospital-month rows use hospital PSU inference; this sensitivity does not assert independent repeated cross sections.",
+  "diagnostic": {
+    "contrast": "robust_minus_stationary",
+    "df_denom": 45.0,
+    "df_num": 4,
+    "distribution": "f",
+    "estimator_selection": false,
+    "group_time": [
+      {
+        "cohort": 4.0,
+        "difference": -0.010279550369996837,
+        "robust": 0.7734992873070721,
+        "stationary": 0.7837788376770689,
+        "time": 4.0
+      },
+      {
+        "cohort": 4.0,
+        "difference": -0.012874516321122687,
+        "robust": 0.9117818629839575,
+        "stationary": 0.9246563793050802,
+        "time": 5.0
+      },
+      {
+        "cohort": 4.0,
+        "difference": -0.012367636765675871,
+        "robust": 0.7733012205515021,
+        "stationary": 0.785668857317178,
+        "time": 6.0
+      },
+      {
+        "cohort": 4.0,
+        "difference": -0.01239491332515208,
+        "robust": 0.8602315053891646,
+        "stationary": 0.8726264187143167,
+        "time": 7.0
+      }
+    ],
+    "pvalue": 0.9407918683258323,
+    "reject": false,
+    "statistic": 0.19303643917008365
+  },
+  "external_longer_comparator": "unavailable: official compdid exposes a two-period target, so no staggered point/influence comparator is manufactured",
+  "generated_at_utc": "2026-07-30T10:00:04.331606+00:00",
+  "generator": "benchmarks/validate_did_rcs_composition_longer_real_data.py",
+  "generator_sha256": "861aacdb22e5f8f3f2e100f0179c018354bf1e9561d7aeda6b8e8d05d7f219a5",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.6",
+  "robust": {
+    "calendar_time": [
+      {
+        "att": 0.7734992873070721,
+        "n_cohorts": 1,
+        "p_value": 1.5249106580730254e-17,
+        "stat": 13.595565522620609,
+        "std_err": 0.056893498547015676,
+        "time": 4.0
+      },
+      {
+        "att": 0.9117818629839575,
+        "n_cohorts": 1,
+        "p_value": 4.652866900645969e-20,
+        "stat": 15.874035425851027,
+        "std_err": 0.057438567983734715,
+        "time": 5.0
+      },
+      {
+        "att": 0.7733012205515021,
+        "n_cohorts": 1,
+        "p_value": 1.6067362502197184e-13,
+        "stat": 10.377793288739452,
+        "std_err": 0.07451499553287323,
+        "time": 6.0
+      },
+      {
+        "att": 0.8602315053891646,
+        "n_cohorts": 1,
+        "p_value": 3.346268714733995e-17,
+        "stat": 13.30376968040867,
+        "std_err": 0.0646607334653391,
+        "time": 7.0
+      }
+    ],
+    "conditional_placebos": [
+      {
+        "att": 0.029476807464894342,
+        "base_period": 1.0,
+        "cohort": 4.0,
+        "comparison_cohorts": [
+          Infinity
+        ],
+        "event_time": -2,
+        "n_comparison_base": 28,
+        "n_comparison_target": 28,
+        "n_treated_base": 18,
+        "n_treated_target": 18,
+        "p_value": 0.5175047584042787,
+        "stat": 0.6523332396614336,
+        "std_err": 0.04518673229068176,
+        "time": 2.0
+      },
+      {
+        "att": 0.02301980694492657,
+        "base_period": 2.0,
+        "cohort": 4.0,
+        "comparison_cohorts": [
+          Infinity
+        ],
+        "event_time": -1,
+        "n_comparison_base": 28,
+        "n_comparison_target": 28,
+        "n_treated_base": 18,
+        "n_treated_target": 18,
+        "p_value": 0.6529705482415762,
+        "stat": 0.4526570802453632,
+        "std_err": 0.050854847851819,
+        "time": 3.0
+      }
+    ],
+    "esavg_aggregation": "arithmetic_mean_of_nonnegative_event_times",
+    "estimate": 0.829703469057924,
+    "event_study": [
+      {
+        "att": 0.7734992873070721,
+        "event_time": 0,
+        "n_cohorts": 1,
+        "p_value": 1.5249106580730254e-17,
+        "stat": 13.595565522620609,
+        "std_err": 0.056893498547015676
+      },
+      {
+        "att": 0.9117818629839575,
+        "event_time": 1,
+        "n_cohorts": 1,
+        "p_value": 4.652866900645969e-20,
+        "stat": 15.874035425851027,
+        "std_err": 0.057438567983734715
+      },
+      {
+        "att": 0.7733012205515021,
+        "event_time": 2,
+        "n_cohorts": 1,
+        "p_value": 1.6067362502197184e-13,
+        "stat": 10.377793288739452,
+        "std_err": 0.07451499553287323
+      },
+      {
+        "att": 0.8602315053891646,
+        "event_time": 3,
+        "n_cohorts": 1,
+        "p_value": 3.346268714733995e-17,
+        "stat": 13.30376968040867,
+        "std_err": 0.0646607334653391
+      }
+    ],
+    "group_time": [
+      {
+        "att": 0.7734992873070721,
+        "base_period": 3.0,
+        "cohort": 4.0,
+        "cohort_share": 0.391304347826087,
+        "comparison_cohorts": [
+          Infinity
+        ],
+        "event_time": 0,
+        "n_comparison_base": 28,
+        "n_comparison_target": 28,
+        "n_treated_base": 18,
+        "n_treated_target": 18,
+        "p_value": 1.5249106580730254e-17,
+        "stat": 13.595565522620609,
+        "std_err": 0.056893498547015676,
+        "target_share": 0.055900621118012424,
+        "time": 4.0
+      },
+      {
+        "att": 0.9117818629839575,
+        "base_period": 3.0,
+        "cohort": 4.0,
+        "cohort_share": 0.391304347826087,
+        "comparison_cohorts": [
+          Infinity
+        ],
+        "event_time": 1,
+        "n_comparison_base": 28,
+        "n_comparison_target": 28,
+        "n_treated_base": 18,
+        "n_treated_target": 18,
+        "p_value": 4.652866900645969e-20,
+        "stat": 15.874035425851027,
+        "std_err": 0.057438567983734715,
+        "target_share": 0.055900621118012424,
+        "time": 5.0
+      },
+      {
+        "att": 0.7733012205515021,
+        "base_period": 3.0,
+        "cohort": 4.0,
+        "cohort_share": 0.391304347826087,
+        "comparison_cohorts": [
+          Infinity
+        ],
+        "event_time": 2,
+        "n_comparison_base": 28,
+        "n_comparison_target": 28,
+        "n_treated_base": 18,
+        "n_treated_target": 18,
+        "p_value": 1.6067362502197184e-13,
+        "stat": 10.377793288739452,
+        "std_err": 0.07451499553287323,
+        "target_share": 0.055900621118012424,
+        "time": 6.0
+      },
+      {
+        "att": 0.8602315053891646,
+        "base_period": 3.0,
+        "cohort": 4.0,
+        "cohort_share": 0.391304347826087,
+        "comparison_cohorts": [
+          Infinity
+        ],
+        "event_time": 3,
+        "n_comparison_base": 28,
+        "n_comparison_target": 28,
+        "n_treated_base": 18,
+        "n_treated_target": 18,
+        "p_value": 3.346268714733995e-17,
+        "stat": 13.30376968040867,
+        "std_err": 0.0646607334653391,
+        "target_share": 0.055900621118012424,
+        "time": 7.0
+      }
+    ],
+    "group_time_aggregation": "estimated_target_period_treated_cell_shares",
+    "nuisance_fold_fits": 120,
+    "pair_count": 6,
+    "probability_bounds": [
+      0.08378387872163323,
+      0.38804822560535407
+    ],
+    "simultaneous_event_study": [
+      {
+        "att": 0.7734992873070721,
+        "critical_value": 2.3219497620195213,
+        "event_time": 0,
+        "level": 0.95,
+        "lower": 0.641395441895371,
+        "std_err": 0.056893498547015676,
+        "upper": 0.9056031327187731
+      },
+      {
+        "att": 0.9117818629839575,
+        "critical_value": 2.3219497620195213,
+        "event_time": 1,
+        "level": 0.95,
+        "lower": 0.7784123937233826,
+        "std_err": 0.057438567983734715,
+        "upper": 1.0451513322445325
+      },
+      {
+        "att": 0.7733012205515021,
+        "critical_value": 2.3219497620195213,
+        "event_time": 2,
+        "level": 0.95,
+        "lower": 0.6002811444070614,
+        "std_err": 0.07451499553287323,
+        "upper": 0.9463212966959428
+      },
+      {
+        "att": 0.8602315053891646,
+        "critical_value": 2.3219497620195213,
+        "event_time": 3,
+        "level": 0.95,
+        "lower": 0.7100925307073128,
+        "std_err": 0.0646607334653391,
+        "upper": 1.0103704800710165
+      }
+    ],
+    "standard_error": 0.056111780244787364
+  },
+  "schema_version": 1,
+  "source": {
+    "analysis_csv_sha256": "db9d3b7182eb8abd2e1c5190305d6edce431b57f690a87550dba27e61df72990",
+    "hospitals": 46,
+    "name": "Stata hospdd",
+    "periods": 7,
+    "rows": 322,
+    "source_sha256": "e3ae6451e89cb915c546ab772410046726f280ad7d117611376beb4f46a521bb",
+    "source_url": "https://www.stata-press.com/data/r19/hospdd.dta"
+  },
+  "stationary": {
+    "estimate": 0.8416826232534109,
+    "group_time": [
+      {
+        "att": 0.7837788376770689,
+        "base_period": 3.0,
+        "cohort": 4.0,
+        "cohort_share": 0.391304347826087,
+        "comparison_cohorts": [
+          Infinity
+        ],
+        "event_time": 0,
+        "n_comparison_base": 28,
+        "n_comparison_target": 28,
+        "n_treated_base": 18,
+        "n_treated_target": 18,
+        "p_value": 9.474635532699038e-19,
+        "stat": 14.659349725664525,
+        "std_err": 0.05346613951810467,
+        "target_share": 0.055900621118012424,
+        "time": 4.0
+      },
+      {
+        "att": 0.9246563793050802,
+        "base_period": 3.0,
+        "cohort": 4.0,
+        "cohort_share": 0.391304347826087,
+        "comparison_cohorts": [
+          Infinity
+        ],
+        "event_time": 1,
+        "n_comparison_base": 28,
+        "n_comparison_target": 28,
+        "n_treated_base": 18,
+        "n_treated_target": 18,
+        "p_value": 9.139371178136898e-21,
+        "stat": 16.558361600722794,
+        "std_err": 0.055842262755314974,
+        "target_share": 0.055900621118012424,
+        "time": 5.0
+      },
+      {
+        "att": 0.785668857317178,
+        "base_period": 3.0,
+        "cohort": 4.0,
+        "cohort_share": 0.391304347826087,
+        "comparison_cohorts": [
+          Infinity
+        ],
+        "event_time": 2,
+        "n_comparison_base": 28,
+        "n_comparison_target": 28,
+        "n_treated_base": 18,
+        "n_treated_target": 18,
+        "p_value": 2.627340354327479e-14,
+        "stat": 10.972082355735752,
+        "std_err": 0.07160617573258213,
+        "target_share": 0.055900621118012424,
+        "time": 6.0
+      },
+      {
+        "att": 0.8726264187143167,
+        "base_period": 3.0,
+        "cohort": 4.0,
+        "cohort_share": 0.391304347826087,
+        "comparison_cohorts": [
+          Infinity
+        ],
+        "event_time": 3,
+        "n_comparison_base": 28,
+        "n_comparison_target": 28,
+        "n_treated_base": 18,
+        "n_treated_target": 18,
+        "p_value": 2.81190490991391e-18,
+        "stat": 14.236720652264923,
+        "std_err": 0.06129406062171279,
+        "target_share": 0.055900621118012424,
+        "time": 7.0
+      }
+    ],
+    "nuisance_fold_fits": 150,
+    "probability_bounds": [
+      0.18346223950588672,
+      0.6176449281463702
+    ],
+    "standard_error": 0.0528848339731936
+  },
+  "status": "pass"
+}

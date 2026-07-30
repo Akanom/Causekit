@@ -1,0 +1,190 @@
+{
+  "causekit_version": "0.7.0a6",
+  "generated_at_utc": "2026-07-30T09:04:39.074416+00:00",
+  "generator": "benchmarks/validate_did_rcs_composition_real_data.py",
+  "generator_sha256": "a9035c07467b4cd7a0a5cbb82dd27cebfc771e075c38eb9c4e669cff90db69ba",
+  "nuisance_contract": {
+    "cluster_split": true,
+    "fold_seed": 1234,
+    "folds": 5,
+    "outcome_alpha": 1.0,
+    "outcome_model": "benchmark_standardized_ridge",
+    "paper_comparison": "descriptive_only_different_nuisance_and_inference_contract",
+    "probability_alpha": 0.5,
+    "probability_model": "benchmark_standardized_reference_class_ridge_softmax"
+  },
+  "overall_status": "pass",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.6",
+  "results": [
+    {
+      "covariates": [
+        "lvalue_tonnage",
+        "tariff2007",
+        "differentiated",
+        "agri",
+        "perishable",
+        "dfs",
+        "day_w_arrival",
+        "monitor",
+        "psi",
+        "rsa",
+        "term"
+      ],
+      "difference": -0.23075249015134092,
+      "n_splits": 5,
+      "outcome": "bp",
+      "robust": {
+        "estimate": -0.8225885300584991,
+        "maximum_probability": 0.856414306692499,
+        "maximum_weight": 27.955388850775883,
+        "minimum_probability": 0.018976990375512683,
+        "nuisance_fold_fits": 20,
+        "paper_final_reference": -0.30683023,
+        "standard_error": 0.1107935116605826,
+        "target_population": "treated_target_period"
+      },
+      "stationary": {
+        "estimate": -0.5918360399071582,
+        "maximum_probability": 0.5396749076386841,
+        "minimum_probability": 0.08241720199651274,
+        "nuisance_fold_fits": 25,
+        "paper_final_reference": -0.27529705,
+        "standard_error": 0.10713045246209871,
+        "target_population": "pooled_treated_stationary_composition"
+      },
+      "status": "pass"
+    },
+    {
+      "covariates": [
+        "lvalue_tonnage",
+        "tariff2007",
+        "differentiated",
+        "agri",
+        "perishable",
+        "dfs",
+        "day_w_arrival",
+        "monitor",
+        "psi",
+        "rsa",
+        "term"
+      ],
+      "difference": -2.544113484855484,
+      "n_splits": 5,
+      "outcome": "lba",
+      "robust": {
+        "estimate": -8.581601179488567,
+        "maximum_probability": 0.856414306692499,
+        "maximum_weight": 27.955388850775883,
+        "minimum_probability": 0.018976990375512683,
+        "nuisance_fold_fits": 20,
+        "paper_final_reference": -2.88842169,
+        "standard_error": 1.0578250151274577,
+        "target_population": "treated_target_period"
+      },
+      "stationary": {
+        "estimate": -6.037487694633083,
+        "maximum_probability": 0.5396749076386841,
+        "minimum_probability": 0.08241720199651274,
+        "nuisance_fold_fits": 25,
+        "paper_final_reference": -2.54213811,
+        "standard_error": 0.8190242326181275,
+        "target_population": "pooled_treated_stationary_composition"
+      },
+      "status": "pass"
+    },
+    {
+      "covariates": [
+        "ltonnage",
+        "tariff2007",
+        "differentiated",
+        "agri",
+        "perishable",
+        "dfs",
+        "day_w_arrival",
+        "monitor",
+        "psi",
+        "rsa",
+        "term"
+      ],
+      "difference": -0.009670545768357228,
+      "n_splits": 5,
+      "outcome": "lba_value",
+      "robust": {
+        "estimate": -0.03585423707876478,
+        "maximum_probability": 0.8549232428980834,
+        "maximum_weight": 27.00120043950566,
+        "minimum_probability": 0.019325069335971733,
+        "nuisance_fold_fits": 20,
+        "paper_final_reference": -0.02743327,
+        "standard_error": 0.008425520350903545,
+        "target_population": "treated_target_period"
+      },
+      "stationary": {
+        "estimate": -0.02618369131040755,
+        "maximum_probability": 0.5269281498260289,
+        "minimum_probability": 0.08250032710211512,
+        "nuisance_fold_fits": 25,
+        "paper_final_reference": -0.01399963,
+        "standard_error": 0.007047624048765204,
+        "target_population": "pooled_treated_stationary_composition"
+      },
+      "status": "pass"
+    },
+    {
+      "covariates": [
+        "lvalue_shipment_metical",
+        "tariff2007",
+        "differentiated",
+        "agri",
+        "perishable",
+        "dfs",
+        "day_w_arrival",
+        "monitor",
+        "psi",
+        "rsa",
+        "term"
+      ],
+      "difference": -1.005350853859226,
+      "n_splits": 5,
+      "outcome": "lba_tonnage",
+      "robust": {
+        "estimate": -4.069377590128564,
+        "maximum_probability": 0.8665679511898567,
+        "maximum_weight": 29.721341294900455,
+        "minimum_probability": 0.018520624965980576,
+        "nuisance_fold_fits": 20,
+        "paper_final_reference": -1.13074952,
+        "standard_error": 0.47098708525433075,
+        "target_population": "treated_target_period"
+      },
+      "stationary": {
+        "estimate": -3.064026736269338,
+        "maximum_probability": 0.5388690458775421,
+        "minimum_probability": 0.08453327932216427,
+        "nuisance_fold_fits": 25,
+        "paper_final_reference": -0.91795753,
+        "standard_error": 0.45352377750219175,
+        "target_population": "pooled_treated_stationary_composition"
+      },
+      "status": "pass"
+    }
+  ],
+  "schema_version": 1,
+  "source": {
+    "analysis_csv_sha256": "48e3d0cc1bd2eb757e4ac0ad24a9cc60946c6041cb4c56debaac95e4aaebb492",
+    "cell_counts_00_01_10_11": [
+      84,
+      824,
+      56,
+      120
+    ],
+    "clusters": 131,
+    "dataset": "Sequeira (2016) tariff liberalization and bribery",
+    "reference_commit": "894bd65a952c30f01a4e0005efba4cb335065eb7",
+    "reference_repository": "https://github.com/pedrohcgs/comp_did",
+    "rows": 1084,
+    "source_blob": "6a6a8bbe9792bc6385849421a7fd0d76692cd79e",
+    "source_sha256": "37f113f1c706a3b35c325b996884c843beb9a4f773c3928d505ca51b285a7953"
+  }
+}

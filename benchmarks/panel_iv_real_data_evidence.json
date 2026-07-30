@@ -1,0 +1,93 @@
+{
+  "artifact": "causekit_panel_iv_real_data_v1",
+  "generated_on": "2026-07-30",
+  "generator": "benchmarks/validate_panel_iv_real_data.py",
+  "reproduction_command": "python benchmarks/validate_panel_iv_real_data.py",
+  "causekit_version": "0.7.0a6",
+  "python_version": "3.14.6",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "comparator": {
+    "package": "linearmodels",
+    "version": "7.0"
+  },
+  "source": {
+    "name": "Vella-Verbeek wage panel",
+    "url": "https://raw.githubusercontent.com/bashtage/linearmodels/28af72e/linearmodels/datasets/wage_panel/wage_panel.csv.bz2",
+    "sha256": "ee4f36706491d6348614f06bfcd5b2eef411603590a996ebb061078ae1024e78",
+    "rows_raw": 4360,
+    "citation": "Vella and Verbeek (1998), Whose Wages Do Unions Raise?, Journal of Applied Econometrics 13:163-183."
+  },
+  "contract": {
+    "outcome": "lwage",
+    "endogenous": [
+      "union"
+    ],
+    "excluded_instruments": [
+      "one-period lag of union"
+    ],
+    "exogenous": [
+      "hours / 1000",
+      "married"
+    ],
+    "effects": [
+      "nr",
+      "year"
+    ],
+    "covariance": "entity-clustered CR1",
+    "inference": "t(G-1)",
+    "missing": "joint drop of first lag row per entity"
+  },
+  "causekit": {
+    "nobs": 3815,
+    "n_entities": 545,
+    "n_periods": 7,
+    "balanced": true,
+    "params": {
+      "hours_1000": -0.15962613778805484,
+      "married": 0.06533125127699804,
+      "union": 0.24962753388340345
+    },
+    "standard_errors": {
+      "hours_1000": 0.02416893230287323,
+      "married": 0.02417901182155533,
+      "union": 0.31401132417362376
+    },
+    "first_stage": {
+      "endogenous": "union",
+      "r_squared": 0.008518541035095972,
+      "partial_r_squared": 0.006725581466966884,
+      "classical_f_statistic": 22.080626214224417,
+      "classical_f_df_num": 1,
+      "classical_f_df_denom": 3261,
+      "classical_f_p_value": 2.72248082171917e-06,
+      "excluded_instrument_statistic": 7.000665080020679,
+      "excluded_instrument_df": 1,
+      "excluded_instrument_p_value": 0.008383709162006696,
+      "excluded_instrument_distribution": "F",
+      "weak_instrument_warning": false
+    },
+    "within_r_squared": 0.022730205344706045,
+    "elapsed_seconds": 0.05636509999749251,
+    "peak_memory_mib": 1.3015499114990234
+  },
+  "linearmodels_explicit_dummy_reference": {
+    "params": {
+      "hours_1000": -0.15962613778808077,
+      "married": 0.06533125127698369,
+      "union": 0.24962753388263081
+    },
+    "standard_errors": {
+      "hours_1000": 0.024168932302878716,
+      "married": 0.024179011821553624,
+      "union": 0.31401132417350774
+    },
+    "elapsed_seconds": 38.1568580000021
+  },
+  "absolute_differences": {
+    "maximum_coefficient": 7.726319584122621e-13,
+    "maximum_covariance": 7.28583859910259e-14
+  },
+  "tolerance": 1e-09,
+  "interpretation": "Numerical parity and specification sensitivity only. Treating current union status as endogenous and its one-period lag as excluded does not establish lag exogeneity, exclusion, monotonicity, or a causal union-wage effect.",
+  "status": "pass"
+}

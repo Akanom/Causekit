@@ -2,7 +2,7 @@
 
 ## Status and decision
 
-The `0.6.0a2` milestone keeps two separate estimators. The efficient estimator is an
+The maintained panel milestone keeps two separate estimators. The efficient estimator is an
 addition, not a replacement for conventional difference-in-differences (DiD).
 
 | Public estimator | Identifying restriction | Comparison observations | Weighting |
@@ -15,8 +15,8 @@ cross-cohort restrictions needed for efficiency are not substantively justified.
 `EfficientDiD` must never silently weaken or relabel those assumptions.
 
 The efficient estimator supports both the paper's closed-form no-covariate path and a
-covariate-adjusted path. It does not copy nuisance estimators from `limiteddepkit`.
-Covariate adjustment consumes user-owned model factories through causalkit's public
+covariate-adjusted path. It does not own or copy nuisance estimators.
+Covariate adjustment consumes user-owned model factories through causekit's public
 `CrossFitter` protocol and implements the paper's conditional covariance contract.
 
 ## Data and timing
@@ -100,9 +100,10 @@ covariate must be numeric, finite, and constant within entity. `EfficientDiD` su
 targets and group masks to the orchestrator; it never instantiates a regression or
 classifier itself.
 
-The first nuisance stage cross-fits one multiclass cohort model and group-specific
-conditional outcome-change regressions. For candidate `(g', t_pre)`, equation (4.4) is
-implemented as
+The first nuisance stage cross-fits either one multiclass cohort model or the exact
+ordered cohort-odds pairs needed by the candidate graph, plus group-specific conditional
+outcome-change regressions. Exactly one weighting route is required. For candidate
+`(g', t_pre)`, equation (4.4) is implemented as
 
 ```text
 Gg/pi_g * (Yt-Y1 - m_inf,t,tpre(X) - m_g',tpre,1(X))
@@ -110,10 +111,14 @@ Gg/pi_g * (Yt-Y1 - m_inf,t,tpre(X) - m_g',tpre,1(X))
 - [p_g(X)/p_g'(X)] * Gg'/pi_g * (Ytpre-Y1 - m_g',tpre,1(X)).
 ```
 
-The density ratios are formed from aligned out-of-fold multiclass probabilities. This is
-a supported implementation route in the paper, although direct ratio regression may be
-more stable near weak overlap. Every probability used in a ratio must exceed
-`nuisance_probability_floor`; the implementation refuses instead of clipping.
+The ratios may be formed from aligned out-of-fold multiclass probabilities or supplied by
+`CohortOddsRatioResultProtocol.predict_odds_ratio(X)`. The direct result must be the
+calibrated posterior odds `P(G=g|X)/P(G=h|X)` in the declared orientation. A scale-free
+group-conditional density ratio is not interchangeable because the PT-All score is not
+Hájek-normalized. The multiclass route enforces `nuisance_probability_floor`; the direct
+route enforces the public ratio floor/ceiling, denominator importance effective-size and
+maximum-share, and pair PSU-support thresholds. Neither route clips or falls back. See
+the [direct cohort-ratio nuisance contract](DID_DIRECT_RATIO_CONTRACT.md).
 
 For equation (3.12), conditional covariances are estimated as cross-fitted regressions of
 products of out-of-fold outcome-change residuals. A dedicated
@@ -122,7 +127,10 @@ is reused. For every entity and group-time cell, the resulting symmetric conditi
 covariance matrix must be finite and positive definite under `singularity_tolerance`.
 No ridge, diagonal clipping, eigenvalue repair, or pseudoinverse is applied.
 
-The observation-specific weights are
+For direct odds, CauseKit constructs `Omega_tilde_i = p_g(X) Omega_i` from treated
+conditional variance plus `rho_g:never`- and `rho_g:g'`-weighted comparison covariances.
+The common positive factor cancels in the normalized solve, so no fabricated multiclass
+probability matrix is needed. The observation-specific weights are
 
 ```text
 w_i = solve(Omega_i, 1) / (1' solve(Omega_i, 1)).
@@ -130,7 +138,9 @@ w_i = solve(Omega_i, 1) / (1' solve(Omega_i, 1)).
 
 `conditional_efficiency_weights` exposes every `w_i`; `efficiency_weights` reports its
 sample mean, minimum, maximum, and standard deviation by candidate. The result also
-exposes the shared nuisance fold and cohort-probability matrix. The semiparametric
+exposes the immutable shared nuisance fold, `nuisance_weighting`, and either the cohort-
+probability matrix or the ordered cohort-ratio matrix plus pair and candidate-use audits.
+The unused matrix is empty rather than fabricated. The semiparametric
 efficiency label is justified only when PT-All and the second-moment, proper-weighting,
 overlap, nuisance consistency, and product-rate conditions in the paper's Assumption C.1
 hold. Cross-fitting prevents own-observation training leakage; it does not prove those
@@ -171,9 +181,60 @@ The paper's semiparametric efficiency-bound claim is retained only for independe
 entities; requesting higher-level clustered uncertainty does not establish efficiency
 under a cluster-dependent model.
 
+## Pre-trend diagnostics
+
+Every no-covariate panel result exposes `result.pretrend`. For cohort `g`, the diagnostic
+uses adjacent changes ending strictly before the effective treatment boundary. With
+anticipation `A`, every retained placebo therefore has event time at most `-A-1`; the
+declared anticipation window is never tested as though it were untreated.
+
+Each placebo compares the treated cohort with the estimator's declared never-treated or
+not-yet-treated comparison population and reports its entity influence function. The
+joint null sets every retained cohort-period placebo to zero. Robust covariance is the
+full HC1-style cross-product of the influence matrix and uses a chi-square reference;
+clustered covariance sums the entire vector once per declared cluster and uses the
+package's finite-cluster F reference. Singular joint covariance leaves the individual
+placebos visible but marks the joint test unavailable. No restriction is dropped and no
+ridge or pseudoinverse is applied.
+
+Two-period designs can have no uncontaminated placebo change; this is recorded as
+unavailable rather than as a passing test. The current covariate-adjusted efficient path
+also records the diagnostic as unavailable because an unadjusted placebo would not test
+its conditional PT-All restriction. Failure to reject any pre-trend diagnostic is not
+evidence that parallel trends holds.
+
+## PT-All versus PT-Post Hausman diagnostic
+
+`did_hausman_test(pt_post, pt_all)` implements the event-study comparison in Theorem A.1
+of Chen, Sant'Anna, and Xie for the maintained no-covariate specialization. It requires a
+conventional never-treated PT-Post result and a no-covariate PT-All result using every
+admissible pre-period moment, fitted to exactly the same outcome/timing sample and
+covariance design.
+
+The tested vector is the common post-treatment event-study path, not only `ESavg`. The
+finite-sample covariance is computed directly from the difference between the aligned
+PT-All and PT-Post influence functions. This positive-semidefinite construction avoids
+subtracting two estimated covariance matrices. A singular difference covariance is
+refused without a pseudoinverse or effective-rank change. Rejection is evidence against
+the extra PT-All restrictions; failure to reject does not prove PT-All and is not an
+automatic estimator-selection rule.
+
+The maintained Hausman slice refuses not-yet-treated PT-Post comparisons, covariate-
+adjusted results, reduced `pre_periods`, different samples, roles, timing, covariance, or
+clusters. Those comparisons require separately aligned efficient influence functions.
+
+## Repeated-cross-section boundary
+
+Repeated cross sections require observation-level rather than entity-level influence
+functions and an explicit composition restriction. They are therefore not a mode switch
+on either panel estimator. The public implementation contract, phased nuisance design,
+strict refusals, parity targets, and promotion gates are frozen in
+[`DID_REPEATED_CROSS_SECTION_CONTRACT.md`](DID_REPEATED_CROSS_SECTION_CONTRACT.md). No
+placeholder estimator is exported yet.
+
 ## Refusals
 
-The public estimators refuse duplicate entity-time rows, unbalanced panels, non-finite
+The public panel estimators refuse duplicate entity-time rows, unbalanced panels, non-finite
 outcomes or time values, varying treatment time, covariates, or cluster within entity, an unobserved
 finite adoption time, missing never-treated observations, cohorts without a clean
 baseline, undersized cohorts, unsupported repeated cross-sections, sampling weights,
@@ -191,9 +252,11 @@ part of this contract.
 
 The maintained promotion evidence now covers covariate nuisance integration, shared-fold
 cross-fitting, conditional covariance inversion and refusal, robust/clustered multiplier
-band identities, and a seeded coverage smoke. Remaining gates include pre-trend/Hausman
-diagnostics, repeated cross-sections, publication-scale Monte Carlo studies, larger
-covariate-performance fixtures, and aligned external parity for the covariate path.
+band identities, a seeded coverage smoke, hand-computed uncontaminated pre-trend placebos,
+clustered joint tests, and the influence-difference PT-All/PT-Post Hausman diagnostic.
+Remaining gates include repeated-cross-section implementation, publication-scale Monte
+Carlo studies, larger covariate-performance fixtures, and aligned external parity for the
+covariate path.
 
 Primary methodology:
 

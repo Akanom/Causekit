@@ -20,8 +20,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-import causalkit
-from causalkit import NearestNeighborMatch
+import causekit
+from causekit import NearestNeighborMatch
 
 SEED = 20_260_728
 
@@ -96,7 +96,7 @@ def _estimated_score_ate_inference(nobs: int, rng: np.random.Generator) -> dict[
         import statsmodels.api as sm
     except ImportError as error:  # pragma: no cover - benchmark environment contract
         raise RuntimeError(
-            "estimated_score_ate_inference requires the causalkit validation extra."
+            "estimated_score_ate_inference requires the causekit validation extra."
         ) from error
 
     covariate = rng.normal(size=nobs)
@@ -118,7 +118,7 @@ def _estimated_score_ate_inference(nobs: int, rng: np.random.Generator) -> dict[
             caliper=None,
             common_support=None,
             inference="abadie_imbens_estimated",
-            variance_neighbors=2,
+            variance_neighbors=1,
         ),
     }
 
@@ -219,7 +219,7 @@ def main() -> None:
         "seed": SEED,
         "python": platform.python_version(),
         "platform": platform.platform(),
-        "causalkit": causalkit.__version__,
+        "causekit": causekit.__version__,
         "numpy": np.__version__,
         "pandas": pd.__version__,
         "memory_measurement_second_pass": args.measure_memory,

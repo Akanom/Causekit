@@ -1,0 +1,1612 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-07-30T05:18:51.596631+00:00",
+  "generator": "benchmarks/validate_did_rcs_covariate_promotion.py",
+  "generator_sha256": "8ccd762cbf60d09c600fe613239da96f82fe1a84a1b72d909ba47810387dfb5c",
+  "reproduction_command": "python benchmarks/validate_did_rcs_covariate_promotion.py --replications 1000 --workers 8",
+  "python_version": "3.14.6",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "causekit_version": "0.7.0a6",
+  "numpy_version": "2.4.6",
+  "pandas_version": "3.0.3",
+  "coverage_simulation": {
+    "seed": 20260730,
+    "replications_per_design": 1000,
+    "nominal_coverage": 0.95,
+    "nominal_conditional_pretrend_size": 0.05,
+    "n_splits": 2,
+    "population_marginal_cohort_probabilities": {
+      "treated_at_3": 0.3333333333333333,
+      "treated_at_4": 0.16666666666666666,
+      "never_treated": 0.5
+    },
+    "designs": {
+      "favorable_balanced": {
+        "period_sizes": [
+          480,
+          480,
+          480,
+          480
+        ],
+        "cohort_probabilities_by_x": [
+          [
+            0.26666666666666666,
+            0.13333333333333333,
+            0.6
+          ],
+          [
+            0.4,
+            0.2,
+            0.4
+          ]
+        ]
+      },
+      "stressed_overlap_unequal": {
+        "period_sizes": [
+          3600,
+          2400,
+          1800,
+          1440
+        ],
+        "cohort_probabilities_by_x": [
+          [
+            0.05,
+            0.05,
+            0.9
+          ],
+          [
+            0.6166666666666667,
+            0.2833333333333333,
+            0.1
+          ]
+        ]
+      }
+    },
+    "dgp": "Independent period samples; stationary binary-X-dependent cohort composition; conditional parallel trends; group-X levels; time-X trends; heterogeneous normal variance; constant declared group-time treatment effects.",
+    "nuisance_contract": "Two-fold cross-fitted saturated binary-X propensity and four group-period outcome means per fixed comparison; no oracle predictions, clipping, or trimming.",
+    "finite_sample_support_contract": "Every period-X-cohort cell has population expected count of at least 32; any realized fold-support failure is recorded as a refusal, never repaired.",
+    "total_estimator_fits": 4000,
+    "total_nuisance_fold_fits": 240000,
+    "refusal_reasons": {},
+    "elapsed_seconds": 120.54283329999816,
+    "fits_per_second": 33.18322533572024,
+    "cells": [
+      {
+        "design": "favorable_balanced",
+        "control_group": "never_treated",
+        "target": "group_3_3",
+        "truth": 1.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 0.996983100599499,
+        "bias": -0.003016899400500983,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.15389911461090658,
+        "mean_standard_error": 0.15151850175688042,
+        "standard_error_ratio": 0.9845313414567399,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.949,
+        "coverage_mcse": 0.006956938982052382,
+        "coverage_wilson_95": [
+          0.9335645136552383,
+          0.9609990572247332
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.08333333333333333,
+        "maximum_nuisance_probability": 0.6091954022988506,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "never_treated",
+        "target": "group_3_4",
+        "truth": 1.5,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.4981752670531596,
+        "bias": -0.0018247329468403795,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.15274458612338757,
+        "mean_standard_error": 0.15140460299842795,
+        "standard_error_ratio": 0.9912272954546673,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.953,
+        "coverage_mcse": 0.00669260786241059,
+        "coverage_wilson_95": [
+          0.9380600619184716,
+          0.9644728948936154
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.08333333333333333,
+        "maximum_nuisance_probability": 0.6091954022988506,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "never_treated",
+        "target": "group_4_4",
+        "truth": 2.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 2.0007995378650847,
+        "bias": 0.0007995378650846874,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.19128842456733466,
+        "mean_standard_error": 0.18918984635490482,
+        "standard_error_ratio": 0.9890292461910515,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.948,
+        "coverage_mcse": 0.007021111023192843,
+        "coverage_wilson_95": [
+          0.93244426068072,
+          0.9601269637162226
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.08333333333333333,
+        "maximum_nuisance_probability": 0.6091954022988506,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "never_treated",
+        "target": "event_0",
+        "truth": 1.3333333333333333,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.33124439998242,
+        "bias": -0.0020889333509133134,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.11331354279114174,
+        "mean_standard_error": 0.11017917613349253,
+        "standard_error_ratio": 0.9723389933767542,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.951,
+        "coverage_mcse": 0.006826346021115546,
+        "coverage_wilson_95": [
+          0.9358092984933898,
+          0.9627389653526394
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.08333333333333333,
+        "maximum_nuisance_probability": 0.6091954022988506,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "never_treated",
+        "target": "event_1",
+        "truth": 1.5,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.4981752670531596,
+        "bias": -0.0018247329468403795,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.15274458612338757,
+        "mean_standard_error": 0.15140460299842795,
+        "standard_error_ratio": 0.9912272954546673,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.953,
+        "coverage_mcse": 0.00669260786241059,
+        "coverage_wilson_95": [
+          0.9380600619184716,
+          0.9644728948936154
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.08333333333333333,
+        "maximum_nuisance_probability": 0.6091954022988506,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "never_treated",
+        "target": "calendar_3",
+        "truth": 1.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 0.996983100599499,
+        "bias": -0.003016899400500983,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.15389911461090658,
+        "mean_standard_error": 0.15151850175688042,
+        "standard_error_ratio": 0.9845313414567399,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.949,
+        "coverage_mcse": 0.006956938982052382,
+        "coverage_wilson_95": [
+          0.9335645136552383,
+          0.9609990572247332
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.08333333333333333,
+        "maximum_nuisance_probability": 0.6091954022988506,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "never_treated",
+        "target": "calendar_4",
+        "truth": 1.6666666666666667,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.6655638313062817,
+        "bias": -0.0011028353603850238,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.13023894002082528,
+        "mean_standard_error": 0.12854556878545775,
+        "standard_error_ratio": 0.9869979651623642,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.953,
+        "coverage_mcse": 0.00669260786241059,
+        "coverage_wilson_95": [
+          0.9380600619184716,
+          0.9644728948936154
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.08333333333333333,
+        "maximum_nuisance_probability": 0.6091954022988506,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "never_treated",
+        "target": "esavg",
+        "truth": 1.4166666666666667,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.4147098335177897,
+        "bias": -0.0019568331488770685,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.11800649386452049,
+        "mean_standard_error": 0.11585175620390646,
+        "standard_error_ratio": 0.9817405162203378,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.956,
+        "coverage_mcse": 0.006485676526007139,
+        "coverage_wilson_95": [
+          0.9414482108495923,
+          0.9670617854115815
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.08333333333333333,
+        "maximum_nuisance_probability": 0.6091954022988506,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "never_treated",
+        "target": "placebo_3_2",
+        "truth": 0.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 0.0055982279880980815,
+        "bias": 0.0055982279880980815,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.15030776092371315,
+        "mean_standard_error": 0.1514356704664827,
+        "standard_error_ratio": 1.007504000697223,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.949,
+        "coverage_mcse": 0.006956938982052382,
+        "coverage_wilson_95": [
+          0.9335645136552383,
+          0.9609990572247332
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.08333333333333333,
+        "maximum_nuisance_probability": 0.6091954022988506,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "never_treated",
+        "target": "placebo_4_2",
+        "truth": 0.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 0.008919595615575987,
+        "bias": 0.008919595615575987,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.18857361405235656,
+        "mean_standard_error": 0.18984485836271678,
+        "standard_error_ratio": 1.0067413689701428,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.949,
+        "coverage_mcse": 0.006956938982052382,
+        "coverage_wilson_95": [
+          0.9335645136552383,
+          0.9609990572247332
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.08333333333333333,
+        "maximum_nuisance_probability": 0.6091954022988506,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "never_treated",
+        "target": "placebo_4_3",
+        "truth": 0.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": -0.004027538391976057,
+        "bias": -0.004027538391976057,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.18464384402232295,
+        "mean_standard_error": 0.1892890072774642,
+        "standard_error_ratio": 1.0251574228197917,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.955,
+        "coverage_mcse": 0.00655553201502365,
+        "coverage_wilson_95": [
+          0.9403171620637766,
+          0.9662004877143683
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.08333333333333333,
+        "maximum_nuisance_probability": 0.6091954022988506,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "not_yet_treated",
+        "target": "group_3_3",
+        "truth": 1.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 0.9996719736788204,
+        "bias": -0.0003280263211795642,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.14717998196885118,
+        "mean_standard_error": 0.14171561395174334,
+        "standard_error_ratio": 0.9628728856736488,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.947,
+        "coverage_mcse": 0.007084560677981384,
+        "coverage_wilson_95": [
+          0.9313253831625082,
+          0.9592534947514054
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.058091286307053944,
+        "maximum_nuisance_probability": 0.6071428571428571,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "not_yet_treated",
+        "target": "group_3_4",
+        "truth": 1.5,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.4981752670531596,
+        "bias": -0.0018247329468403795,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.15274458612338757,
+        "mean_standard_error": 0.15140460299842795,
+        "standard_error_ratio": 0.9912272954546673,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.953,
+        "coverage_mcse": 0.00669260786241059,
+        "coverage_wilson_95": [
+          0.9380600619184716,
+          0.9644728948936154
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.058091286307053944,
+        "maximum_nuisance_probability": 0.6071428571428571,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "not_yet_treated",
+        "target": "group_4_4",
+        "truth": 2.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 2.0007995378650847,
+        "bias": 0.0007995378650846874,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.19128842456733466,
+        "mean_standard_error": 0.18918984635490482,
+        "standard_error_ratio": 0.9890292461910515,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.948,
+        "coverage_mcse": 0.007021111023192843,
+        "coverage_wilson_95": [
+          0.93244426068072,
+          0.9601269637162226
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.058091286307053944,
+        "maximum_nuisance_probability": 0.6071428571428571,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "not_yet_treated",
+        "target": "event_0",
+        "truth": 1.3333333333333333,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.3330562551249596,
+        "bias": -0.00027707820837363784,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.11912630909246615,
+        "mean_standard_error": 0.11455503808290937,
+        "standard_error_ratio": 0.9616266881398252,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.953,
+        "coverage_mcse": 0.00669260786241059,
+        "coverage_wilson_95": [
+          0.9380600619184716,
+          0.9644728948936154
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.058091286307053944,
+        "maximum_nuisance_probability": 0.6071428571428571,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "not_yet_treated",
+        "target": "event_1",
+        "truth": 1.5,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.4981752670531596,
+        "bias": -0.0018247329468403795,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.15274458612338757,
+        "mean_standard_error": 0.15140460299842795,
+        "standard_error_ratio": 0.9912272954546673,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.953,
+        "coverage_mcse": 0.00669260786241059,
+        "coverage_wilson_95": [
+          0.9380600619184716,
+          0.9644728948936154
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.058091286307053944,
+        "maximum_nuisance_probability": 0.6071428571428571,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "not_yet_treated",
+        "target": "calendar_3",
+        "truth": 1.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 0.9996719736788204,
+        "bias": -0.0003280263211795642,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.14717998196885118,
+        "mean_standard_error": 0.14171561395174334,
+        "standard_error_ratio": 0.9628728856736488,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.947,
+        "coverage_mcse": 0.007084560677981384,
+        "coverage_wilson_95": [
+          0.9313253831625082,
+          0.9592534947514054
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.058091286307053944,
+        "maximum_nuisance_probability": 0.6071428571428571,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "not_yet_treated",
+        "target": "calendar_4",
+        "truth": 1.6666666666666667,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.6655638313062817,
+        "bias": -0.0011028353603850238,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.13023894002082528,
+        "mean_standard_error": 0.12854556878545775,
+        "standard_error_ratio": 0.9869979651623642,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.953,
+        "coverage_mcse": 0.00669260786241059,
+        "coverage_wilson_95": [
+          0.9380600619184716,
+          0.9644728948936154
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.058091286307053944,
+        "maximum_nuisance_probability": 0.6071428571428571,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "not_yet_treated",
+        "target": "esavg",
+        "truth": 1.4166666666666667,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.4156157610890598,
+        "bias": -0.0010509055776068976,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.1176989440492364,
+        "mean_standard_error": 0.11458345173422495,
+        "standard_error_ratio": 0.9735299892435044,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.955,
+        "coverage_mcse": 0.00655553201502365,
+        "coverage_wilson_95": [
+          0.9403171620637766,
+          0.9662004877143683
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.058091286307053944,
+        "maximum_nuisance_probability": 0.6071428571428571,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "not_yet_treated",
+        "target": "placebo_3_2",
+        "truth": 0.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 0.0028699112242454995,
+        "bias": 0.0028699112242454995,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.14354153051585564,
+        "mean_standard_error": 0.14180396590783004,
+        "standard_error_ratio": 0.9878950391445515,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.947,
+        "coverage_mcse": 0.007084560677981384,
+        "coverage_wilson_95": [
+          0.9313253831625082,
+          0.9592534947514054
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.058091286307053944,
+        "maximum_nuisance_probability": 0.6071428571428571,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "not_yet_treated",
+        "target": "placebo_4_2",
+        "truth": 0.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 0.005393943982537926,
+        "bias": 0.005393943982537926,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.17923202928926948,
+        "mean_standard_error": 0.1768404063586786,
+        "standard_error_ratio": 0.986656274885272,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.946,
+        "coverage_mcse": 0.0071473071852271785,
+        "coverage_wilson_95": [
+          0.9302078451539475,
+          0.9583786862769372
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.058091286307053944,
+        "maximum_nuisance_probability": 0.6071428571428571,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "not_yet_treated",
+        "target": "placebo_4_3",
+        "truth": 0.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": -0.004027538391976057,
+        "bias": -0.004027538391976057,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.18464384402232295,
+        "mean_standard_error": 0.1892890072774642,
+        "standard_error_ratio": 1.0251574228197917,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.955,
+        "coverage_mcse": 0.00655553201502365,
+        "coverage_wilson_95": [
+          0.9403171620637766,
+          0.9662004877143683
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 51,
+        "minimum_nuisance_probability": 0.058091286307053944,
+        "maximum_nuisance_probability": 0.6071428571428571,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "never_treated",
+        "target": "group_3_3",
+        "truth": 1.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.0028306807459115,
+        "bias": 0.002830680745911529,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.15998880618996125,
+        "mean_standard_error": 0.15686042604681733,
+        "standard_error_ratio": 0.9804462560997582,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.949,
+        "coverage_mcse": 0.006956938982052382,
+        "coverage_wilson_95": [
+          0.9335645136552383,
+          0.9609990572247332
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.029490616621983913,
+        "maximum_nuisance_probability": 0.9065040650406504,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "never_treated",
+        "target": "group_3_4",
+        "truth": 1.5,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.4960314914093633,
+        "bias": -0.003968508590636688,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.17469043689811053,
+        "mean_standard_error": 0.17885652744683495,
+        "standard_error_ratio": 1.023848417936892,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.962,
+        "coverage_mcse": 0.006046155803483734,
+        "coverage_wilson_95": [
+          0.9482730796686497,
+          0.9721909954906974
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.029490616621983913,
+        "maximum_nuisance_probability": 0.9065040650406504,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "never_treated",
+        "target": "group_4_4",
+        "truth": 2.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 2.000035642223009,
+        "bias": 3.564222300900255e-05,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.22295552295010893,
+        "mean_standard_error": 0.21273726477571264,
+        "standard_error_ratio": 0.9541690735479882,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.942,
+        "coverage_mcse": 0.007391616873188169,
+        "coverage_wilson_95": [
+          0.9257504237337675,
+          0.9548667217650018
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.029490616621983913,
+        "maximum_nuisance_probability": 0.9065040650406504,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "never_treated",
+        "target": "event_0",
+        "truth": 1.3333333333333333,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.3352020469353643,
+        "bias": 0.0018687136020310025,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.10336651474783282,
+        "mean_standard_error": 0.1035500747028105,
+        "standard_error_ratio": 1.0017758164278392,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.948,
+        "coverage_mcse": 0.007021111023192843,
+        "coverage_wilson_95": [
+          0.93244426068072,
+          0.9601269637162226
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.029490616621983913,
+        "maximum_nuisance_probability": 0.9065040650406504,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "never_treated",
+        "target": "event_1",
+        "truth": 1.5,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.4960314914093633,
+        "bias": -0.003968508590636688,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.17469043689811053,
+        "mean_standard_error": 0.17885652744683495,
+        "standard_error_ratio": 1.023848417936892,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.962,
+        "coverage_mcse": 0.006046155803483734,
+        "coverage_wilson_95": [
+          0.9482730796686497,
+          0.9721909954906974
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.029490616621983913,
+        "maximum_nuisance_probability": 0.9065040650406504,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "never_treated",
+        "target": "calendar_3",
+        "truth": 1.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.0028306807459115,
+        "bias": 0.002830680745911529,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.15998880618996125,
+        "mean_standard_error": 0.15686042604681733,
+        "standard_error_ratio": 0.9804462560997582,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.949,
+        "coverage_mcse": 0.006956938982052382,
+        "coverage_wilson_95": [
+          0.9335645136552383,
+          0.9609990572247332
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.029490616621983913,
+        "maximum_nuisance_probability": 0.9065040650406504,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "never_treated",
+        "target": "calendar_4",
+        "truth": 1.6666666666666667,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.6639993308841043,
+        "bias": -0.0026673357825623967,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.1640371781012945,
+        "mean_standard_error": 0.16472135486692097,
+        "standard_error_ratio": 1.004170864029397,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.957,
+        "coverage_mcse": 0.006414904519944161,
+        "coverage_wilson_95": [
+          0.942580996155916,
+          0.9679213465882865
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.029490616621983913,
+        "maximum_nuisance_probability": 0.9065040650406504,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "never_treated",
+        "target": "esavg",
+        "truth": 1.4166666666666667,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.4156167691723638,
+        "bias": -0.0010498974943029538,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.12671906950086567,
+        "mean_standard_error": 0.1295579967510421,
+        "standard_error_ratio": 1.0224033151550014,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.959,
+        "coverage_mcse": 0.006270486424512857,
+        "coverage_wilson_95": [
+          0.9448520067923587,
+          0.9696350289179017
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.029490616621983913,
+        "maximum_nuisance_probability": 0.9065040650406504,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "never_treated",
+        "target": "placebo_3_2",
+        "truth": 0.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 0.003172440715225308,
+        "bias": 0.003172440715225308,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.11952420702665939,
+        "mean_standard_error": 0.12055617362200795,
+        "standard_error_ratio": 1.0086339547529346,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.95,
+        "coverage_mcse": 0.006892024376045114,
+        "coverage_wilson_95": [
+          0.9346861797557492,
+          0.9618697376072513
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.029490616621983913,
+        "maximum_nuisance_probability": 0.9065040650406504,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "never_treated",
+        "target": "placebo_4_2",
+        "truth": 0.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 0.00598335023740633,
+        "bias": 0.00598335023740633,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.13536552052451248,
+        "mean_standard_error": 0.13419109972122198,
+        "standard_error_ratio": 0.9913240772189265,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.951,
+        "coverage_mcse": 0.006826346021115546,
+        "coverage_wilson_95": [
+          0.9358092984933898,
+          0.9627389653526394
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.029490616621983913,
+        "maximum_nuisance_probability": 0.9065040650406504,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "never_treated",
+        "target": "placebo_4_3",
+        "truth": 0.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 0.0008796704679813025,
+        "bias": 0.0008796704679813025,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.17863927449584308,
+        "mean_standard_error": 0.17286271483946447,
+        "standard_error_ratio": 0.9676635517431357,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.94,
+        "coverage_mcse": 0.007509993342207438,
+        "coverage_wilson_95": [
+          0.9235289252086434,
+          0.953103527324068
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.029490616621983913,
+        "maximum_nuisance_probability": 0.9065040650406504,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "not_yet_treated",
+        "target": "group_3_3",
+        "truth": 1.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.0028142876713018,
+        "bias": 0.002814287671301763,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.10482709219439702,
+        "mean_standard_error": 0.10989776214106275,
+        "standard_error_ratio": 1.0483717504751768,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.964,
+        "coverage_mcse": 0.005891010100144119,
+        "coverage_wilson_95": [
+          0.9505643395327921,
+          0.9738844285926127
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.028971028971028972,
+        "maximum_nuisance_probability": 0.9016393442622951,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "not_yet_treated",
+        "target": "group_3_4",
+        "truth": 1.5,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.4960314914093633,
+        "bias": -0.003968508590636688,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.17469043689811053,
+        "mean_standard_error": 0.17885652744683495,
+        "standard_error_ratio": 1.023848417936892,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.962,
+        "coverage_mcse": 0.006046155803483734,
+        "coverage_wilson_95": [
+          0.9482730796686497,
+          0.9721909954906974
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.028971028971028972,
+        "maximum_nuisance_probability": 0.9016393442622951,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "not_yet_treated",
+        "target": "group_4_4",
+        "truth": 2.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 2.000035642223009,
+        "bias": 3.564222300900255e-05,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.22295552295010893,
+        "mean_standard_error": 0.21273726477571264,
+        "standard_error_ratio": 0.9541690735479882,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.942,
+        "coverage_mcse": 0.007391616873188169,
+        "coverage_wilson_95": [
+          0.9257504237337675,
+          0.9548667217650018
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.028971028971028972,
+        "maximum_nuisance_probability": 0.9016393442622951,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "not_yet_treated",
+        "target": "event_0",
+        "truth": 1.3333333333333333,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.3351567695047748,
+        "bias": 0.0018234361714415392,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.10700126453347064,
+        "mean_standard_error": 0.10672506496636433,
+        "standard_error_ratio": 0.9974187261401951,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.943,
+        "coverage_mcse": 0.007331507348424336,
+        "coverage_wilson_95": [
+          0.9268629323405141,
+          0.9557465596412841
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.028971028971028972,
+        "maximum_nuisance_probability": 0.9016393442622951,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "not_yet_treated",
+        "target": "event_1",
+        "truth": 1.5,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.4960314914093633,
+        "bias": -0.003968508590636688,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.17469043689811053,
+        "mean_standard_error": 0.17885652744683495,
+        "standard_error_ratio": 1.023848417936892,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.962,
+        "coverage_mcse": 0.006046155803483734,
+        "coverage_wilson_95": [
+          0.9482730796686497,
+          0.9721909954906974
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.028971028971028972,
+        "maximum_nuisance_probability": 0.9016393442622951,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "not_yet_treated",
+        "target": "calendar_3",
+        "truth": 1.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.0028142876713018,
+        "bias": 0.002814287671301763,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.10482709219439702,
+        "mean_standard_error": 0.10989776214106275,
+        "standard_error_ratio": 1.0483717504751768,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.964,
+        "coverage_mcse": 0.005891010100144119,
+        "coverage_wilson_95": [
+          0.9505643395327921,
+          0.9738844285926127
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.028971028971028972,
+        "maximum_nuisance_probability": 0.9016393442622951,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "not_yet_treated",
+        "target": "calendar_4",
+        "truth": 1.6666666666666667,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.6639993308841043,
+        "bias": -0.0026673357825623967,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.1640371781012945,
+        "mean_standard_error": 0.16472135486692097,
+        "standard_error_ratio": 1.004170864029397,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.957,
+        "coverage_mcse": 0.006414904519944161,
+        "coverage_wilson_95": [
+          0.942580996155916,
+          0.9679213465882865
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.028971028971028972,
+        "maximum_nuisance_probability": 0.9016393442622951,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "not_yet_treated",
+        "target": "esavg",
+        "truth": 1.4166666666666667,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 1.4155941304570692,
+        "bias": -0.0010725362095975743,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.11950659165818688,
+        "mean_standard_error": 0.12225375050411526,
+        "standard_error_ratio": 1.0229875089550358,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.963,
+        "coverage_mcse": 0.005969170796685251,
+        "coverage_wilson_95": [
+          0.9494176025179306,
+          0.9730388191244452
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.028971028971028972,
+        "maximum_nuisance_probability": 0.9016393442622951,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "not_yet_treated",
+        "target": "placebo_3_2",
+        "truth": 0.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": -0.0017105139039129585,
+        "bias": -0.0017105139039129585,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.08253087385886283,
+        "mean_standard_error": 0.08602951321165024,
+        "standard_error_ratio": 1.042391885475131,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.955,
+        "coverage_mcse": 0.00655553201502365,
+        "coverage_wilson_95": [
+          0.9403171620637766,
+          0.9662004877143683
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.028971028971028972,
+        "maximum_nuisance_probability": 0.9016393442622951,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "not_yet_treated",
+        "target": "placebo_4_2",
+        "truth": 0.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 0.0033807288003354294,
+        "bias": 0.0033807288003354294,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.09264827629675737,
+        "mean_standard_error": 0.09455955800940587,
+        "standard_error_ratio": 1.020629436283591,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.95,
+        "coverage_mcse": 0.006892024376045114,
+        "coverage_wilson_95": [
+          0.9346861797557492,
+          0.9618697376072513
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.028971028971028972,
+        "maximum_nuisance_probability": 0.9016393442622951,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "not_yet_treated",
+        "target": "placebo_4_3",
+        "truth": 0.0,
+        "replications": 1000,
+        "refusals": 0,
+        "mean_estimate": 0.0008796704679813025,
+        "bias": 0.0008796704679813025,
+        "absolute_bias_gate": 0.08,
+        "empirical_standard_deviation": 0.17863927449584308,
+        "mean_standard_error": 0.17286271483946447,
+        "standard_error_ratio": 0.9676635517431357,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "coverage": 0.94,
+        "coverage_mcse": 0.007509993342207438,
+        "coverage_wilson_95": [
+          0.9235289252086434,
+          0.953103527324068
+        ],
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "minimum_realized_cell": 197,
+        "minimum_nuisance_probability": 0.028971028971028972,
+        "maximum_nuisance_probability": 0.9016393442622951,
+        "nuisance_fold_fits_per_estimator": 60,
+        "status": "pass"
+      }
+    ],
+    "conditional_pretrend_joint_size": [
+      {
+        "design": "favorable_balanced",
+        "control_group": "never_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "unavailable": 0,
+        "nominal_size": 0.05,
+        "rejections": 57,
+        "rejection_rate": 0.057,
+        "rejection_rate_mcse": 0.007331507348424334,
+        "rejection_rate_wilson_95": [
+          0.04425344035871594,
+          0.07313706765948591
+        ],
+        "rejection_rate_gate": [
+          0.01,
+          0.1
+        ],
+        "status": "pass"
+      },
+      {
+        "design": "favorable_balanced",
+        "control_group": "not_yet_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "unavailable": 0,
+        "nominal_size": 0.05,
+        "rejections": 49,
+        "rejection_rate": 0.049,
+        "rejection_rate_mcse": 0.006826346021115542,
+        "rejection_rate_wilson_95": [
+          0.037261034647360615,
+          0.06419070150661013
+        ],
+        "rejection_rate_gate": [
+          0.01,
+          0.1
+        ],
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "never_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "unavailable": 0,
+        "nominal_size": 0.05,
+        "rejections": 56,
+        "rejection_rate": 0.056,
+        "rejection_rate_mcse": 0.007270763371201128,
+        "rejection_rate_wilson_95": [
+          0.043374813385442,
+          0.07202334814973096
+        ],
+        "rejection_rate_gate": [
+          0.01,
+          0.1
+        ],
+        "status": "pass"
+      },
+      {
+        "design": "stressed_overlap_unequal",
+        "control_group": "not_yet_treated",
+        "replications": 1000,
+        "refusals": 0,
+        "unavailable": 0,
+        "nominal_size": 0.05,
+        "rejections": 57,
+        "rejection_rate": 0.057,
+        "rejection_rate_mcse": 0.007331507348424334,
+        "rejection_rate_wilson_95": [
+          0.04425344035871594,
+          0.07313706765948591
+        ],
+        "rejection_rate_gate": [
+          0.01,
+          0.1
+        ],
+        "status": "pass"
+      }
+    ],
+    "status": "pass"
+  },
+  "overall_status": "pass"
+}

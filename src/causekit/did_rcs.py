@@ -1,0 +1,4012 @@
+"""Conventional difference-in-differences for repeated cross sections.
+
+This module is deliberately separate from :mod:`causekit.did`.  Rows are sampled
+observations, not balanced-panel entities, so cell means, influence functions, and
+cluster aggregation are all constructed at the observation/PSU level.
+"""
+
+from __future__ import annotations
+
+import hashlib
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from numbers import Integral, Real
+from typing import Any, Literal, cast
+
+import numpy as np
+import pandas as pd
+from pandas.api.types import is_bool_dtype, is_complex_dtype, is_numeric_dtype
+from scipy.stats import chi2, norm
+from scipy.stats import f as fisher_f
+from scipy.stats import t as student_t
+
+from .crossfit import ClassProbabilityCrossFitTask, CrossFitTask, CrossFitter
+from .did import (
+    ControlGroup,
+    DiDCovariance,
+    _joint_wald,
+    _score_cross_covariance,
+)
+
+RCSComposition = Literal["stationary", "robust"]
+RCSInference = Literal["analytic", "multiplier_bootstrap"]
+RCSCovariance = Literal["robust", "clustered", "survey_taylor"]
+SurveyWeightType = Literal["inverse_inclusion", "calibrated_analysis"]
+SurveyPopulationTarget = Literal["sample", "survey_population"]
+_MAX_MULTIPLIER_BATCH = 256
+_MAX_MULTIPLIER_ELEMENTS = 8_000_000
+_SURVEY_MIN_EFFECTIVE_N = 2.0
+_SURVEY_MAX_NORMALIZED_SHARE = 0.8
+
+
+@dataclass(frozen=True)
+class RepeatedCrossSectionSurveyDesign:
+    """One-stage with-replacement survey design for repeated-section DiD.
+
+    ``psu=None`` is an explicit independent-observation design. String roles are resolved
+    against the fitted data; labelled Series must have the exact fitted row index.
+    """
+
+    weights: str | pd.Series
+    psu: str | pd.Series | None
+    strata: str | pd.Series | None = None
+    weight_type: SurveyWeightType = "inverse_inclusion"
+    singleton_psu: Literal["raise"] = "raise"
+
+    def __post_init__(self) -> None:
+        for value, name, allow_none in (
+            (self.weights, "weights", False),
+            (self.psu, "psu", True),
+            (self.strata, "strata", True),
+        ):
+            if value is None and allow_none:
+                continue
+            if isinstance(value, str):
+                if not value:
+                    raise ValueError(f"{name} must be a non-empty column name or labelled Series.")
+                continue
+            if not isinstance(value, pd.Series):
+                raise TypeError(f"{name} must be a column name or labelled pandas Series.")
+            if value.ndim != 1:
+                raise ValueError(f"{name} must be one-dimensional.")
+        if self.weight_type not in {"inverse_inclusion", "calibrated_analysis"}:
+            raise ValueError("weight_type must be 'inverse_inclusion' or 'calibrated_analysis'.")
+        if self.singleton_psu != "raise":
+            raise ValueError("singleton_psu must be 'raise' in the implemented Taylor slice.")
+
+
+@dataclass(frozen=True)
+class RepeatedCrossSectionPretrendDiagnostic:
+    """Adjacent repeated-cross-section placebo effects and their joint test."""
+
+    available: bool
+    reason: str | None
+    placebo_effects: pd.DataFrame
+    influence: pd.DataFrame
+    covariance: pd.DataFrame
+    statistic: float | None
+    pvalue: float | None
+    n_restrictions: int
+    df_num: int
+    df_denom: float | None
+    distribution: str | None
+    covariance_type: RCSCovariance
+    n_clusters: int | None
+    null_hypothesis: str
+    notes: tuple[str, ...]
+    conditional: bool = False
+    covariates: tuple[str, ...] = ()
+    cross_fitted: bool = False
+
+
+@dataclass(frozen=True)
+class RepeatedCrossSectionCompositionDiagnostic:
+    """Aligned robust-versus-stationary repeated-section equality diagnostic."""
+
+    statistic: float
+    pvalue: float
+    reject: bool
+    level: float
+    group_time: pd.DataFrame
+    influence: pd.DataFrame
+    covariance: pd.DataFrame
+    robust_covariance: pd.DataFrame
+    stationary_covariance: pd.DataFrame
+    cross_covariance: pd.DataFrame
+    n_restrictions: int
+    df_num: int
+    df_denom: float | None
+    distribution: str
+    covariance_type: DiDCovariance
+    n_clusters: int | None
+    estimation_index: pd.Index
+    inference_clusters: pd.Series
+    design_fingerprint: str
+    null_hypothesis: str
+    notes: tuple[str, ...]
+    official_hc0_statistic: float | None = None
+    official_hc0_pvalue: float | None = None
+    official_hc0_mapping: str | None = None
+
+    @property
+    def nobs(self) -> int:
+        return len(self.estimation_index)
+
+    @property
+    def params(self) -> pd.Series:
+        return self.group_time["difference"].rename("coef")
+
+    @property
+    def standard_errors(self) -> pd.Series:
+        return pd.Series(
+            np.sqrt(np.diag(self.covariance.to_numpy(dtype=float))),
+            index=self.group_time.index.copy(),
+            name="std_err",
+        )
+
+    @property
+    def pvalues(self) -> pd.Series:
+        statistics = np.abs(
+            self.params.to_numpy(dtype=float) / self.standard_errors.to_numpy(dtype=float)
+        )
+        if self.distribution == "chi2":
+            values = 2.0 * norm.sf(statistics)
+        else:
+            values = 2.0 * student_t.sf(statistics, self.df_denom)
+        return pd.Series(values, index=self.group_time.index.copy(), name="p_value")
+
+    def summary_frame(self) -> pd.DataFrame:
+        """Return both paths and their maintained robust-minus-stationary contrast."""
+
+        summary = self.group_time.copy()
+        summary["difference_std_err"] = self.standard_errors
+        summary["difference_p_value"] = self.pvalues
+        return summary
+
+
+@dataclass(frozen=True)
+class RepeatedCrossSectionDiDResult:
+    """Auditable conventional DiD result for independent repeated samples."""
+
+    estimate: float
+    standard_error: float
+    statistic: float
+    pvalue: float
+    group_time: pd.DataFrame
+    event_study: pd.DataFrame
+    calendar_time: pd.DataFrame
+    group_time_influence: pd.DataFrame
+    event_study_influence: pd.DataFrame
+    calendar_time_influence: pd.DataFrame
+    overall_influence: pd.Series
+    pretrend: RepeatedCrossSectionPretrendDiagnostic
+    cell_counts: pd.DataFrame
+    cohort_sizes: pd.Series
+    n_observations: int
+    n_periods: int
+    n_clusters: int | None
+    covariance_type: RCSCovariance
+    inference_distribution: str
+    inference_df: float | None
+    inference_method: RCSInference
+    method: str
+    parallel_trends: str
+    control_group: str
+    composition: str
+    target_population: str
+    population_basis: str
+    group_time_aggregation: str
+    esavg_aggregation: str
+    anticipation: int
+    pre_periods: int
+    sampling_unit: str
+    time_name: str
+    outcome_name: str
+    treatment_time_name: str
+    cluster_name: str | None
+    covariates: tuple[str, ...]
+    cross_fitted: bool
+    estimation_index: pd.Index
+    inference_clusters: pd.Series
+    times: tuple[float, ...]
+    design_fingerprint: str
+    assumptions: tuple[str, ...]
+    notes: tuple[str, ...]
+    converged: bool = True
+    backend: str = "native-repeated-cross-section-did"
+    nuisance_predictions: pd.DataFrame = field(default_factory=pd.DataFrame)
+    nuisance_fold: pd.Series = field(default_factory=lambda: pd.Series(dtype="int64", name="fold"))
+    nuisance_diagnostics: pd.DataFrame = field(default_factory=pd.DataFrame)
+    n_splits: int | None = None
+    nuisance_probability_floor: float | None = None
+    composition_weights: pd.DataFrame = field(default_factory=pd.DataFrame)
+    pair_ledger: pd.DataFrame = field(default_factory=pd.DataFrame)
+    simultaneous_event_study: pd.DataFrame = field(default_factory=pd.DataFrame)
+    simultaneous_level: float | None = None
+    simultaneous_critical_value: float | None = None
+    bootstrap_iterations: int | None = None
+    bootstrap_random_state: int | None = None
+    survey_linearized: pd.DataFrame = field(default_factory=pd.DataFrame)
+    weighted_cell_counts: pd.DataFrame = field(default_factory=pd.DataFrame)
+    survey_weight_diagnostics: pd.DataFrame = field(default_factory=pd.DataFrame)
+    survey_design_diagnostics: pd.Series = field(default_factory=lambda: pd.Series(dtype="object"))
+    survey_cohort_shares: pd.Series = field(default_factory=lambda: pd.Series(dtype=float))
+    weight_type: str | None = None
+    weight_normalization: str | None = None
+    survey_weight_name: str | None = None
+    survey_psu_name: str | None = None
+    survey_strata_name: str | None = None
+
+    @property
+    def nobs(self) -> int:
+        return self.n_observations
+
+    @property
+    def params(self) -> pd.Series:
+        return pd.Series({"esavg": self.estimate}, name="coef")
+
+    @property
+    def all_params(self) -> pd.Series:
+        return self.params.copy()
+
+    @property
+    def coefficients(self) -> pd.Series:
+        return self.params.copy()
+
+    @property
+    def covariance(self) -> pd.DataFrame:
+        return pd.DataFrame(
+            [[self.standard_error**2]],
+            index=pd.Index(["esavg"], dtype="object"),
+            columns=pd.Index(["esavg"], dtype="object"),
+        )
+
+    @property
+    def standard_errors(self) -> pd.Series:
+        return pd.Series({"esavg": self.standard_error}, name="std_err")
+
+    @property
+    def pvalues(self) -> pd.Series:
+        return pd.Series({"esavg": self.pvalue}, name="p_value")
+
+    @property
+    def causal_interpretation(self) -> str:
+        composition_condition = (
+            "conditional parallel trends and four-cell support for the treated target-period "
+            "population under measured composition changes"
+            if self.composition == "robust"
+            else "stationary composition of the declared cohort populations"
+        )
+        conditions = [
+            "consistency",
+            "no interference",
+            "overlap",
+            "the declared no-anticipation window",
+            "repeated-cross-section parallel trends",
+        ]
+        if self.population_basis == "survey_population":
+            conditions.append(
+                "the declared survey weights and one-stage stratified-PSU design transport "
+                "the sample to the stated survey population"
+            )
+        conditions.append(composition_condition)
+        return f"The estimates are causal only under {', '.join(conditions[:-1])}, and {conditions[-1]}."
+
+    def conf_int(self, level: float = 0.95) -> pd.Series:
+        """Return a pointwise confidence interval for the ESavg summary."""
+
+        if not 0.0 < level < 1.0:
+            raise ValueError("level must be strictly between zero and one.")
+        probability = 0.5 + level / 2.0
+        critical = (
+            float(norm.ppf(probability))
+            if self.inference_distribution == "normal"
+            else float(student_t.ppf(probability, self.inference_df))
+        )
+        return pd.Series(
+            {
+                "lower": self.estimate - critical * self.standard_error,
+                "upper": self.estimate + critical * self.standard_error,
+            },
+            name="esavg",
+        )
+
+    def summary_frame(self, level: float = 0.95) -> pd.DataFrame:
+        """Return the scalar ESavg summary in CauseKit's standard schema."""
+
+        interval = self.conf_int(level)
+        return pd.DataFrame(
+            {
+                "coef": [self.estimate],
+                "std_err": [self.standard_error],
+                "stat": [self.statistic],
+                "p_value": [self.pvalue],
+                "ci_lower": [interval["lower"]],
+                "ci_upper": [interval["upper"]],
+            },
+            index=pd.Index(["esavg"], dtype="object"),
+        )
+
+
+@dataclass(frozen=True)
+class _RepeatedSample:
+    outcome: np.ndarray
+    time_positions: np.ndarray
+    cohorts: np.ndarray
+    treated_cohorts: tuple[float, ...]
+    original_positions: dict[float, int]
+    effective_positions: dict[float, int]
+    row_effective_positions: np.ndarray
+    never_mask: np.ndarray
+    clusters: np.ndarray | None
+    cluster_codes: np.ndarray | None
+    n_clusters: int | None
+    index: pd.Index
+    times: np.ndarray
+    cell_counts: pd.DataFrame
+    design_fingerprint: str
+
+
+@dataclass(frozen=True)
+class _RepeatedEffectCell:
+    cohort: float
+    time: float
+    event_time: int
+    base_period: float
+    att: float
+    influence: np.ndarray
+    n_treated_target: int
+    n_treated_base: int
+    n_comparison_target: int
+    n_comparison_base: int
+    comparison_cohorts: tuple[float, ...]
+    cohort_share: float
+
+
+@dataclass(frozen=True)
+class _SurveyEffectCell:
+    cohort: float
+    time: float
+    event_time: int
+    base_period: float
+    att: float
+    linearized: np.ndarray
+    n_treated_target: int
+    n_treated_base: int
+    n_comparison_target: int
+    n_comparison_base: int
+    comparison_cohorts: tuple[float, ...]
+    cohort_share: float
+    target_share: float
+    target_weight_mass: float
+
+
+@dataclass(frozen=True)
+class _ResolvedSurveyDesign:
+    weights: np.ndarray
+    psu: pd.Series
+    strata: pd.Series
+    psu_codes: np.ndarray
+    stratum_codes: np.ndarray
+    n_psus: int
+    n_strata: int
+    design_df: int
+    weight_name: str
+    psu_name: str
+    strata_name: str
+    weight_type: SurveyWeightType
+    fingerprint: str
+
+
+@dataclass(frozen=True)
+class _WeightedSurveyCell:
+    mean: float
+    linearized: np.ndarray
+    count: int
+    weight_sum: float
+    effective_n: float
+    max_normalized_share: float
+
+
+@dataclass(frozen=True)
+class _CovariateComparison:
+    cohort: float
+    target_position: int
+    base_position: int
+    stage: Literal["group_time", "conditional_pretrend"]
+    comparison_mask: np.ndarray
+    comparison_cohorts: tuple[float, ...]
+    task_names: dict[str, str]
+
+
+def _numeric_role(data: pd.DataFrame, name: str, *, role: str) -> np.ndarray:
+    series = data[name]
+    if not is_numeric_dtype(series.dtype) or is_bool_dtype(series.dtype):
+        raise ValueError(f"{role} must contain only numeric values.")
+    if series.isna().any():
+        raise ValueError(f"{role} must not contain missing values.")
+    values = series.to_numpy(dtype=float)
+    return values
+
+
+def _survey_role(
+    data: pd.DataFrame,
+    value: str | pd.Series | None,
+    *,
+    role: str,
+    allow_none: bool,
+) -> tuple[pd.Series | None, str]:
+    if value is None:
+        if not allow_none:
+            raise ValueError(f"survey {role} must be supplied.")
+        return None, f"independent_{role}"
+    if isinstance(value, str):
+        if value not in data.columns:
+            raise ValueError(f"data is missing survey {role} column {value!r}.")
+        return data[value].copy(), value
+    if not value.index.equals(data.index):
+        raise ValueError(f"survey {role} Series index must exactly equal the data index.")
+    name = value.name if isinstance(value.name, str) and value.name else f"labelled_{role}"
+    return value.copy(), name
+
+
+def _resolve_survey_design(
+    data: pd.DataFrame,
+    sample: _RepeatedSample,
+    design: RepeatedCrossSectionSurveyDesign,
+    *,
+    protected_names: Sequence[str | None],
+) -> _ResolvedSurveyDesign:
+    role_names = {
+        value for value in (design.weights, design.psu, design.strata) if isinstance(value, str)
+    }
+    overlap = sorted(role_names & {name for name in protected_names if name is not None})
+    if overlap:
+        raise ValueError(
+            "survey weight, PSU, and strata columns must be distinct from outcome and timing "
+            f"role columns: {overlap}."
+        )
+
+    weight_series, weight_name = _survey_role(
+        data, design.weights, role="weights", allow_none=False
+    )
+    if weight_series is None:  # pragma: no cover - narrowed by the immutable design contract
+        raise RuntimeError("survey weights were not resolved.")
+    if (
+        not is_numeric_dtype(weight_series.dtype)
+        or is_bool_dtype(weight_series.dtype)
+        or is_complex_dtype(weight_series.dtype)
+    ):
+        raise ValueError("survey weights must contain only numeric values.")
+    if weight_series.isna().any():
+        raise ValueError("survey weights must not contain missing values.")
+    weights = weight_series.to_numpy(dtype=float)
+    if not np.isfinite(weights).all():
+        raise ValueError("survey weights must contain only finite values.")
+    if np.any(weights <= 0.0):
+        raise ValueError("survey weights must be strictly positive.")
+
+    psu_series, psu_name = _survey_role(data, design.psu, role="PSU", allow_none=True)
+    if psu_series is None:
+        psu_series = pd.Series(data.index.to_numpy(copy=True), index=data.index, name="observation")
+        psu_name = "independent_observation"
+    strata_series, strata_name = _survey_role(data, design.strata, role="strata", allow_none=True)
+    if strata_series is None:
+        strata_series = pd.Series("__unstratified__", index=data.index, name="stratum")
+        strata_name = "unstratified"
+    if psu_series.isna().any():
+        raise ValueError("survey PSU labels must not contain missing values.")
+    if strata_series.isna().any():
+        raise ValueError("survey strata labels must not contain missing values.")
+    try:
+        psu_codes, psu_labels = pd.factorize(psu_series, sort=False)
+        stratum_codes, stratum_labels = pd.factorize(strata_series, sort=False)
+        nesting = (
+            pd.DataFrame({"psu": psu_series, "stratum": strata_series})
+            .groupby("psu", sort=False, dropna=False)["stratum"]
+            .nunique(dropna=False)
+        )
+    except TypeError as error:
+        raise ValueError("survey PSU and strata labels must be scalar and hashable.") from error
+    if np.any(psu_codes < 0) or np.any(stratum_codes < 0):
+        raise ValueError("survey PSU and strata labels must not contain missing values.")
+    if bool((nesting > 1).any()):
+        raise ValueError("each survey PSU must be nested within one stratum.")
+    psus_per_stratum = (
+        pd.DataFrame({"psu": psu_series, "stratum": strata_series})
+        .groupby("stratum", sort=False, dropna=False)["psu"]
+        .nunique(dropna=False)
+    )
+    if bool((psus_per_stratum < 2).any()):
+        raise ValueError("every survey stratum must contain at least two PSUs.")
+    n_psus = int(len(psu_labels))
+    n_strata = int(len(stratum_labels))
+    design_df = n_psus - n_strata
+    if design_df <= 0:  # defensive consequence of the stratum-level refusal
+        raise ValueError("survey design degrees of freedom must be positive.")
+
+    fingerprint = hashlib.sha256()
+    fingerprint.update(sample.design_fingerprint.encode())
+    fingerprint.update(
+        repr(
+            (
+                weight_name,
+                psu_name,
+                strata_name,
+                design.weight_type,
+                design.singleton_psu,
+                "one_stage_with_replacement_taylor",
+            )
+        ).encode()
+    )
+    audit_frame = pd.DataFrame(
+        {"weight": weights, "psu": psu_series, "stratum": strata_series}, index=data.index
+    )
+    try:
+        row_hashes = pd.util.hash_pandas_object(audit_frame, index=True).to_numpy(dtype=np.uint64)
+    except TypeError as error:
+        raise ValueError(
+            "survey data index, PSU labels, and strata labels must be scalar and hashable."
+        ) from error
+    fingerprint.update(np.sort(row_hashes).tobytes())
+    return _ResolvedSurveyDesign(
+        weights=weights,
+        psu=psu_series,
+        strata=strata_series,
+        psu_codes=psu_codes.astype(int, copy=False),
+        stratum_codes=stratum_codes.astype(int, copy=False),
+        n_psus=n_psus,
+        n_strata=n_strata,
+        design_df=design_df,
+        weight_name=weight_name,
+        psu_name=psu_name,
+        strata_name=strata_name,
+        weight_type=design.weight_type,
+        fingerprint=fingerprint.hexdigest(),
+    )
+
+
+def _prepare_repeated_sample(
+    data: pd.DataFrame,
+    *,
+    outcome: str,
+    time: str,
+    treatment_time: str,
+    never_treated: float,
+    anticipation: int,
+    covariance: DiDCovariance,
+    cluster: str | None,
+) -> _RepeatedSample:
+    if not isinstance(data, pd.DataFrame):
+        raise TypeError("data must be a pandas DataFrame.")
+    if data.empty:
+        raise ValueError("data must contain observations.")
+    if not data.columns.is_unique:
+        raise ValueError("data column names must be unique.")
+    roles = (outcome, time, treatment_time)
+    if any(not isinstance(name, str) or not name for name in roles):
+        raise TypeError("outcome, time, and treatment_time must be non-empty column names.")
+    if len(set(roles)) != len(roles):
+        raise ValueError("outcome, time, and treatment_time must name distinct columns.")
+    missing = [name for name in roles if name not in data.columns]
+    if missing:
+        raise ValueError(f"data is missing required role column(s): {missing}.")
+    if not data.index.is_unique:
+        raise ValueError("data index labels must be unique for observation-level audit records.")
+    try:
+        index_missing = bool(np.asarray(pd.isna(data.index)).any())
+    except (TypeError, ValueError):
+        index_missing = False
+    if index_missing:
+        raise ValueError("data index labels must not be missing.")
+
+    if covariance == "robust" and cluster is not None:
+        raise ValueError("cluster may be supplied only when covariance='clustered'.")
+    if covariance == "clustered" and cluster is None:
+        raise ValueError("a cluster column is required when covariance='clustered'.")
+    if cluster is not None:
+        if not isinstance(cluster, str) or not cluster:
+            raise TypeError("cluster must be a non-empty column name.")
+        if cluster in roles:
+            raise ValueError("cluster must be distinct from outcome and timing role columns.")
+        if cluster not in data.columns:
+            raise ValueError(f"data is missing cluster column {cluster!r}.")
+
+    outcomes = _numeric_role(data, outcome, role="outcome")
+    if not np.isfinite(outcomes).all():
+        raise ValueError("outcome must contain only finite values.")
+    time_values = _numeric_role(data, time, role="time")
+    if not np.isfinite(time_values).all():
+        raise ValueError("time must contain only finite values.")
+    cohort_values = _numeric_role(data, treatment_time, role="treatment_time")
+
+    if not isinstance(never_treated, Real) or isinstance(never_treated, (bool, np.bool_)):
+        raise TypeError("never_treated must be a numeric sentinel.")
+    never_value = float(never_treated)
+    if np.isnan(never_value):
+        raise ValueError("never_treated must not be NaN.")
+    never_mask = cohort_values == never_value
+    if not never_mask.any():
+        raise ValueError("the sample must contain the declared never-treated cohort.")
+    treated_values = cohort_values[~never_mask]
+    if not np.isfinite(treated_values).all():
+        raise ValueError(
+            "finite treatment cohorts are required; non-finite values must equal never_treated."
+        )
+
+    times = np.unique(time_values)
+    if len(times) < 2:
+        raise ValueError("repeated-cross-section DiD requires at least two observed time periods.")
+    if np.any(times == never_value):
+        raise ValueError("never_treated must not equal an observed time value.")
+    time_positions = np.searchsorted(times, time_values)
+    treated_cohorts = tuple(float(value) for value in np.unique(treated_values))
+    if not treated_cohorts:
+        raise ValueError("the sample must contain at least one treated cohort.")
+    observed_times = set(float(value) for value in times)
+    if any(cohort not in observed_times for cohort in treated_cohorts):
+        raise ValueError("every finite treatment time must coincide with an observed time label.")
+    original_positions = {cohort: int(np.searchsorted(times, cohort)) for cohort in treated_cohorts}
+    effective_positions = {
+        cohort: position - anticipation for cohort, position in original_positions.items()
+    }
+    if any(position <= 0 for position in effective_positions.values()):
+        raise ValueError(
+            "every treated cohort must retain a clean observed baseline before the declared "
+            "anticipation boundary."
+        )
+    row_effective_positions = np.full(len(data), len(times) + 1, dtype=int)
+    for cohort, position in effective_positions.items():
+        row_effective_positions[cohort_values == cohort] = position
+
+    clusters: np.ndarray | None = None
+    cluster_codes: np.ndarray | None = None
+    n_clusters: int | None = None
+    if cluster is not None:
+        cluster_series = data[cluster]
+        if cluster_series.isna().any():
+            raise ValueError("cluster labels must not contain missing values.")
+        try:
+            codes, labels = pd.factorize(cluster_series, sort=False)
+        except TypeError as error:
+            raise ValueError("cluster labels must be scalar and hashable.") from error
+        if np.any(codes < 0):
+            raise ValueError("cluster labels must not contain missing values.")
+        if len(labels) < 2:
+            raise ValueError("clustered inference requires at least two clusters.")
+        clusters = cluster_series.to_numpy(copy=True)
+        cluster_codes = codes.astype(int, copy=False)
+        n_clusters = len(labels)
+
+    count_frame = pd.DataFrame(
+        {
+            "cohort": cohort_values,
+            "time": time_values,
+            "cluster": np.arange(len(data)) if clusters is None else clusters,
+        },
+        index=data.index,
+    )
+    grouped = count_frame.groupby(["cohort", "time"], sort=True, dropna=False)
+    cell_counts = grouped.size().rename("nobs").to_frame()
+    if clusters is not None:
+        cell_counts["n_clusters"] = grouped["cluster"].nunique()
+    cell_counts["pooled_share"] = cell_counts["nobs"] / len(data)
+
+    fingerprint = hashlib.sha256()
+    fingerprint.update(
+        repr(
+            (
+                outcome,
+                time,
+                treatment_time,
+                cluster,
+                never_value,
+                anticipation,
+                covariance,
+            )
+        ).encode()
+    )
+    fingerprint_frame = pd.DataFrame(
+        {
+            "outcome": outcomes,
+            "time": time_values,
+            "cohort": cohort_values,
+            "cluster": np.zeros(len(data), dtype=np.int8) if clusters is None else clusters,
+        },
+        index=data.index,
+    )
+    try:
+        row_hashes = pd.util.hash_pandas_object(fingerprint_frame, index=True).to_numpy(
+            dtype=np.uint64
+        )
+    except TypeError as error:
+        raise ValueError("data index and cluster labels must be scalar and hashable.") from error
+    fingerprint.update(np.sort(row_hashes).tobytes())
+
+    return _RepeatedSample(
+        outcome=outcomes,
+        time_positions=time_positions,
+        cohorts=cohort_values,
+        treated_cohorts=treated_cohorts,
+        original_positions=original_positions,
+        effective_positions=effective_positions,
+        row_effective_positions=row_effective_positions,
+        never_mask=never_mask,
+        clusters=clusters,
+        cluster_codes=cluster_codes,
+        n_clusters=n_clusters,
+        index=data.index.copy(),
+        times=times,
+        cell_counts=cell_counts,
+        design_fingerprint=fingerprint.hexdigest(),
+    )
+
+
+def _prepare_repeated_covariates(
+    data: pd.DataFrame,
+    sample: _RepeatedSample,
+    *,
+    covariates: Sequence[str],
+    protected_names: Sequence[str | None],
+) -> tuple[pd.DataFrame, tuple[str, ...]]:
+    if isinstance(covariates, (str, bytes)):
+        raise TypeError("covariates must be a non-empty sequence of column names.")
+    names = tuple(covariates)
+    if not names:
+        raise ValueError("covariates must contain at least one column name.")
+    if any(not isinstance(name, str) or not name for name in names):
+        raise TypeError("covariates must contain only non-empty column names.")
+    if len(set(names)) != len(names):
+        raise ValueError("covariates must name distinct columns.")
+    protected = {name for name in protected_names if name is not None}
+    overlap = sorted(set(names) & protected)
+    if overlap:
+        raise ValueError(
+            "covariates must be distinct from outcome, timing, and cluster role columns: "
+            f"{overlap}."
+        )
+    missing = [name for name in names if name not in data.columns]
+    if missing:
+        raise ValueError(f"data is missing covariate column(s): {missing}.")
+    frame = data.loc[:, list(names)].copy()
+    if frame.isna().any().any():
+        raise ValueError("covariates must not contain missing values.")
+    if any(
+        not is_numeric_dtype(frame[name].dtype) or is_bool_dtype(frame[name].dtype)
+        for name in names
+    ):
+        raise ValueError("covariates must contain only numeric values.")
+    values = frame.to_numpy(dtype=float)
+    if not np.isfinite(values).all():
+        raise ValueError("covariates must contain only finite values.")
+    if not frame.index.equals(sample.index):
+        raise RuntimeError("covariate rows must retain the validated estimation index.")
+    return frame, names
+
+
+def _covariate_design_fingerprint(
+    sample: _RepeatedSample,
+    covariates: pd.DataFrame,
+    *,
+    n_splits: int,
+    probability_floor: float,
+) -> str:
+    fingerprint = hashlib.sha256()
+    fingerprint.update(sample.design_fingerprint.encode())
+    fingerprint_payload: tuple[Any, ...] = (
+        tuple(covariates.columns),
+        n_splits,
+        probability_floor,
+    )
+    fingerprint.update(repr(fingerprint_payload).encode())
+    row_hashes = pd.util.hash_pandas_object(covariates, index=True).to_numpy(dtype=np.uint64)
+    fingerprint.update(np.sort(row_hashes).tobytes())
+    return fingerprint.hexdigest()
+
+
+def _comparison_membership(
+    sample: _RepeatedSample,
+    *,
+    cohort: float,
+    target_position: int,
+    control_group: ControlGroup,
+) -> np.ndarray:
+    if control_group == "never_treated":
+        membership = sample.never_mask.copy()
+    else:
+        membership = sample.never_mask | (sample.row_effective_positions > target_position)
+    membership &= sample.cohorts != cohort
+    return membership
+
+
+def _cell_mean_and_influence(
+    sample: _RepeatedSample,
+    mask: np.ndarray,
+    *,
+    label: str,
+) -> tuple[float, np.ndarray, int]:
+    count = int(np.count_nonzero(mask))
+    if count < 2:
+        raise ValueError(
+            f"{label} must contain at least two observations for analytical inference."
+        )
+    if sample.cluster_codes is not None and len(np.unique(sample.cluster_codes[mask])) < 2:
+        raise ValueError(
+            f"{label} must contain observations from at least two clusters for clustered inference."
+        )
+    mean = float(sample.outcome[mask].mean())
+    probability = count / len(sample.outcome)
+    influence = mask.astype(float) / probability * (sample.outcome - mean)
+    return mean, influence, count
+
+
+def _survey_cell_mean_and_linearized(
+    sample: _RepeatedSample,
+    design: _ResolvedSurveyDesign,
+    mask: np.ndarray,
+    *,
+    label: str,
+) -> _WeightedSurveyCell:
+    count = int(np.count_nonzero(mask))
+    component_psus = int(np.unique(design.psu_codes[mask]).size)
+    if component_psus < 2:
+        raise ValueError(f"{label} must contain at least two PSUs for survey Taylor inference.")
+    selected_weights = design.weights[mask]
+    weight_sum = float(selected_weights.sum())
+    if count == 0 or not np.isfinite(weight_sum) or weight_sum <= 0.0:
+        raise ValueError(f"{label} has a zero weighted denominator.")
+    sum_squared = float(np.dot(selected_weights, selected_weights))
+    effective_n = weight_sum**2 / sum_squared
+    max_share = float(selected_weights.max() / weight_sum)
+    if effective_n < _SURVEY_MIN_EFFECTIVE_N:
+        raise ValueError(
+            f"{label} has inadequate weighted support: Kish effective sample size must be at "
+            f"least {_SURVEY_MIN_EFFECTIVE_N:g}."
+        )
+    if max_share > _SURVEY_MAX_NORMALIZED_SHARE:
+        raise ValueError(
+            f"{label} has severe weight concentration: maximum normalized share exceeds "
+            f"{_SURVEY_MAX_NORMALIZED_SHARE:g}."
+        )
+    mean = float(np.dot(design.weights[mask], sample.outcome[mask]) / weight_sum)
+    linearized = design.weights * mask * (sample.outcome - mean) / weight_sum
+    return _WeightedSurveyCell(
+        mean=mean,
+        linearized=linearized,
+        count=count,
+        weight_sum=weight_sum,
+        effective_n=effective_n,
+        max_normalized_share=max_share,
+    )
+
+
+def _survey_covariance(
+    linearized: np.ndarray,
+    design: _ResolvedSurveyDesign,
+) -> np.ndarray:
+    matrix = np.asarray(linearized, dtype=float)
+    if matrix.ndim == 1:
+        matrix = matrix[:, None]
+    if matrix.ndim != 2 or matrix.shape[0] != len(design.weights):
+        raise RuntimeError("survey linearized variables must align with the estimation rows.")
+    if not np.isfinite(matrix).all():
+        raise RuntimeError("survey linearized variables must be finite.")
+    covariance = np.zeros((matrix.shape[1], matrix.shape[1]), dtype=float)
+    psu_totals = np.zeros((design.n_psus, matrix.shape[1]), dtype=float)
+    np.add.at(psu_totals, design.psu_codes, matrix)
+    psu_strata = np.full(design.n_psus, -1, dtype=int)
+    psu_strata[design.psu_codes] = design.stratum_codes
+    for stratum_code in np.unique(design.stratum_codes):
+        totals = psu_totals[psu_strata == stratum_code]
+        m_h = len(totals)
+        if m_h < 2:  # protected again at the variance boundary
+            raise ValueError("every survey stratum must contain at least two PSUs.")
+        centered = totals - totals.mean(axis=0)
+        covariance += m_h / (m_h - 1.0) * centered.T @ centered
+    covariance = (covariance + covariance.T) / 2.0
+    if not np.isfinite(covariance).all():
+        raise RuntimeError("survey Taylor covariance is non-finite.")
+    return covariance
+
+
+def _survey_summary_row(
+    estimate: float,
+    linearized: np.ndarray,
+    design: _ResolvedSurveyDesign,
+) -> dict[str, float]:
+    variance = float(_survey_covariance(linearized, design)[0, 0])
+    if variance <= 0.0:
+        raise ValueError("survey Taylor variance must be strictly positive.")
+    standard_error = float(np.sqrt(variance))
+    statistic = estimate / standard_error
+    pvalue = float(2.0 * student_t.sf(abs(statistic), design.design_df))
+    return {
+        "att": estimate,
+        "std_err": standard_error,
+        "stat": statistic,
+        "p_value": pvalue,
+    }
+
+
+def _survey_effect_from_four_cells(
+    sample: _RepeatedSample,
+    design: _ResolvedSurveyDesign,
+    *,
+    cohort: float,
+    target_position: int,
+    base_position: int,
+    control_group: ControlGroup,
+) -> tuple[float, np.ndarray, tuple[_WeightedSurveyCell, ...], tuple[float, ...]]:
+    comparison = _comparison_membership(
+        sample,
+        cohort=cohort,
+        target_position=target_position,
+        control_group=control_group,
+    )
+    treated = sample.cohorts == cohort
+    target = sample.time_positions == target_position
+    baseline = sample.time_positions == base_position
+    labels_and_masks = (
+        ("treated target-period survey cell", treated & target),
+        ("treated baseline survey cell", treated & baseline),
+        ("comparison target-period survey cell", comparison & target),
+        ("comparison baseline survey cell", comparison & baseline),
+    )
+    components = tuple(
+        _survey_cell_mean_and_linearized(sample, design, mask, label=label)
+        for label, mask in labels_and_masks
+    )
+    signs = (1.0, -1.0, -1.0, 1.0)
+    estimate = float(
+        sum(sign * component.mean for sign, component in zip(signs, components, strict=True))
+    )
+    linearized = sum(
+        (sign * component.linearized for sign, component in zip(signs, components, strict=True)),
+        start=np.zeros(len(sample.outcome), dtype=float),
+    )
+    comparison_cohorts = tuple(float(value) for value in np.unique(sample.cohorts[comparison]))
+    return estimate, linearized, components, comparison_cohorts
+
+
+def _score_statistics_rcs(
+    sample: _RepeatedSample,
+    estimate: float,
+    influence: np.ndarray,
+    *,
+    covariance: DiDCovariance,
+) -> tuple[float, float, float, str, float | None, int | None]:
+    n = len(influence)
+    inference_df: float | None = None
+    if covariance == "robust":
+        variance = float(influence @ influence) / (n * (n - 1))
+        distribution = "normal"
+        n_clusters = None
+    else:
+        if sample.cluster_codes is None or sample.n_clusters is None:
+            raise ValueError("cluster codes are required for clustered inference.")
+        cluster_scores = np.zeros(sample.n_clusters)
+        np.add.at(cluster_scores, sample.cluster_codes, influence)
+        variance = float(
+            sample.n_clusters / (sample.n_clusters - 1) * (cluster_scores @ cluster_scores) / n**2
+        )
+        distribution = "t"
+        inference_df = float(sample.n_clusters - 1)
+        n_clusters = sample.n_clusters
+    standard_error = float(np.sqrt(max(variance, 0.0)))
+    if standard_error == 0.0:
+        statistic = float("nan") if estimate == 0.0 else float(np.sign(estimate) * np.inf)
+        pvalue = float("nan") if estimate == 0.0 else 0.0
+    else:
+        statistic = estimate / standard_error
+        pvalue = float(
+            2
+            * (
+                norm.sf(abs(statistic))
+                if distribution == "normal"
+                else student_t.sf(abs(statistic), inference_df)
+            )
+        )
+    return standard_error, statistic, pvalue, distribution, inference_df, n_clusters
+
+
+def _multiplier_event_study_band_rcs(
+    event_study: pd.DataFrame,
+    influence: pd.DataFrame,
+    *,
+    sample: _RepeatedSample,
+    covariance: DiDCovariance,
+    iterations: int,
+    random_state: int | None,
+    level: float,
+) -> tuple[pd.DataFrame, float]:
+    """Studentized max-t bands at the repeated-section sampling-unit level."""
+
+    scores = influence.to_numpy(dtype=float)
+    standard_errors = event_study["std_err"].to_numpy(dtype=float)
+    if np.any(~np.isfinite(standard_errors)) or np.any(standard_errors <= 0.0):
+        raise ValueError(
+            "Simultaneous event-study bands require a positive finite standard error "
+            "for every event time."
+        )
+    n = len(sample.outcome)
+    if covariance == "robust":
+        score_units = scores
+        finite_sample_scale = np.sqrt(n / (n - 1))
+    else:
+        if sample.cluster_codes is None or sample.n_clusters is None:
+            raise ValueError("cluster labels are required for clustered multiplier bands.")
+        score_units = np.zeros((sample.n_clusters, scores.shape[1]))
+        np.add.at(score_units, sample.cluster_codes, scores)
+        finite_sample_scale = np.sqrt(sample.n_clusters / (sample.n_clusters - 1))
+
+    rng = np.random.default_rng(random_state)
+    maximum_statistics = np.empty(iterations, dtype=float)
+    completed = 0
+    while completed < iterations:
+        memory_bounded_batch = max(1, _MAX_MULTIPLIER_ELEMENTS // len(score_units))
+        batch = min(
+            _MAX_MULTIPLIER_BATCH,
+            memory_bounded_batch,
+            iterations - completed,
+        )
+        multipliers = rng.choice(np.array([-1.0, 1.0]), size=(batch, len(score_units)))
+        perturbations = finite_sample_scale * multipliers @ score_units / n
+        maximum_statistics[completed : completed + batch] = np.max(
+            np.abs(perturbations / standard_errors), axis=1
+        )
+        completed += batch
+    critical = float(np.quantile(maximum_statistics, level, method="higher"))
+    estimates = event_study["att"].to_numpy(dtype=float)
+    bands = pd.DataFrame(
+        {
+            "att": estimates,
+            "std_err": standard_errors,
+            "critical_value": critical,
+            "level": level,
+            "lower": estimates - critical * standard_errors,
+            "upper": estimates + critical * standard_errors,
+        },
+        index=event_study.index.copy(),
+    )
+    return bands, critical
+
+
+def _summary_row_rcs(
+    sample: _RepeatedSample,
+    estimate: float,
+    influence: np.ndarray,
+    *,
+    covariance: DiDCovariance,
+) -> dict[str, float]:
+    standard_error, statistic, pvalue, _, _, _ = _score_statistics_rcs(
+        sample, estimate, influence, covariance=covariance
+    )
+    return {
+        "att": estimate,
+        "std_err": standard_error,
+        "stat": statistic,
+        "p_value": pvalue,
+    }
+
+
+def _score_cross_covariance_rcs(
+    sample: _RepeatedSample,
+    left: np.ndarray,
+    right: np.ndarray,
+    *,
+    covariance: DiDCovariance,
+) -> tuple[np.ndarray, int | None]:
+    if left.ndim != 2 or right.ndim != 2 or left.shape[0] != right.shape[0]:
+        raise ValueError("Influence matrices must be two-dimensional and row aligned.")
+    n = left.shape[0]
+    if covariance == "robust":
+        return left.T @ right / (n * (n - 1)), None
+    if sample.cluster_codes is None or sample.n_clusters is None:
+        raise ValueError("cluster codes are required for clustered joint inference.")
+    cluster_left = np.zeros((sample.n_clusters, left.shape[1]))
+    cluster_right = np.zeros((sample.n_clusters, right.shape[1]))
+    np.add.at(cluster_left, sample.cluster_codes, left)
+    np.add.at(cluster_right, sample.cluster_codes, right)
+    scale = sample.n_clusters / (sample.n_clusters - 1) / n**2
+    return scale * cluster_left.T @ cluster_right, sample.n_clusters
+
+
+def _effect_from_four_cells(
+    sample: _RepeatedSample,
+    *,
+    cohort: float,
+    target_position: int,
+    base_position: int,
+    control_group: ControlGroup,
+) -> tuple[float, np.ndarray, tuple[int, int, int, int], tuple[float, ...]]:
+    treated_membership = sample.cohorts == cohort
+    comparison_membership = _comparison_membership(
+        sample,
+        cohort=cohort,
+        target_position=target_position,
+        control_group=control_group,
+    )
+    treated_target = treated_membership & (sample.time_positions == target_position)
+    treated_base = treated_membership & (sample.time_positions == base_position)
+    comparison_target = comparison_membership & (sample.time_positions == target_position)
+    comparison_base = comparison_membership & (sample.time_positions == base_position)
+    treated_target_mean, treated_target_score, n_treated_target = _cell_mean_and_influence(
+        sample, treated_target, label="the treated target-period cell"
+    )
+    treated_base_mean, treated_base_score, n_treated_base = _cell_mean_and_influence(
+        sample, treated_base, label="the treated baseline-period cell"
+    )
+    comparison_target_mean, comparison_target_score, n_comparison_target = _cell_mean_and_influence(
+        sample, comparison_target, label="the comparison target-period cell"
+    )
+    comparison_base_mean, comparison_base_score, n_comparison_base = _cell_mean_and_influence(
+        sample, comparison_base, label="the comparison baseline-period cell"
+    )
+    estimate = (treated_target_mean - treated_base_mean) - (
+        comparison_target_mean - comparison_base_mean
+    )
+    influence = (
+        treated_target_score - treated_base_score - comparison_target_score + comparison_base_score
+    )
+    comparison_cohorts = tuple(
+        float(value) for value in np.unique(sample.cohorts[comparison_membership])
+    )
+    return (
+        estimate,
+        influence,
+        (n_treated_target, n_treated_base, n_comparison_target, n_comparison_base),
+        comparison_cohorts,
+    )
+
+
+def _treated_probability_prediction(result: Any, X: pd.DataFrame) -> Any:
+    if not hasattr(result, "predict_proba"):
+        raise TypeError(
+            "The fitted repeated-cross-section propensity result must provide "
+            "predict_proba(X), or CrossFitter must supply propensity_predict=."
+        )
+    values = result.predict_proba(X)
+    if isinstance(values, pd.DataFrame):
+        if not values.index.equals(X.index):
+            raise ValueError("Propensity prediction index must match the held-out index.")
+        if 1 in values.columns:
+            return values[1]
+        if values.shape[1] == 2:
+            return values.iloc[:, 1]
+        raise ValueError("predict_proba must expose the treated-class probability.")
+    raw = np.asarray(values, dtype=float)
+    if raw.ndim == 2 and raw.shape[1] == 2:
+        return raw[:, 1]
+    return raw
+
+
+def _normalized_ratio(
+    weight: np.ndarray,
+    value: np.ndarray,
+    *,
+    label: str,
+) -> tuple[float, np.ndarray]:
+    denominator = float(weight.mean())
+    if not np.isfinite(denominator) or denominator <= np.finfo(float).eps:
+        raise ValueError(
+            f"The {label} normalization has no usable overlap; no clipping, trimming, "
+            "or row deletion was applied."
+        )
+    eta = weight * value / denominator
+    mean = float(eta.mean())
+    influence = eta - weight * mean / denominator
+    if not np.isfinite(influence).all():
+        raise ValueError(f"The {label} score is non-finite.")
+    return mean, influence
+
+
+def _effect_from_cross_fitted_score(
+    sample: _RepeatedSample,
+    comparison: _CovariateComparison,
+    predictions: pd.DataFrame,
+    *,
+    probability_floor: float,
+) -> tuple[float, np.ndarray, tuple[int, int, int, int]]:
+    cohort_mask = sample.cohorts == comparison.cohort
+    target_mask = sample.time_positions == comparison.target_position
+    base_mask = sample.time_positions == comparison.base_position
+    pair_mask = (cohort_mask | comparison.comparison_mask) & (target_mask | base_mask)
+    treated_target = cohort_mask & target_mask
+    treated_base = cohort_mask & base_mask
+    comparison_target = comparison.comparison_mask & target_mask
+    comparison_base = comparison.comparison_mask & base_mask
+    cell_masks = (treated_target, treated_base, comparison_target, comparison_base)
+    cell_labels = (
+        "treated target cell",
+        "treated baseline cell",
+        "comparison target cell",
+        "comparison baseline cell",
+    )
+    counts: list[int] = []
+    for mask, label in zip(cell_masks, cell_labels, strict=True):
+        _, _, count = _cell_mean_and_influence(sample, mask, label=label)
+        counts.append(count)
+
+    used = np.flatnonzero(pair_mask)
+    pair_outcome = sample.outcome[used]
+    treated = cohort_mask[used].astype(float)
+    post = target_mask[used].astype(float)
+    names = comparison.task_names
+    propensity = predictions[names["propensity"]].to_numpy(dtype=float)[used]
+    if np.any(propensity <= probability_floor) or np.any(propensity >= 1.0 - probability_floor):
+        raise ValueError(
+            "Cross-fitted repeated-cross-section propensities violate "
+            "nuisance_probability_floor; no clipping, trimming, or row deletion was applied."
+        )
+    m0_pre = predictions[names["outcome_control_pre"]].to_numpy(dtype=float)[used]
+    m0_post = predictions[names["outcome_control_post"]].to_numpy(dtype=float)[used]
+    m1_pre = predictions[names["outcome_treated_pre"]].to_numpy(dtype=float)[used]
+    m1_post = predictions[names["outcome_treated_post"]].to_numpy(dtype=float)[used]
+    m0 = post * m0_post + (1.0 - post) * m0_pre
+
+    odds = propensity / (1.0 - propensity)
+    ratio_inputs = (
+        (treated * post, pair_outcome - m0, 1.0, "treated target residual"),
+        (treated * (1.0 - post), pair_outcome - m0, -1.0, "treated baseline residual"),
+        (
+            odds * (1.0 - treated) * post,
+            pair_outcome - m0,
+            -1.0,
+            "comparison target residual",
+        ),
+        (
+            odds * (1.0 - treated) * (1.0 - post),
+            pair_outcome - m0,
+            1.0,
+            "comparison baseline residual",
+        ),
+        (treated, m1_post - m0_post, 1.0, "treated pooled post regression"),
+        (treated * post, m1_post - m0_post, -1.0, "treated target post regression"),
+        (treated, m1_pre - m0_pre, -1.0, "treated pooled baseline regression"),
+        (
+            treated * (1.0 - post),
+            m1_pre - m0_pre,
+            1.0,
+            "treated baseline regression",
+        ),
+    )
+    estimate = 0.0
+    pair_influence = np.zeros(len(used))
+    for weight, value, sign, label in ratio_inputs:
+        component, component_influence = _normalized_ratio(weight, value, label=label)
+        estimate += sign * component
+        pair_influence += sign * component_influence
+
+    influence = np.zeros(len(sample.outcome))
+    influence[used] = len(sample.outcome) / len(used) * pair_influence
+    if abs(float(influence.sum())) > 1e-8 * max(1.0, float(np.abs(influence).sum())):
+        raise RuntimeError("The repeated-cross-section efficient influence score is not centered.")
+    count_tuple = (counts[0], counts[1], counts[2], counts[3])
+    return float(estimate), influence, count_tuple
+
+
+def _survey_normalized_ratio(
+    design_weights: np.ndarray,
+    score_weight: np.ndarray,
+    value: np.ndarray,
+    *,
+    label: str,
+) -> tuple[float, np.ndarray]:
+    weighted_score = design_weights * score_weight
+    denominator = float(weighted_score.sum())
+    if not np.isfinite(denominator) or denominator <= np.finfo(float).eps:
+        raise ValueError(
+            f"The survey-weighted {label} normalization has no usable overlap; no clipping, "
+            "trimming, or row deletion was applied."
+        )
+    estimate = float(np.dot(weighted_score, value) / denominator)
+    linearized = weighted_score * (value - estimate) / denominator
+    if not np.isfinite(linearized).all():
+        raise ValueError(f"The survey-weighted {label} score is non-finite.")
+    return estimate, linearized
+
+
+def _effect_from_survey_cross_fitted_score(
+    sample: _RepeatedSample,
+    design: _ResolvedSurveyDesign,
+    comparison: _CovariateComparison,
+    predictions: pd.DataFrame,
+    *,
+    probability_floor: float,
+) -> tuple[float, np.ndarray, tuple[int, int, int, int], float]:
+    cohort_mask = sample.cohorts == comparison.cohort
+    target_mask = sample.time_positions == comparison.target_position
+    base_mask = sample.time_positions == comparison.base_position
+    pair_mask = (cohort_mask | comparison.comparison_mask) & (target_mask | base_mask)
+    treated_target = cohort_mask & target_mask
+    treated_base = cohort_mask & base_mask
+    comparison_target = comparison.comparison_mask & target_mask
+    comparison_base = comparison.comparison_mask & base_mask
+    components = tuple(
+        _survey_cell_mean_and_linearized(sample, design, mask, label=label)
+        for mask, label in zip(
+            (treated_target, treated_base, comparison_target, comparison_base),
+            (
+                "treated target survey cell",
+                "treated baseline survey cell",
+                "comparison target survey cell",
+                "comparison baseline survey cell",
+            ),
+            strict=True,
+        )
+    )
+
+    treated = cohort_mask.astype(float)
+    post = target_mask.astype(float)
+    names = comparison.task_names
+    propensity = predictions[names["propensity"]].to_numpy(dtype=float)
+    used_propensity = propensity[pair_mask]
+    if np.any(used_propensity <= probability_floor) or np.any(
+        used_propensity >= 1.0 - probability_floor
+    ):
+        raise ValueError(
+            "Cross-fitted survey repeated-cross-section propensities violate "
+            "nuisance_probability_floor; no clipping, trimming, or row deletion was applied."
+        )
+    m0_pre = predictions[names["outcome_control_pre"]].to_numpy(dtype=float)
+    m0_post = predictions[names["outcome_control_post"]].to_numpy(dtype=float)
+    m1_pre = predictions[names["outcome_treated_pre"]].to_numpy(dtype=float)
+    m1_post = predictions[names["outcome_treated_post"]].to_numpy(dtype=float)
+    m0 = post * m0_post + (1.0 - post) * m0_pre
+    odds = propensity / (1.0 - propensity)
+    comparison_numeric = comparison.comparison_mask.astype(float)
+    pair_numeric = pair_mask.astype(float)
+    ratio_inputs = (
+        (treated * post * pair_numeric, sample.outcome - m0, 1.0, "treated target residual"),
+        (
+            treated * (1.0 - post) * pair_numeric,
+            sample.outcome - m0,
+            -1.0,
+            "treated baseline residual",
+        ),
+        (
+            odds * comparison_numeric * post,
+            sample.outcome - m0,
+            -1.0,
+            "comparison target residual",
+        ),
+        (
+            odds * comparison_numeric * (1.0 - post),
+            sample.outcome - m0,
+            1.0,
+            "comparison baseline residual",
+        ),
+        (treated * pair_numeric, m1_post - m0_post, 1.0, "treated pooled post regression"),
+        (
+            treated * post * pair_numeric,
+            m1_post - m0_post,
+            -1.0,
+            "treated target post regression",
+        ),
+        (
+            treated * pair_numeric,
+            m1_pre - m0_pre,
+            -1.0,
+            "treated pooled baseline regression",
+        ),
+        (
+            treated * (1.0 - post) * pair_numeric,
+            m1_pre - m0_pre,
+            1.0,
+            "treated baseline regression",
+        ),
+    )
+    estimate = 0.0
+    linearized = np.zeros(len(sample.outcome), dtype=float)
+    for score_weight, value, sign, label in ratio_inputs:
+        component, component_linearized = _survey_normalized_ratio(
+            design.weights,
+            score_weight,
+            value,
+            label=label,
+        )
+        estimate += sign * component
+        linearized += sign * component_linearized
+    if abs(float(linearized.sum())) > 1e-10 * max(1.0, float(np.abs(linearized).sum())):
+        raise RuntimeError("The survey repeated-cross-section efficient score is not centered.")
+    counts = tuple(component.count for component in components)
+    return (
+        float(estimate),
+        linearized,
+        cast(tuple[int, int, int, int], counts),
+        components[0].weight_sum,
+    )
+
+
+def _effect_from_composition_robust_score(
+    sample: _RepeatedSample,
+    *,
+    cohort: float,
+    target_position: int,
+    base_position: int,
+    comparison_mask: np.ndarray,
+    generalized_propensity: pd.DataFrame,
+    outcome_predictions: pd.DataFrame,
+    probability_floor: float,
+) -> tuple[float, np.ndarray, tuple[int, int, int, int], pd.DataFrame]:
+    """Evaluate the Sant'Anna-Xu pairwise efficient score and influence."""
+
+    cohort_mask = sample.cohorts == cohort
+    target_mask = sample.time_positions == target_position
+    base_mask = sample.time_positions == base_position
+    pair_mask = (cohort_mask | comparison_mask) & (target_mask | base_mask)
+    treated_target = cohort_mask & target_mask
+    treated_base = cohort_mask & base_mask
+    comparison_target = comparison_mask & target_mask
+    comparison_base = comparison_mask & base_mask
+    cell_masks = (treated_target, treated_base, comparison_target, comparison_base)
+    cell_labels = (
+        "treated target cell",
+        "treated baseline cell",
+        "comparison target cell",
+        "comparison baseline cell",
+    )
+    counts: list[int] = []
+    for mask, label in zip(cell_masks, cell_labels, strict=True):
+        _, _, count = _cell_mean_and_influence(sample, mask, label=label)
+        counts.append(count)
+
+    used = np.flatnonzero(pair_mask)
+    if not len(used):
+        raise ValueError("The composition-robust pair contains no usable observations.")
+    required_classes = pd.Index([0, 1, 2, 3], dtype="int64")
+    missing_classes = [
+        int(label) for label in required_classes if label not in generalized_propensity.columns
+    ]
+    if missing_classes:
+        raise ValueError(
+            "The generalized propensity is missing ordered group-period class(es): "
+            f"{missing_classes}."
+        )
+    probabilities = generalized_propensity.loc[:, required_classes].to_numpy(dtype=float)[used]
+    if np.any(probabilities <= probability_floor):
+        raise ValueError(
+            "Cross-fitted generalized propensities violate nuisance_probability_floor; "
+            "no clipping, trimming, renormalization, or row deletion was applied."
+        )
+    if not np.allclose(probabilities.sum(axis=1), 1.0, rtol=1e-7, atol=1e-9):
+        raise ValueError("Cross-fitted generalized propensities must sum to one in every row.")
+
+    m00 = outcome_predictions["outcome_control_pre"].to_numpy(dtype=float)[used]
+    m01 = outcome_predictions["outcome_control_post"].to_numpy(dtype=float)[used]
+    m10 = outcome_predictions["outcome_treated_pre"].to_numpy(dtype=float)[used]
+    indicators = (
+        comparison_base[used].astype(float),
+        comparison_target[used].astype(float),
+        treated_base[used].astype(float),
+        treated_target[used].astype(float),
+    )
+    p00, p01, p10 = (probabilities[:, position] for position in range(3))
+    target_probability = probabilities[:, 3]
+
+    weights: dict[str, np.ndarray] = {}
+    target_denominator = float(indicators[3].mean())
+    if target_denominator <= np.finfo(float).eps:
+        raise ValueError("The treated target-period normalization has no usable observations.")
+    weights["w_11"] = indicators[3] / target_denominator
+    for label, indicator, denominator_probability in zip(
+        ("w_00", "w_01", "w_10"),
+        indicators[:3],
+        (p00, p01, p10),
+        strict=True,
+    ):
+        raw_weight = indicator * target_probability / denominator_probability
+        denominator = float(raw_weight.mean())
+        if not np.isfinite(denominator) or denominator <= np.finfo(float).eps:
+            raise ValueError(
+                f"The composition-robust {label} normalization has no usable overlap; "
+                "no clipping, trimming, or row deletion was applied."
+            )
+        weights[label] = raw_weight / denominator
+
+    y = sample.outcome[used]
+    tau_target = y - m10 - m01 + m00
+    signed_residual = (
+        weights["w_00"] * (y - m00) - weights["w_01"] * (y - m01) - weights["w_10"] * (y - m10)
+    )
+    estimate = float(np.mean(weights["w_11"] * tau_target + signed_residual))
+    pair_influence = weights["w_11"] * (tau_target - estimate) + signed_residual
+    if not np.isfinite(pair_influence).all():
+        raise ValueError("The composition-robust efficient influence score is non-finite.")
+    influence = np.zeros(len(sample.outcome))
+    embedding_scale = len(sample.outcome) / len(used)
+    influence[used] = embedding_scale * pair_influence
+    if abs(float(influence.sum())) > 1e-8 * max(1.0, float(np.abs(influence).sum())):
+        raise RuntimeError("The composition-robust efficient influence score is not centered.")
+    weight_frame = pd.DataFrame(
+        0.0,
+        index=sample.index.copy(),
+        columns=["w_00", "w_01", "w_10", "w_11"],
+    )
+    for label in weight_frame.columns:
+        weight_frame.loc[sample.index[used], label] = embedding_scale * weights[label]
+    count_tuple = (counts[0], counts[1], counts[2], counts[3])
+    return estimate, influence, count_tuple, weight_frame
+
+
+def _aggregate_influence(
+    cells: list[_RepeatedEffectCell],
+    sample: _RepeatedSample,
+    *,
+    composition: RCSComposition,
+) -> tuple[float, np.ndarray]:
+    n = len(sample.outcome)
+    if composition == "robust":
+        masks = [
+            (sample.cohorts == cell.cohort)
+            & (sample.time_positions == int(np.searchsorted(sample.times, cell.time)))
+            for cell in cells
+        ]
+        shares = np.array([float(mask.mean()) for mask in masks], dtype=float)
+    else:
+        masks = [sample.cohorts == cell.cohort for cell in cells]
+        shares = np.array([cell.cohort_share for cell in cells], dtype=float)
+    denominator = float(shares.sum())
+    if not np.isfinite(denominator) or denominator <= np.finfo(float).eps:
+        raise ValueError("Aggregation has no positive treated target share.")
+    weights = shares / denominator
+    estimate = float(sum(weight * cell.att for weight, cell in zip(weights, cells, strict=True)))
+    influence = np.zeros(n)
+    for weight, share, mask, cell in zip(weights, shares, masks, cells, strict=True):
+        influence += weight * cell.influence
+        influence += (cell.att - estimate) * (mask.astype(float) - share) / denominator
+    return estimate, influence
+
+
+def _empty_pretrend(
+    sample: _RepeatedSample,
+    *,
+    covariance: DiDCovariance,
+    reason: str,
+    conditional: bool = False,
+    covariates: tuple[str, ...] = (),
+    cross_fitted: bool = False,
+    composition: RCSComposition = "stationary",
+) -> RepeatedCrossSectionPretrendDiagnostic:
+    columns = pd.MultiIndex.from_arrays([[], []], names=["cohort", "time"])
+    placebo_effects = pd.DataFrame(
+        columns=[
+            "event_time",
+            "base_period",
+            "att",
+            "std_err",
+            "stat",
+            "p_value",
+            "n_treated_target",
+            "n_treated_base",
+            "n_comparison_target",
+            "n_comparison_base",
+        ],
+        index=columns,
+    )
+    influence = pd.DataFrame(index=sample.index.copy(), columns=columns, dtype=float)
+    covariance_frame = pd.DataFrame(index=columns, columns=columns, dtype=float)
+    n_clusters = None if sample.clusters is None else len(pd.unique(sample.clusters))
+    return RepeatedCrossSectionPretrendDiagnostic(
+        available=False,
+        reason=reason,
+        placebo_effects=placebo_effects,
+        influence=influence,
+        covariance=covariance_frame,
+        statistic=None,
+        pvalue=None,
+        n_restrictions=0,
+        df_num=0,
+        df_denom=None,
+        distribution=None,
+        covariance_type=covariance,
+        n_clusters=n_clusters,
+        null_hypothesis="Every retained repeated-cross-section placebo effect equals zero.",
+        notes=(
+            "Failure to reject is not evidence that repeated-cross-section parallel trends is true.",
+            (
+                "The composition-robust score permits observed covariate composition to change "
+                "across periods; it does not protect against unmeasured composition changes."
+                if composition == "robust"
+                else "Stationary composition is an identifying assumption, not established by "
+                "this diagnostic."
+            ),
+        ),
+        conditional=conditional,
+        covariates=covariates,
+        cross_fitted=cross_fitted,
+    )
+
+
+def _pretrend_diagnostic(
+    sample: _RepeatedSample,
+    *,
+    covariance: DiDCovariance,
+    control_group: ControlGroup,
+) -> RepeatedCrossSectionPretrendDiagnostic:
+    cells: list[_RepeatedEffectCell] = []
+    for cohort in sample.treated_cohorts:
+        effective_position = sample.effective_positions[cohort]
+        for target_position in range(1, effective_position):
+            base_position = target_position - 1
+            estimate, influence, counts, comparison_cohorts = _effect_from_four_cells(
+                sample,
+                cohort=cohort,
+                target_position=target_position,
+                base_position=base_position,
+                control_group=control_group,
+            )
+            cells.append(
+                _RepeatedEffectCell(
+                    cohort=cohort,
+                    time=float(sample.times[target_position]),
+                    event_time=target_position - sample.original_positions[cohort],
+                    base_period=float(sample.times[base_position]),
+                    att=estimate,
+                    influence=influence,
+                    n_treated_target=counts[0],
+                    n_treated_base=counts[1],
+                    n_comparison_target=counts[2],
+                    n_comparison_base=counts[3],
+                    comparison_cohorts=comparison_cohorts,
+                    cohort_share=float(np.mean(sample.cohorts == cohort)),
+                )
+            )
+    return _pretrend_diagnostic_from_cells(
+        sample,
+        cells,
+        covariance=covariance,
+        conditional=False,
+        covariates=(),
+        cross_fitted=False,
+    )
+
+
+def _pretrend_diagnostic_from_cells(
+    sample: _RepeatedSample,
+    cells: list[_RepeatedEffectCell],
+    *,
+    covariance: DiDCovariance,
+    conditional: bool,
+    covariates: tuple[str, ...],
+    cross_fitted: bool,
+    composition: RCSComposition = "stationary",
+) -> RepeatedCrossSectionPretrendDiagnostic:
+    if not cells:
+        return _empty_pretrend(
+            sample,
+            covariance=covariance,
+            reason=(
+                "No uncontaminated adjacent repeated-cross-section changes remain before "
+                "the declared treatment or anticipation boundary."
+            ),
+            conditional=conditional,
+            covariates=covariates,
+            cross_fitted=cross_fitted,
+            composition=composition,
+        )
+
+    rows: list[dict[str, Any]] = []
+    keys: list[tuple[float, float]] = []
+    influences: list[np.ndarray] = []
+    for cell in cells:
+        keys.append((cell.cohort, cell.time))
+        influences.append(cell.influence)
+        rows.append(
+            {
+                "cohort": cell.cohort,
+                "time": cell.time,
+                "event_time": cell.event_time,
+                "base_period": cell.base_period,
+                **_summary_row_rcs(
+                    sample,
+                    cell.att,
+                    cell.influence,
+                    covariance=covariance,
+                ),
+                "n_treated_target": cell.n_treated_target,
+                "n_treated_base": cell.n_treated_base,
+                "n_comparison_target": cell.n_comparison_target,
+                "n_comparison_base": cell.n_comparison_base,
+                "comparison_cohorts": cell.comparison_cohorts,
+            }
+        )
+    columns = pd.MultiIndex.from_tuples(keys, names=["cohort", "time"])
+    influence_matrix = np.column_stack(influences)
+    influence_frame = pd.DataFrame(influence_matrix, index=sample.index.copy(), columns=columns)
+    covariance_matrix, n_clusters = _score_cross_covariance_rcs(
+        sample,
+        influence_matrix,
+        influence_matrix,
+        covariance=covariance,
+    )
+    covariance_frame = pd.DataFrame(covariance_matrix, index=columns.copy(), columns=columns.copy())
+    placebo_effects = pd.DataFrame(rows).set_index(["cohort", "time"])
+    estimates = placebo_effects["att"].to_numpy(dtype=float)
+    try:
+        statistic, pvalue, distribution, denominator_df = _joint_wald(
+            estimates,
+            covariance_matrix,
+            covariance=covariance,
+            n_clusters=n_clusters,
+        )
+    except ValueError as error:
+        return RepeatedCrossSectionPretrendDiagnostic(
+            available=False,
+            reason=str(error),
+            placebo_effects=placebo_effects,
+            influence=influence_frame,
+            covariance=covariance_frame,
+            statistic=None,
+            pvalue=None,
+            n_restrictions=len(keys),
+            df_num=len(keys),
+            df_denom=None,
+            distribution=None,
+            covariance_type=covariance,
+            n_clusters=n_clusters,
+            null_hypothesis="Every retained repeated-cross-section placebo effect equals zero.",
+            notes=(
+                "Placebo effects remain available, but their joint covariance was singular.",
+                "No ridge, dimension dropping, or pseudoinverse was applied.",
+                (
+                    "The robust score permits measured composition changes but not unmeasured "
+                    "composition changes."
+                    if composition == "robust"
+                    else "Stationary composition remains an identifying assumption."
+                ),
+            ),
+            conditional=conditional,
+            covariates=covariates,
+            cross_fitted=cross_fitted,
+        )
+    return RepeatedCrossSectionPretrendDiagnostic(
+        available=True,
+        reason=None,
+        placebo_effects=placebo_effects,
+        influence=influence_frame,
+        covariance=covariance_frame,
+        statistic=statistic,
+        pvalue=pvalue,
+        n_restrictions=len(keys),
+        df_num=len(keys),
+        df_denom=denominator_df,
+        distribution=distribution,
+        covariance_type=covariance,
+        n_clusters=n_clusters,
+        null_hypothesis="Every retained repeated-cross-section placebo effect equals zero.",
+        notes=(
+            (
+                "Placebos use the same cross-fitted locally efficient conditional score as "
+                "reported group-time effects."
+                if conditional
+                else "Placebos use four independent adjacent cohort-period cell means."
+            ),
+            "Failure to reject is not evidence that repeated-cross-section parallel trends is true.",
+            (
+                "The robust score permits measured composition changes but does not protect "
+                "against unmeasured composition changes."
+                if composition == "robust"
+                else "Stationary composition is an identifying assumption, not established by "
+                "this diagnostic."
+            ),
+        ),
+        conditional=conditional,
+        covariates=covariates,
+        cross_fitted=cross_fitted,
+    )
+
+
+def _aggregate_survey_cells(
+    cells: Sequence[_SurveyEffectCell],
+    sample: _RepeatedSample,
+    design: _ResolvedSurveyDesign,
+) -> tuple[float, np.ndarray]:
+    if not cells:
+        raise RuntimeError("at least one survey effect cell is required for aggregation.")
+    masses = np.asarray([cell.target_weight_mass for cell in cells], dtype=float)
+    total_mass = float(masses.sum())
+    if not np.isfinite(total_mass) or total_mass <= 0.0:
+        raise ValueError("survey aggregation has a zero weighted target share.")
+    shares = masses / total_mass
+    estimates = np.asarray([cell.att for cell in cells], dtype=float)
+    estimate = float(np.dot(shares, estimates))
+    linearized = sum(
+        (share * cell.linearized for share, cell in zip(shares, cells, strict=True)),
+        start=np.zeros(len(sample.outcome), dtype=float),
+    )
+    for cell, cell_estimate in zip(cells, estimates, strict=True):
+        target_position = int(np.searchsorted(sample.times, cell.time))
+        target_cell = (sample.cohorts == cell.cohort) & (sample.time_positions == target_position)
+        linearized += (
+            (cell_estimate - estimate) * design.weights * target_cell.astype(float) / total_mass
+        )
+    return estimate, linearized
+
+
+def _empty_survey_pretrend(
+    sample: _RepeatedSample,
+    design: _ResolvedSurveyDesign,
+) -> RepeatedCrossSectionPretrendDiagnostic:
+    empty_index = pd.MultiIndex.from_tuples([], names=["cohort", "time"])
+    return RepeatedCrossSectionPretrendDiagnostic(
+        available=False,
+        reason=(
+            "No uncontaminated adjacent survey-weighted repeated-cross-section changes remain "
+            "before the declared treatment or anticipation boundary."
+        ),
+        placebo_effects=pd.DataFrame(index=empty_index),
+        influence=pd.DataFrame(index=sample.index.copy(), columns=empty_index, dtype=float),
+        covariance=pd.DataFrame(index=empty_index, columns=empty_index, dtype=float),
+        statistic=None,
+        pvalue=None,
+        n_restrictions=0,
+        df_num=0,
+        df_denom=float(design.design_df),
+        distribution=None,
+        covariance_type="survey_taylor",
+        n_clusters=design.n_psus,
+        null_hypothesis="Every retained survey-weighted placebo effect equals zero.",
+        notes=(
+            "Absence of a retained placebo is not evidence for parallel trends.",
+            "Survey weighting does not establish the repeated-cross-section identifying assumptions.",
+        ),
+    )
+
+
+def _survey_pretrend_diagnostic(
+    sample: _RepeatedSample,
+    design: _ResolvedSurveyDesign,
+    *,
+    control_group: ControlGroup,
+) -> RepeatedCrossSectionPretrendDiagnostic:
+    cells: list[_SurveyEffectCell] = []
+    total_weight = float(design.weights.sum())
+    for cohort in sample.treated_cohorts:
+        effective_position = sample.effective_positions[cohort]
+        for target_position in range(1, effective_position):
+            base_position = target_position - 1
+            estimate, linearized, components, comparison_cohorts = _survey_effect_from_four_cells(
+                sample,
+                design,
+                cohort=cohort,
+                target_position=target_position,
+                base_position=base_position,
+                control_group=control_group,
+            )
+            target_mass = components[0].weight_sum
+            cohort_mass = float(design.weights[sample.cohorts == cohort].sum())
+            cells.append(
+                _SurveyEffectCell(
+                    cohort=cohort,
+                    time=float(sample.times[target_position]),
+                    event_time=target_position - sample.original_positions[cohort],
+                    base_period=float(sample.times[base_position]),
+                    att=estimate,
+                    linearized=linearized,
+                    n_treated_target=components[0].count,
+                    n_treated_base=components[1].count,
+                    n_comparison_target=components[2].count,
+                    n_comparison_base=components[3].count,
+                    comparison_cohorts=comparison_cohorts,
+                    cohort_share=cohort_mass / total_weight,
+                    target_share=target_mass / total_weight,
+                    target_weight_mass=target_mass,
+                )
+            )
+    if not cells:
+        return _empty_survey_pretrend(sample, design)
+
+    rows: list[dict[str, Any]] = []
+    keys: list[tuple[float, float]] = []
+    linearized_columns: list[np.ndarray] = []
+    for cell in cells:
+        keys.append((cell.cohort, cell.time))
+        linearized_columns.append(cell.linearized)
+        rows.append(
+            {
+                "cohort": cell.cohort,
+                "time": cell.time,
+                "event_time": cell.event_time,
+                "base_period": cell.base_period,
+                **_survey_summary_row(cell.att, cell.linearized, design),
+                "n_treated_target": cell.n_treated_target,
+                "n_treated_base": cell.n_treated_base,
+                "n_comparison_target": cell.n_comparison_target,
+                "n_comparison_base": cell.n_comparison_base,
+                "comparison_cohorts": cell.comparison_cohorts,
+            }
+        )
+    columns = pd.MultiIndex.from_tuples(keys, names=["cohort", "time"])
+    linearized_matrix = np.column_stack(linearized_columns)
+    covariance = _survey_covariance(linearized_matrix, design)
+    placebo_effects = pd.DataFrame(rows).set_index(["cohort", "time"])
+    estimates = placebo_effects["att"].to_numpy(dtype=float)
+    available = True
+    reason: str | None = None
+    statistic: float | None
+    pvalue: float | None
+    try:
+        inverse = np.linalg.inv(covariance)
+        statistic = float(estimates @ inverse @ estimates / len(estimates))
+        if not np.isfinite(statistic) or statistic < 0.0:
+            raise ValueError("survey pre-trend statistic is invalid.")
+        pvalue = float(fisher_f.sf(statistic, len(estimates), design.design_df))
+    except (np.linalg.LinAlgError, ValueError) as error:
+        available = False
+        reason = (
+            "Survey pre-trend covariance is singular or invalid; no ridge, coordinate "
+            f"deletion, or pseudoinverse was applied ({error})."
+        )
+        statistic = None
+        pvalue = None
+    return RepeatedCrossSectionPretrendDiagnostic(
+        available=available,
+        reason=reason,
+        placebo_effects=placebo_effects,
+        influence=pd.DataFrame(
+            len(sample.outcome) * linearized_matrix,
+            index=sample.index.copy(),
+            columns=columns,
+        ),
+        covariance=pd.DataFrame(covariance, index=columns.copy(), columns=columns.copy()),
+        statistic=statistic,
+        pvalue=pvalue,
+        n_restrictions=len(estimates),
+        df_num=len(estimates),
+        df_denom=float(design.design_df),
+        distribution="F" if available else None,
+        covariance_type="survey_taylor",
+        n_clusters=design.n_psus,
+        null_hypothesis="Every retained survey-weighted placebo effect equals zero.",
+        notes=(
+            "The joint diagnostic uses a Taylor-linearized Wald F test with survey design degrees of freedom.",
+            "Failure to reject does not verify survey-population parallel trends.",
+        ),
+    )
+
+
+def _survey_weighted_cell_counts(
+    sample: _RepeatedSample,
+    design: _ResolvedSurveyDesign,
+) -> pd.DataFrame:
+    rows: list[dict[str, float]] = []
+    total_weight = float(design.weights.sum())
+    for cohort in np.unique(sample.cohorts):
+        for position, time_value in enumerate(sample.times):
+            mask = (sample.cohorts == cohort) & (sample.time_positions == position)
+            if not mask.any():
+                continue
+            selected = design.weights[mask]
+            weight_sum = float(selected.sum())
+            rows.append(
+                {
+                    "cohort": float(cohort),
+                    "time": float(time_value),
+                    "nobs": float(mask.sum()),
+                    "n_psus": float(np.unique(design.psu_codes[mask]).size),
+                    "weight_sum": weight_sum,
+                    "population_share": weight_sum / total_weight,
+                    "kish_effective_n": weight_sum**2 / float(np.dot(selected, selected)),
+                    "max_normalized_weight_share": float(selected.max() / weight_sum),
+                }
+            )
+    frame = pd.DataFrame(rows).set_index(["cohort", "time"]).sort_index()
+    frame["nobs"] = frame["nobs"].astype(int)
+    frame["n_psus"] = frame["n_psus"].astype(int)
+    return frame
+
+
+def _survey_pretrend_from_fitted_cells(
+    sample: _RepeatedSample,
+    design: _ResolvedSurveyDesign,
+    cells: list[_SurveyEffectCell],
+    *,
+    covariates: tuple[str, ...],
+) -> RepeatedCrossSectionPretrendDiagnostic:
+    if not cells:
+        empty = _empty_survey_pretrend(sample, design)
+        return RepeatedCrossSectionPretrendDiagnostic(
+            **{
+                **empty.__dict__,
+                "conditional": True,
+                "covariates": covariates,
+                "cross_fitted": True,
+            }
+        )
+    rows: list[dict[str, Any]] = []
+    keys: list[tuple[float, float]] = []
+    linearized_columns: list[np.ndarray] = []
+    for cell in cells:
+        keys.append((cell.cohort, cell.time))
+        linearized_columns.append(cell.linearized)
+        rows.append(
+            {
+                "cohort": cell.cohort,
+                "time": cell.time,
+                "event_time": cell.event_time,
+                "base_period": cell.base_period,
+                **_survey_summary_row(cell.att, cell.linearized, design),
+                "n_treated_target": cell.n_treated_target,
+                "n_treated_base": cell.n_treated_base,
+                "n_comparison_target": cell.n_comparison_target,
+                "n_comparison_base": cell.n_comparison_base,
+                "comparison_cohorts": cell.comparison_cohorts,
+            }
+        )
+    columns = pd.MultiIndex.from_tuples(keys, names=["cohort", "time"])
+    matrix = np.column_stack(linearized_columns)
+    covariance = _survey_covariance(matrix, design)
+    placebo_effects = pd.DataFrame(rows).set_index(["cohort", "time"])
+    estimates = placebo_effects["att"].to_numpy(dtype=float)
+    available = True
+    reason: str | None = None
+    statistic: float | None = None
+    pvalue: float | None = None
+    try:
+        statistic = float(estimates @ np.linalg.inv(covariance) @ estimates / len(estimates))
+        if not np.isfinite(statistic) or statistic < 0.0:
+            raise ValueError("survey pre-trend statistic is invalid.")
+        pvalue = float(fisher_f.sf(statistic, len(estimates), design.design_df))
+    except (np.linalg.LinAlgError, ValueError) as error:
+        available = False
+        reason = (
+            "Survey conditional pre-trend covariance is singular or invalid; no repair was "
+            f"applied ({error})."
+        )
+    return RepeatedCrossSectionPretrendDiagnostic(
+        available=available,
+        reason=reason,
+        placebo_effects=placebo_effects,
+        influence=pd.DataFrame(
+            len(sample.outcome) * matrix,
+            index=sample.index.copy(),
+            columns=columns,
+        ),
+        covariance=pd.DataFrame(covariance, index=columns.copy(), columns=columns.copy()),
+        statistic=statistic,
+        pvalue=pvalue,
+        n_restrictions=len(estimates),
+        df_num=len(estimates),
+        df_denom=float(design.design_df),
+        distribution="F" if available else None,
+        covariance_type="survey_taylor",
+        n_clusters=design.n_psus,
+        null_hypothesis="Every retained conditional survey-weighted placebo effect equals zero.",
+        notes=(
+            "Placebos use the same cross-fitted survey-weighted score as reported effects.",
+            "Failure to reject does not verify survey-population conditional parallel trends.",
+        ),
+        conditional=True,
+        covariates=covariates,
+        cross_fitted=True,
+    )
+
+
+def _assemble_survey_result(
+    cells: list[_SurveyEffectCell],
+    sample: _RepeatedSample,
+    design: _ResolvedSurveyDesign,
+    *,
+    control_group: ControlGroup,
+    anticipation: int,
+    outcome_name: str,
+    time_name: str,
+    treatment_time_name: str,
+    pretrend_override: RepeatedCrossSectionPretrendDiagnostic | None = None,
+    covariate_names: tuple[str, ...] = (),
+    nuisance_predictions: pd.DataFrame | None = None,
+    nuisance_fold: pd.Series | None = None,
+    nuisance_diagnostics: pd.DataFrame | None = None,
+    n_splits: int | None = None,
+    nuisance_probability_floor: float | None = None,
+    design_fingerprint: str | None = None,
+) -> RepeatedCrossSectionDiDResult:
+    group_rows: list[dict[str, Any]] = []
+    group_linearized: dict[tuple[float, float], np.ndarray] = {}
+    for cell in cells:
+        key = (cell.cohort, cell.time)
+        group_linearized[key] = cell.linearized
+        group_rows.append(
+            {
+                "cohort": cell.cohort,
+                "time": cell.time,
+                "event_time": cell.event_time,
+                "base_period": cell.base_period,
+                **_survey_summary_row(cell.att, cell.linearized, design),
+                "n_treated_target": cell.n_treated_target,
+                "n_treated_base": cell.n_treated_base,
+                "n_comparison_target": cell.n_comparison_target,
+                "n_comparison_base": cell.n_comparison_base,
+                "comparison_cohorts": cell.comparison_cohorts,
+                "cohort_share": cell.cohort_share,
+                "target_share": cell.target_share,
+            }
+        )
+    group_time = pd.DataFrame(group_rows).set_index(["cohort", "time"]).sort_index()
+    group_linearized_frame = pd.DataFrame(group_linearized, index=sample.index.copy()).sort_index(
+        axis=1
+    )
+    group_linearized_frame.columns.names = ["cohort", "time"]
+
+    event_rows: list[dict[str, Any]] = []
+    event_linearized: dict[int, np.ndarray] = {}
+    for event_time in sorted({cell.event_time for cell in cells}):
+        selected = [cell for cell in cells if cell.event_time == event_time]
+        estimate, linearized = _aggregate_survey_cells(selected, sample, design)
+        event_linearized[event_time] = linearized
+        event_rows.append(
+            {
+                "event_time": event_time,
+                **_survey_summary_row(estimate, linearized, design),
+                "n_cohorts": len(selected),
+            }
+        )
+    event_study = pd.DataFrame(event_rows).set_index("event_time").sort_index()
+    event_linearized_frame = pd.DataFrame(event_linearized, index=sample.index.copy()).sort_index(
+        axis=1
+    )
+    event_linearized_frame.columns.name = "event_time"
+
+    calendar_rows: list[dict[str, Any]] = []
+    calendar_linearized: dict[float, np.ndarray] = {}
+    for calendar_value in sorted({cell.time for cell in cells if cell.event_time >= 0}):
+        selected = [cell for cell in cells if cell.time == calendar_value and cell.event_time >= 0]
+        estimate, linearized = _aggregate_survey_cells(selected, sample, design)
+        calendar_linearized[calendar_value] = linearized
+        calendar_rows.append(
+            {
+                "time": calendar_value,
+                **_survey_summary_row(estimate, linearized, design),
+                "n_cohorts": len(selected),
+            }
+        )
+    calendar_time = pd.DataFrame(calendar_rows).set_index("time").sort_index()
+    calendar_linearized_frame = pd.DataFrame(
+        calendar_linearized, index=sample.index.copy()
+    ).sort_index(axis=1)
+    calendar_linearized_frame.columns.name = "time"
+
+    post_events = [value for value in event_study.index if value >= 0]
+    estimate = float(event_study.loc[post_events, "att"].mean())
+    overall_linearized = (
+        event_linearized_frame.loc[:, post_events].mean(axis=1).to_numpy(dtype=float)
+    )
+    variance = float(_survey_covariance(overall_linearized, design)[0, 0])
+    if variance <= 0.0:
+        raise ValueError("survey Taylor variance for ESavg must be strictly positive.")
+    standard_error = float(np.sqrt(variance))
+    statistic = estimate / standard_error
+    pvalue = float(2.0 * student_t.sf(abs(statistic), design.design_df))
+    n = len(sample.outcome)
+    overall_influence = pd.Series(
+        n * overall_linearized, index=sample.index.copy(), name="esavg_influence"
+    )
+    survey_linearized = pd.DataFrame({"esavg": overall_linearized}, index=sample.index.copy())
+    cohort_sizes = pd.Series(
+        {
+            cohort: int(np.count_nonzero(sample.cohorts == cohort))
+            for cohort in sample.treated_cohorts
+        },
+        name="n_observations",
+    )
+    cohort_sizes.index.name = "cohort"
+    total_weight = float(design.weights.sum())
+    survey_cohort_shares = pd.Series(
+        {
+            cohort: float(design.weights[sample.cohorts == cohort].sum() / total_weight)
+            for cohort in sample.treated_cohorts
+        },
+        name="survey_population_share",
+    )
+    survey_cohort_shares.index.name = "cohort"
+    squared_sum = float(np.dot(design.weights, design.weights))
+    overall_effective_n = total_weight**2 / squared_sum
+    survey_weight_diagnostics = pd.DataFrame(
+        {
+            "value": {
+                "n_observations": float(n),
+                "weight_sum": total_weight,
+                "weight_min": float(design.weights.min()),
+                "weight_max": float(design.weights.max()),
+                "kish_effective_n": overall_effective_n,
+                "design_effect_weights": n / overall_effective_n,
+                "max_normalized_weight_share": float(design.weights.max() / total_weight),
+            }
+        }
+    )
+    psus_per_stratum = (
+        pd.DataFrame({"psu": design.psu, "stratum": design.strata})
+        .groupby("stratum", sort=False, dropna=False)["psu"]
+        .nunique(dropna=False)
+    )
+    survey_design_diagnostics = pd.Series(
+        {
+            "n_strata": design.n_strata,
+            "n_psus": design.n_psus,
+            "design_df": design.design_df,
+            "min_psus_per_stratum": int(psus_per_stratum.min()),
+            "max_psus_per_stratum": int(psus_per_stratum.max()),
+            "singleton_policy": "raise",
+            "variance_method": "one_stage_with_replacement_stratified_psu_taylor",
+            "independent_observation_design": design.psu_name == "independent_observation",
+        },
+        dtype="object",
+        name="value",
+    )
+    pretrend = (
+        _survey_pretrend_diagnostic(sample, design, control_group=control_group)
+        if pretrend_override is None
+        else pretrend_override
+    )
+    return RepeatedCrossSectionDiDResult(
+        estimate=estimate,
+        standard_error=standard_error,
+        statistic=statistic,
+        pvalue=pvalue,
+        group_time=group_time,
+        event_study=event_study,
+        calendar_time=calendar_time,
+        group_time_influence=n * group_linearized_frame,
+        event_study_influence=n * event_linearized_frame,
+        calendar_time_influence=n * calendar_linearized_frame,
+        overall_influence=overall_influence,
+        pretrend=pretrend,
+        cell_counts=sample.cell_counts.copy(),
+        cohort_sizes=cohort_sizes,
+        n_observations=n,
+        n_periods=len(sample.times),
+        n_clusters=design.n_psus,
+        covariance_type="survey_taylor",
+        inference_distribution="t",
+        inference_df=float(design.design_df),
+        inference_method="analytic",
+        method=(
+            "survey_weighted_repeated_cross_section_doubly_robust_group_time"
+            if covariate_names
+            else "survey_weighted_repeated_cross_section_group_time"
+        ),
+        parallel_trends=(
+            "conditional_survey_population_repeated_cross_section_post_stationary_composition"
+            if covariate_names
+            else "survey_population_repeated_cross_section_post_stationary_composition"
+        ),
+        control_group=control_group,
+        composition="stationary",
+        target_population="survey_treated_target_period",
+        population_basis="survey_population",
+        group_time_aggregation="estimated_survey_target_period_treated_cell_shares",
+        esavg_aggregation="arithmetic_mean_of_nonnegative_event_times",
+        anticipation=anticipation,
+        pre_periods=1,
+        sampling_unit="survey_psu",
+        time_name=time_name,
+        outcome_name=outcome_name,
+        treatment_time_name=treatment_time_name,
+        cluster_name=design.psu_name,
+        covariates=covariate_names,
+        cross_fitted=bool(covariate_names),
+        estimation_index=sample.index.copy(),
+        inference_clusters=design.psu.rename("survey_psu").copy(),
+        times=tuple(float(value) for value in sample.times),
+        design_fingerprint=design_fingerprint or design.fingerprint,
+        assumptions=(
+            "Declared inverse-inclusion or calibrated analysis weights transport the sample to the survey population",
+            "One-stage with-replacement stratified-PSU Taylor design",
+            "Stationary composition of the relevant treatment-cohort survey populations across periods",
+            "Absorbing conceptual treatment at the declared first-treatment time",
+            "No anticipation outside the declared anticipation window",
+            "Consistency, no interference, survey-population overlap, and repeated-section parallel trends",
+            *(
+                (
+                    "Weighted cross-fitted nuisance consistency and product-rate conditions for the locally efficient score",
+                )
+                if covariate_names
+                else ()
+            ),
+        ),
+        notes=(
+            "Each group-time effect is a contrast of four component-wise Hájek survey means.",
+            "Event and calendar aggregation uses design-weighted treated target-period shares and includes their linearization.",
+            "PSU totals are centered within stratum under the preregistered with-replacement Taylor formula.",
+            *(
+                (
+                    "Every reported nuisance prediction is out of fold; providers receive only aligned training analysis weights.",
+                )
+                if covariate_names
+                else ()
+            ),
+            "Survey weights do not establish sampling ignorability, parallel trends, treatment overlap, or population coverage.",
+            "No finite-population correction, replicate weights, singleton adjustment, composition robustness, or simultaneous bands are applied.",
+        ),
+        nuisance_predictions=(
+            pd.DataFrame() if nuisance_predictions is None else nuisance_predictions.copy()
+        ),
+        nuisance_fold=(
+            pd.Series(dtype="int64", name="fold") if nuisance_fold is None else nuisance_fold.copy()
+        ),
+        nuisance_diagnostics=(
+            pd.DataFrame() if nuisance_diagnostics is None else nuisance_diagnostics.copy()
+        ),
+        n_splits=n_splits,
+        nuisance_probability_floor=nuisance_probability_floor,
+        survey_linearized=survey_linearized,
+        weighted_cell_counts=_survey_weighted_cell_counts(sample, design),
+        survey_weight_diagnostics=survey_weight_diagnostics,
+        survey_design_diagnostics=survey_design_diagnostics,
+        survey_cohort_shares=survey_cohort_shares,
+        weight_type=design.weight_type,
+        weight_normalization="component_hajek",
+        survey_weight_name=design.weight_name,
+        survey_psu_name=design.psu_name,
+        survey_strata_name=design.strata_name,
+    )
+
+
+def _assemble_result(
+    cells: list[_RepeatedEffectCell],
+    sample: _RepeatedSample,
+    *,
+    covariance: DiDCovariance,
+    control_group: ControlGroup,
+    composition: RCSComposition,
+    anticipation: int,
+    inference: RCSInference,
+    bootstrap_iterations: int,
+    bootstrap_random_state: int | None,
+    simultaneous_level: float,
+    outcome_name: str,
+    time_name: str,
+    treatment_time_name: str,
+    cluster_name: str | None,
+    pretrend_override: RepeatedCrossSectionPretrendDiagnostic | None = None,
+    covariate_names: tuple[str, ...] = (),
+    nuisance_predictions: pd.DataFrame | None = None,
+    nuisance_fold: pd.Series | None = None,
+    nuisance_diagnostics: pd.DataFrame | None = None,
+    n_splits: int | None = None,
+    nuisance_probability_floor: float | None = None,
+    composition_weights: pd.DataFrame | None = None,
+    pair_ledger: pd.DataFrame | None = None,
+    design_fingerprint: str | None = None,
+) -> RepeatedCrossSectionDiDResult:
+    group_rows: list[dict[str, Any]] = []
+    group_influences: dict[tuple[float, float], np.ndarray] = {}
+    for cell in cells:
+        key = (cell.cohort, cell.time)
+        group_influences[key] = cell.influence
+        group_rows.append(
+            {
+                "cohort": cell.cohort,
+                "time": cell.time,
+                "event_time": cell.event_time,
+                "base_period": cell.base_period,
+                **_summary_row_rcs(
+                    sample,
+                    cell.att,
+                    cell.influence,
+                    covariance=covariance,
+                ),
+                "n_treated_target": cell.n_treated_target,
+                "n_treated_base": cell.n_treated_base,
+                "n_comparison_target": cell.n_comparison_target,
+                "n_comparison_base": cell.n_comparison_base,
+                "comparison_cohorts": cell.comparison_cohorts,
+                "cohort_share": cell.cohort_share,
+                "target_share": float(
+                    np.mean(
+                        (sample.cohorts == cell.cohort)
+                        & (sample.time_positions == int(np.searchsorted(sample.times, cell.time)))
+                    )
+                ),
+            }
+        )
+    group_time = pd.DataFrame(group_rows).set_index(["cohort", "time"]).sort_index()
+    group_time_influence = pd.DataFrame(group_influences, index=sample.index.copy()).sort_index(
+        axis=1
+    )
+    group_time_influence.columns.names = ["cohort", "time"]
+
+    event_rows: list[dict[str, Any]] = []
+    event_influences: dict[int, np.ndarray] = {}
+    for event_time in sorted({cell.event_time for cell in cells}):
+        selected = [cell for cell in cells if cell.event_time == event_time]
+        estimate, influence = _aggregate_influence(
+            selected,
+            sample,
+            composition=composition,
+        )
+        event_influences[event_time] = influence
+        event_rows.append(
+            {
+                "event_time": event_time,
+                **_summary_row_rcs(sample, estimate, influence, covariance=covariance),
+                "n_cohorts": len(selected),
+            }
+        )
+    event_study = pd.DataFrame(event_rows).set_index("event_time").sort_index()
+    event_study_influence = pd.DataFrame(event_influences, index=sample.index.copy()).sort_index(
+        axis=1
+    )
+    event_study_influence.columns.name = "event_time"
+
+    calendar_rows: list[dict[str, Any]] = []
+    calendar_influences: dict[float, np.ndarray] = {}
+    for calendar_value in sorted({cell.time for cell in cells if cell.event_time >= 0}):
+        selected = [cell for cell in cells if cell.time == calendar_value and cell.event_time >= 0]
+        estimate, influence = _aggregate_influence(
+            selected,
+            sample,
+            composition=composition,
+        )
+        calendar_influences[calendar_value] = influence
+        calendar_rows.append(
+            {
+                "time": calendar_value,
+                **_summary_row_rcs(sample, estimate, influence, covariance=covariance),
+                "n_cohorts": len(selected),
+            }
+        )
+    calendar_time = pd.DataFrame(calendar_rows).set_index("time").sort_index()
+    calendar_time_influence = pd.DataFrame(
+        calendar_influences, index=sample.index.copy()
+    ).sort_index(axis=1)
+    calendar_time_influence.columns.name = "time"
+
+    post_events = [value for value in event_study.index if value >= 0]
+    estimate = float(event_study.loc[post_events, "att"].mean())
+    overall_array = event_study_influence.loc[:, post_events].mean(axis=1).to_numpy(dtype=float)
+    standard_error, statistic, pvalue, distribution, inference_df, n_clusters = (
+        _score_statistics_rcs(sample, estimate, overall_array, covariance=covariance)
+    )
+    overall_influence = pd.Series(overall_array, index=sample.index.copy(), name="esavg_influence")
+    cohort_sizes = pd.Series(
+        {
+            cohort: int(np.count_nonzero(sample.cohorts == cohort))
+            for cohort in sample.treated_cohorts
+        },
+        name="n_observations",
+    )
+    cohort_sizes.index.name = "cohort"
+    simultaneous_event_study = pd.DataFrame(
+        columns=["att", "std_err", "critical_value", "level", "lower", "upper"]
+    )
+    simultaneous_critical_value: float | None = None
+    if inference == "multiplier_bootstrap":
+        simultaneous_event_study, simultaneous_critical_value = _multiplier_event_study_band_rcs(
+            event_study,
+            event_study_influence,
+            sample=sample,
+            covariance=covariance,
+            iterations=bootstrap_iterations,
+            random_state=bootstrap_random_state,
+            level=simultaneous_level,
+        )
+    pretrend = (
+        _pretrend_diagnostic(sample, covariance=covariance, control_group=control_group)
+        if pretrend_override is None
+        else pretrend_override
+    )
+    inference_clusters = (
+        pd.Series(dtype="object", name="cluster")
+        if sample.clusters is None
+        else pd.Series(sample.clusters.copy(), index=sample.index.copy(), name="cluster")
+    )
+    if composition == "robust":
+        parallel_trends = (
+            "conditional_repeated_cross_section_post_composition_robust_target_period_treated"
+        )
+        method = "repeated_cross_section_composition_robust_group_time"
+        target_population = "treated_target_period"
+    elif covariate_names:
+        parallel_trends = (
+            "conditional_repeated_cross_section_post_stationary_composition"
+            if control_group == "never_treated"
+            else "conditional_repeated_cross_section_post_not_yet_treated_stationary_composition"
+        )
+        method = "repeated_cross_section_doubly_robust_group_time"
+        target_population = "pooled_treated_stationary_composition"
+    else:
+        parallel_trends = (
+            "repeated_cross_section_post_stationary_composition"
+            if control_group == "never_treated"
+            else "repeated_cross_section_post_not_yet_treated_stationary_composition"
+        )
+        method = "repeated_cross_section_group_time"
+        target_population = "pooled_treated_stationary_composition"
+    return RepeatedCrossSectionDiDResult(
+        estimate=estimate,
+        standard_error=standard_error,
+        statistic=statistic,
+        pvalue=pvalue,
+        group_time=group_time,
+        event_study=event_study,
+        calendar_time=calendar_time,
+        group_time_influence=group_time_influence,
+        event_study_influence=event_study_influence,
+        calendar_time_influence=calendar_time_influence,
+        overall_influence=overall_influence,
+        simultaneous_event_study=simultaneous_event_study,
+        pretrend=pretrend,
+        cell_counts=sample.cell_counts.copy(),
+        cohort_sizes=cohort_sizes,
+        n_observations=len(sample.outcome),
+        n_periods=len(sample.times),
+        n_clusters=n_clusters,
+        covariance_type=covariance,
+        inference_distribution=distribution,
+        inference_df=inference_df,
+        inference_method=inference,
+        simultaneous_level=(simultaneous_level if inference == "multiplier_bootstrap" else None),
+        simultaneous_critical_value=simultaneous_critical_value,
+        bootstrap_iterations=(
+            bootstrap_iterations if inference == "multiplier_bootstrap" else None
+        ),
+        bootstrap_random_state=(
+            bootstrap_random_state if inference == "multiplier_bootstrap" else None
+        ),
+        method=method,
+        parallel_trends=parallel_trends,
+        control_group=control_group,
+        composition=composition,
+        target_population=target_population,
+        population_basis="sample",
+        group_time_aggregation=(
+            "estimated_target_period_treated_cell_shares"
+            if composition == "robust"
+            else "estimated_pooled_treated_cohort_shares"
+        ),
+        esavg_aggregation="arithmetic_mean_of_nonnegative_event_times",
+        anticipation=anticipation,
+        pre_periods=1,
+        sampling_unit="observation" if sample.clusters is None else "cluster",
+        time_name=time_name,
+        outcome_name=outcome_name,
+        treatment_time_name=treatment_time_name,
+        cluster_name=cluster_name,
+        covariates=covariate_names,
+        cross_fitted=bool(covariate_names),
+        estimation_index=sample.index.copy(),
+        inference_clusters=inference_clusters,
+        times=tuple(float(value) for value in sample.times),
+        design_fingerprint=design_fingerprint or sample.design_fingerprint,
+        assumptions=(
+            "Rows are independent repeated-cross-section observations unless PSUs are declared",
+            *(
+                (
+                    "Observed covariate composition may change across periods; the target is "
+                    "the treated target-period population",
+                )
+                if composition == "robust"
+                else (
+                    "Stationary composition of the relevant treatment-cohort populations "
+                    "across periods",
+                )
+            ),
+            "Absorbing conceptual treatment at the declared first-treatment time",
+            "No anticipation outside the declared anticipation window",
+            "Consistency and no interference",
+            (
+                "Strict four-cell generalized-propensity overlap on the target covariate support"
+                if composition == "robust"
+                else (
+                    "Strict conditional propensity overlap in every reported fixed-comparison pair"
+                    if covariate_names
+                    else "Overlap in every reported treated and fixed-comparison group-period cell"
+                )
+            ),
+            f"Parallel trends contract: {parallel_trends}",
+            *(
+                (
+                    "Cross-fitted nuisance consistency and product-rate conditions for the "
+                    "composition-robust efficient score",
+                )
+                if composition == "robust"
+                else (
+                    (
+                        "Cross-fitted nuisance consistency and product-rate conditions for the "
+                        "locally efficient repeated-cross-section score",
+                    )
+                    if covariate_names
+                    else ()
+                )
+            ),
+        ),
+        notes=(
+            (
+                "Each robust pair uses the cross-fitted composition-change-robust efficient "
+                "score with one four-cell generalized propensity and three outcome regressions."
+                if composition == "robust"
+                else (
+                    "Each group-time effect uses the cross-fitted locally efficient, doubly "
+                    "robust repeated-cross-section score."
+                    if covariate_names
+                    else "Each group-time effect uses four repeated-cross-section cell means."
+                )
+            ),
+            "The comparison cohort-membership rule is held fixed at target and baseline.",
+            (
+                "Robust event and calendar aggregation use estimated target-period treated-cell "
+                "shares and include their influence terms."
+                if composition == "robust"
+                else "Cohort-share aggregation includes estimated pooled-share influence terms."
+            ),
+            (
+                "The robust score permits measured composition to change; it does not protect "
+                "against unmeasured composition changes."
+                if composition == "robust"
+                else "Stationary composition is declared, not tested or verified."
+            ),
+            *(
+                (
+                    "All reported generalized-propensity and three outcome-regression predictions "
+                    "are out of fold; overlap violations are refused without clipping.",
+                )
+                if composition == "robust"
+                else (
+                    (
+                        "All reported propensity and four group-period outcome-regression "
+                        "predictions are out of fold; overlap violations are refused without "
+                        "clipping.",
+                    )
+                    if covariate_names
+                    else ()
+                )
+            ),
+            (
+                "Event-study bands use studentized Rademacher multipliers drawn once per "
+                "observation or declared PSU."
+                if inference == "multiplier_bootstrap"
+                else "Reported confidence intervals are pointwise."
+            ),
+        ),
+        nuisance_predictions=(
+            pd.DataFrame() if nuisance_predictions is None else nuisance_predictions.copy()
+        ),
+        nuisance_fold=(
+            pd.Series(dtype="int64", name="fold") if nuisance_fold is None else nuisance_fold.copy()
+        ),
+        nuisance_diagnostics=(
+            pd.DataFrame() if nuisance_diagnostics is None else nuisance_diagnostics.copy()
+        ),
+        n_splits=n_splits,
+        nuisance_probability_floor=nuisance_probability_floor,
+        composition_weights=(
+            pd.DataFrame() if composition_weights is None else composition_weights.copy()
+        ),
+        pair_ledger=pd.DataFrame() if pair_ledger is None else pair_ledger.copy(),
+    )
+
+
+def _fit_survey_covariate_repeated_cross_section(
+    data: pd.DataFrame,
+    sample: _RepeatedSample,
+    design: _ResolvedSurveyDesign,
+    *,
+    outcome: str,
+    time: str,
+    treatment_time: str,
+    covariates: Sequence[str],
+    cross_fitter: CrossFitter,
+    control_group: ControlGroup,
+    anticipation: int,
+    probability_floor: float,
+) -> RepeatedCrossSectionDiDResult:
+    if cross_fitter.propensity_factory is None:
+        raise ValueError("cross_fitter must provide a weighted propensity_factory.")
+    if cross_fitter.outcome_factory is None:
+        raise ValueError("cross_fitter must provide a weighted outcome_factory.")
+    X, covariate_names = _prepare_repeated_covariates(
+        data,
+        sample,
+        covariates=covariates,
+        protected_names=(
+            outcome,
+            time,
+            treatment_time,
+            design.weight_name,
+            design.psu_name,
+            design.strata_name,
+        ),
+    )
+    nuisance_order = (
+        "propensity",
+        "outcome_control_pre",
+        "outcome_control_post",
+        "outcome_treated_pre",
+        "outcome_treated_post",
+    )
+    comparisons: list[_CovariateComparison] = []
+    tasks: list[CrossFitTask] = []
+    task_metadata: dict[str, tuple[float, float, str, str]] = {}
+    task_relevant_masks: dict[str, np.ndarray] = {}
+    outcome_target = pd.Series(sample.outcome, index=sample.index.copy(), name="outcome")
+    sample_weight = pd.Series(design.weights, index=sample.index.copy(), name=design.weight_name)
+    for cohort in sample.treated_cohorts:
+        effective_position = sample.effective_positions[cohort]
+        for target_position in range(1, len(sample.times)):
+            if target_position < effective_position:
+                stage: Literal["group_time", "conditional_pretrend"] = "conditional_pretrend"
+                base_position = target_position - 1
+            else:
+                stage = "group_time"
+                base_position = effective_position - 1
+            comparison_mask = _comparison_membership(
+                sample,
+                cohort=cohort,
+                target_position=target_position,
+                control_group=control_group,
+            )
+            cohort_mask = sample.cohorts == cohort
+            target_mask = sample.time_positions == target_position
+            base_mask = sample.time_positions == base_position
+            pair_mask = (cohort_mask | comparison_mask) & (target_mask | base_mask)
+            public_time = float(sample.times[target_position])
+            task_names = {
+                nuisance: f"survey_rcs_{len(comparisons)}_{nuisance}" for nuisance in nuisance_order
+            }
+            comparison = _CovariateComparison(
+                cohort=cohort,
+                target_position=target_position,
+                base_position=base_position,
+                stage=stage,
+                comparison_mask=comparison_mask,
+                comparison_cohorts=tuple(
+                    float(value) for value in np.unique(sample.cohorts[comparison_mask])
+                ),
+                task_names=task_names,
+            )
+            comparisons.append(comparison)
+            tasks.append(
+                CrossFitTask(
+                    name=task_names["propensity"],
+                    target=pd.Series(
+                        cohort_mask.astype(float),
+                        index=sample.index.copy(),
+                        name=task_names["propensity"],
+                    ),
+                    train_mask=pd.Series(pair_mask, index=sample.index.copy()),
+                    factory=cross_fitter.propensity_factory,
+                    predict=(cross_fitter.propensity_predict or _treated_probability_prediction),
+                    sample_weight=sample_weight,
+                )
+            )
+            outcome_masks = {
+                "outcome_control_pre": comparison_mask & base_mask,
+                "outcome_control_post": comparison_mask & target_mask,
+                "outcome_treated_pre": cohort_mask & base_mask,
+                "outcome_treated_post": cohort_mask & target_mask,
+            }
+            for nuisance_name, train_mask in outcome_masks.items():
+                tasks.append(
+                    CrossFitTask(
+                        name=task_names[nuisance_name],
+                        target=outcome_target,
+                        train_mask=pd.Series(train_mask, index=sample.index.copy()),
+                        sample_weight=sample_weight,
+                    )
+                )
+            for nuisance_name, task_name in task_names.items():
+                task_metadata[task_name] = (cohort, public_time, nuisance_name, stage)
+                task_relevant_masks[task_name] = pair_mask.copy()
+
+    cell_pairs = pd.Series(
+        pd.factorize(pd.MultiIndex.from_arrays([sample.cohorts, sample.time_positions]))[0],
+        index=sample.index.copy(),
+        name="cohort_period_cell",
+    )
+    nuisance_result = cross_fitter.fit_predict_tasks(
+        X,
+        tasks=tasks,
+        strata=cell_pairs,
+        clusters=design.psu,
+    )
+    prediction_columns: list[pd.Series] = []
+    prediction_keys: list[tuple[float, float, str]] = []
+    for comparison in comparisons:
+        public_time = float(sample.times[comparison.target_position])
+        pair_mask = ((sample.cohorts == comparison.cohort) | comparison.comparison_mask) & (
+            (sample.time_positions == comparison.target_position)
+            | (sample.time_positions == comparison.base_position)
+        )
+        for nuisance_name in nuisance_order:
+            prediction_columns.append(
+                nuisance_result.predictions[comparison.task_names[nuisance_name]].where(pair_mask)
+            )
+            prediction_keys.append((comparison.cohort, public_time, nuisance_name))
+    nuisance_predictions = pd.concat(prediction_columns, axis=1)
+    nuisance_predictions.columns = pd.MultiIndex.from_tuples(
+        prediction_keys,
+        names=["cohort", "time", "nuisance"],
+    )
+    diagnostics = nuisance_result.model_diagnostics.copy()
+    parsed = diagnostics["task"].map(task_metadata)
+    diagnostics.insert(0, "cohort", parsed.map(lambda value: value[0]))
+    diagnostics.insert(1, "time", parsed.map(lambda value: value[1]))
+    diagnostics.insert(2, "nuisance", parsed.map(lambda value: value[2]))
+    diagnostics.insert(3, "comparison_stage", parsed.map(lambda value: value[3]))
+    relevant_holdout = [
+        int(
+            np.count_nonzero(
+                task_relevant_masks[str(row.task)]
+                & (nuisance_result.fold.to_numpy(dtype=int) == int(row.fold))
+            )
+        )
+        for row in diagnostics.itertuples(index=False)
+    ]
+    diagnostics.insert(
+        diagnostics.columns.get_loc("holdout_nobs") + 1,
+        "relevant_holdout_nobs",
+        relevant_holdout,
+    )
+
+    total_weight = float(design.weights.sum())
+    group_cells: list[_SurveyEffectCell] = []
+    placebo_cells: list[_SurveyEffectCell] = []
+    for comparison in comparisons:
+        estimate, linearized, counts, target_mass = _effect_from_survey_cross_fitted_score(
+            sample,
+            design,
+            comparison,
+            nuisance_result.predictions,
+            probability_floor=probability_floor,
+        )
+        cohort_mass = float(design.weights[sample.cohorts == comparison.cohort].sum())
+        cell = _SurveyEffectCell(
+            cohort=comparison.cohort,
+            time=float(sample.times[comparison.target_position]),
+            event_time=comparison.target_position - sample.original_positions[comparison.cohort],
+            base_period=float(sample.times[comparison.base_position]),
+            att=estimate,
+            linearized=linearized,
+            n_treated_target=counts[0],
+            n_treated_base=counts[1],
+            n_comparison_target=counts[2],
+            n_comparison_base=counts[3],
+            comparison_cohorts=comparison.comparison_cohorts,
+            cohort_share=cohort_mass / total_weight,
+            target_share=target_mass / total_weight,
+            target_weight_mass=target_mass,
+        )
+        (group_cells if comparison.stage == "group_time" else placebo_cells).append(cell)
+    pretrend = _survey_pretrend_from_fitted_cells(
+        sample,
+        design,
+        placebo_cells,
+        covariates=covariate_names,
+    )
+    fingerprint = hashlib.sha256()
+    fingerprint.update(design.fingerprint.encode())
+    fingerprint.update(
+        repr((covariate_names, nuisance_result.n_splits, probability_floor)).encode()
+    )
+    fingerprint.update(
+        np.sort(pd.util.hash_pandas_object(X, index=True).to_numpy(dtype=np.uint64)).tobytes()
+    )
+    return _assemble_survey_result(
+        group_cells,
+        sample,
+        design,
+        control_group=control_group,
+        anticipation=anticipation,
+        outcome_name=outcome,
+        time_name=time,
+        treatment_time_name=treatment_time,
+        pretrend_override=pretrend,
+        covariate_names=covariate_names,
+        nuisance_predictions=nuisance_predictions,
+        nuisance_fold=nuisance_result.fold,
+        nuisance_diagnostics=diagnostics,
+        n_splits=nuisance_result.n_splits,
+        nuisance_probability_floor=probability_floor,
+        design_fingerprint=fingerprint.hexdigest(),
+    )
+
+
+def _fit_covariate_repeated_cross_section(
+    data: pd.DataFrame,
+    sample: _RepeatedSample,
+    *,
+    outcome: str,
+    time: str,
+    treatment_time: str,
+    cluster: str | None,
+    covariates: Sequence[str],
+    cross_fitter: CrossFitter,
+    control_group: ControlGroup,
+    composition: RCSComposition,
+    anticipation: int,
+    covariance: DiDCovariance,
+    inference: RCSInference,
+    bootstrap_iterations: int,
+    bootstrap_random_state: int | None,
+    simultaneous_level: float,
+    probability_floor: float,
+) -> RepeatedCrossSectionDiDResult:
+    if cross_fitter.propensity_factory is None:
+        raise ValueError(
+            "cross_fitter must provide a propensity_factory for repeated-cross-section DiD."
+        )
+    if cross_fitter.outcome_factory is None:
+        raise ValueError(
+            "cross_fitter must provide an outcome_factory for repeated-cross-section DiD."
+        )
+    X, covariate_names = _prepare_repeated_covariates(
+        data,
+        sample,
+        covariates=covariates,
+        protected_names=(outcome, time, treatment_time, cluster),
+    )
+    nuisance_order = (
+        "propensity",
+        "outcome_control_pre",
+        "outcome_control_post",
+        "outcome_treated_pre",
+        "outcome_treated_post",
+    )
+    comparisons: list[_CovariateComparison] = []
+    tasks: list[CrossFitTask] = []
+    task_metadata: dict[str, tuple[float, float, str, str]] = {}
+    task_relevant_masks: dict[str, np.ndarray] = {}
+    outcome_target = pd.Series(sample.outcome, index=sample.index.copy(), name="outcome")
+    for cohort in sample.treated_cohorts:
+        effective_position = sample.effective_positions[cohort]
+        for target_position in range(1, len(sample.times)):
+            if target_position < effective_position:
+                stage: Literal["group_time", "conditional_pretrend"] = "conditional_pretrend"
+                base_position = target_position - 1
+            else:
+                stage = "group_time"
+                base_position = effective_position - 1
+            comparison_mask = _comparison_membership(
+                sample,
+                cohort=cohort,
+                target_position=target_position,
+                control_group=control_group,
+            )
+            cohort_mask = sample.cohorts == cohort
+            target_mask = sample.time_positions == target_position
+            base_mask = sample.time_positions == base_position
+            pair_mask = (cohort_mask | comparison_mask) & (target_mask | base_mask)
+            public_time = float(sample.times[target_position])
+            task_names = {
+                nuisance: f"rcs_{len(comparisons)}_{nuisance}" for nuisance in nuisance_order
+            }
+            comparison_cohorts = tuple(
+                float(value) for value in np.unique(sample.cohorts[comparison_mask])
+            )
+            comparison = _CovariateComparison(
+                cohort=cohort,
+                target_position=target_position,
+                base_position=base_position,
+                stage=stage,
+                comparison_mask=comparison_mask,
+                comparison_cohorts=comparison_cohorts,
+                task_names=task_names,
+            )
+            comparisons.append(comparison)
+            propensity_target = pd.Series(
+                cohort_mask.astype(float),
+                index=sample.index.copy(),
+                name=task_names["propensity"],
+            )
+            propensity_predict = cross_fitter.propensity_predict or _treated_probability_prediction
+            tasks.append(
+                CrossFitTask(
+                    name=task_names["propensity"],
+                    target=propensity_target,
+                    train_mask=pd.Series(pair_mask, index=sample.index.copy()),
+                    factory=cross_fitter.propensity_factory,
+                    predict=propensity_predict,
+                )
+            )
+            outcome_masks = {
+                "outcome_control_pre": comparison_mask & base_mask,
+                "outcome_control_post": comparison_mask & target_mask,
+                "outcome_treated_pre": cohort_mask & base_mask,
+                "outcome_treated_post": cohort_mask & target_mask,
+            }
+            for nuisance_name, train_mask in outcome_masks.items():
+                tasks.append(
+                    CrossFitTask(
+                        name=task_names[nuisance_name],
+                        target=outcome_target,
+                        train_mask=pd.Series(train_mask, index=sample.index.copy()),
+                    )
+                )
+            for nuisance_name, task_name in task_names.items():
+                task_metadata[task_name] = (cohort, public_time, nuisance_name, stage)
+                task_relevant_masks[task_name] = pair_mask.copy()
+
+    cell_pairs = pd.Series(
+        pd.factorize(pd.MultiIndex.from_arrays([sample.cohorts, sample.time_positions]))[0],
+        index=sample.index.copy(),
+        name="cohort_period_cell",
+    )
+    clusters = (
+        None
+        if sample.clusters is None
+        else pd.Series(sample.clusters, index=sample.index.copy(), name="cluster")
+    )
+    nuisance_result = cross_fitter.fit_predict_tasks(
+        X,
+        tasks=tasks,
+        strata=cell_pairs,
+        clusters=clusters,
+    )
+
+    prediction_columns: list[pd.Series] = []
+    prediction_keys: list[tuple[float, float, str]] = []
+    for comparison in comparisons:
+        public_time = float(sample.times[comparison.target_position])
+        pair_mask = ((sample.cohorts == comparison.cohort) | comparison.comparison_mask) & (
+            (sample.time_positions == comparison.target_position)
+            | (sample.time_positions == comparison.base_position)
+        )
+        for nuisance_name in nuisance_order:
+            prediction_columns.append(
+                nuisance_result.predictions[comparison.task_names[nuisance_name]].where(pair_mask)
+            )
+            prediction_keys.append((comparison.cohort, public_time, nuisance_name))
+    nuisance_predictions = pd.concat(prediction_columns, axis=1)
+    nuisance_predictions.columns = pd.MultiIndex.from_tuples(
+        prediction_keys,
+        names=["cohort", "time", "nuisance"],
+    )
+    diagnostic_frame = nuisance_result.model_diagnostics.copy()
+    parsed = diagnostic_frame["task"].map(task_metadata)
+    diagnostic_frame.insert(0, "cohort", parsed.map(lambda value: value[0]))
+    diagnostic_frame.insert(1, "time", parsed.map(lambda value: value[1]))
+    diagnostic_frame.insert(2, "nuisance", parsed.map(lambda value: value[2]))
+    diagnostic_frame.insert(3, "comparison_stage", parsed.map(lambda value: value[3]))
+    relevant_holdout = [
+        int(
+            np.count_nonzero(
+                task_relevant_masks[str(row.task)]
+                & (nuisance_result.fold.to_numpy(dtype=int) == int(row.fold))
+            )
+        )
+        for row in diagnostic_frame.itertuples(index=False)
+    ]
+    diagnostic_frame.insert(
+        diagnostic_frame.columns.get_loc("holdout_nobs") + 1,
+        "relevant_holdout_nobs",
+        relevant_holdout,
+    )
+
+    group_cells: list[_RepeatedEffectCell] = []
+    placebo_cells: list[_RepeatedEffectCell] = []
+    n = len(sample.outcome)
+    for comparison in comparisons:
+        estimate, influence, counts = _effect_from_cross_fitted_score(
+            sample,
+            comparison,
+            nuisance_result.predictions,
+            probability_floor=probability_floor,
+        )
+        cell = _RepeatedEffectCell(
+            cohort=comparison.cohort,
+            time=float(sample.times[comparison.target_position]),
+            event_time=(comparison.target_position - sample.original_positions[comparison.cohort]),
+            base_period=float(sample.times[comparison.base_position]),
+            att=estimate,
+            influence=influence,
+            n_treated_target=counts[0],
+            n_treated_base=counts[1],
+            n_comparison_target=counts[2],
+            n_comparison_base=counts[3],
+            comparison_cohorts=comparison.comparison_cohorts,
+            cohort_share=float(np.count_nonzero(sample.cohorts == comparison.cohort) / n),
+        )
+        (group_cells if comparison.stage == "group_time" else placebo_cells).append(cell)
+
+    pretrend = _pretrend_diagnostic_from_cells(
+        sample,
+        placebo_cells,
+        covariance=covariance,
+        conditional=True,
+        covariates=covariate_names,
+        cross_fitted=True,
+        composition=composition,
+    )
+    return _assemble_result(
+        group_cells,
+        sample,
+        covariance=covariance,
+        control_group=control_group,
+        composition=composition,
+        anticipation=anticipation,
+        inference=inference,
+        bootstrap_iterations=bootstrap_iterations,
+        bootstrap_random_state=bootstrap_random_state,
+        simultaneous_level=simultaneous_level,
+        outcome_name=outcome,
+        time_name=time,
+        treatment_time_name=treatment_time,
+        cluster_name=cluster,
+        pretrend_override=pretrend,
+        covariate_names=covariate_names,
+        nuisance_predictions=nuisance_predictions,
+        nuisance_fold=nuisance_result.fold,
+        nuisance_diagnostics=diagnostic_frame,
+        n_splits=nuisance_result.n_splits,
+        nuisance_probability_floor=probability_floor,
+        design_fingerprint=_covariate_design_fingerprint(
+            sample,
+            X,
+            n_splits=nuisance_result.n_splits,
+            probability_floor=probability_floor,
+        ),
+    )
+
+
+def _fit_composition_robust_lattice(
+    data: pd.DataFrame,
+    sample: _RepeatedSample,
+    *,
+    outcome: str,
+    time: str,
+    treatment_time: str,
+    cluster: str | None,
+    covariates: Sequence[str],
+    cross_fitter: CrossFitter,
+    control_group: ControlGroup,
+    anticipation: int,
+    covariance: DiDCovariance,
+    inference: RCSInference,
+    bootstrap_iterations: int,
+    bootstrap_random_state: int | None,
+    simultaneous_level: float,
+    probability_floor: float,
+) -> RepeatedCrossSectionDiDResult:
+    """Fit the composition-robust pair lattice on one immutable global fold plan."""
+
+    if cross_fitter.propensity_factory is None:
+        raise ValueError(
+            "cross_fitter must provide a propensity_factory for the four-cell generalized "
+            "propensity."
+        )
+    if cross_fitter.outcome_factory is None:
+        raise ValueError("cross_fitter must provide an outcome_factory for composition-robust DiD.")
+    X, covariate_names = _prepare_repeated_covariates(
+        data,
+        sample,
+        covariates=covariates,
+        protected_names=(outcome, time, treatment_time, cluster),
+    )
+    cluster_series = (
+        None
+        if sample.clusters is None
+        else pd.Series(sample.clusters, index=sample.index.copy(), name="cluster")
+    )
+    global_strata = pd.Series(
+        pd.factorize(pd.MultiIndex.from_arrays([sample.cohorts, sample.time_positions]))[0],
+        index=sample.index.copy(),
+        name="cohort_period_cell",
+    )
+    outcome_target = pd.Series(sample.outcome, index=sample.index.copy(), name="outcome")
+    comparisons: list[_CovariateComparison] = []
+    class_tasks: list[ClassProbabilityCrossFitTask] = []
+    outcome_tasks: list[CrossFitTask] = []
+    task_metadata: dict[str, tuple[float, float, str, str]] = {}
+    task_relevant_masks: dict[str, np.ndarray] = {}
+    for cohort in sample.treated_cohorts:
+        effective_position = sample.effective_positions[cohort]
+        for target_position in range(1, len(sample.times)):
+            if target_position < effective_position:
+                stage: Literal["group_time", "conditional_pretrend"] = "conditional_pretrend"
+                base_position = target_position - 1
+            else:
+                stage = "group_time"
+                base_position = effective_position - 1
+            comparison_mask = _comparison_membership(
+                sample,
+                cohort=cohort,
+                target_position=target_position,
+                control_group=control_group,
+            )
+            cohort_mask = sample.cohorts == cohort
+            target_mask = sample.time_positions == target_position
+            base_mask = sample.time_positions == base_position
+            pair_mask = (cohort_mask | comparison_mask) & (target_mask | base_mask)
+            public_time = float(sample.times[target_position])
+            task_prefix = f"rcs_robust_{len(comparisons)}"
+            task_names = {
+                "generalized_propensity": f"{task_prefix}_generalized_propensity",
+                "outcome_control_pre": f"{task_prefix}_outcome_control_pre",
+                "outcome_control_post": f"{task_prefix}_outcome_control_post",
+                "outcome_treated_pre": f"{task_prefix}_outcome_treated_pre",
+            }
+            comparison = _CovariateComparison(
+                cohort=cohort,
+                target_position=target_position,
+                base_position=base_position,
+                stage=stage,
+                comparison_mask=comparison_mask,
+                comparison_cohorts=tuple(
+                    float(value) for value in np.unique(sample.cohorts[comparison_mask])
+                ),
+                task_names=task_names,
+            )
+            comparisons.append(comparison)
+            cell_code = pd.Series(
+                2 * cohort_mask.astype(int) + target_mask.astype(int),
+                index=sample.index.copy(),
+                name=task_names["generalized_propensity"],
+            )
+            class_tasks.append(
+                ClassProbabilityCrossFitTask(
+                    name=task_names["generalized_propensity"],
+                    classes=cell_code,
+                    train_mask=pd.Series(pair_mask, index=sample.index.copy()),
+                    predict_mask=pd.Series(pair_mask, index=sample.index.copy()),
+                    class_labels=(0, 1, 2, 3),
+                )
+            )
+            outcome_masks = {
+                "outcome_control_pre": comparison_mask & base_mask,
+                "outcome_control_post": comparison_mask & target_mask,
+                "outcome_treated_pre": cohort_mask & base_mask,
+            }
+            for nuisance, mask in outcome_masks.items():
+                outcome_tasks.append(
+                    CrossFitTask(
+                        name=task_names[nuisance],
+                        target=outcome_target,
+                        train_mask=pd.Series(mask, index=sample.index.copy()),
+                    )
+                )
+            for nuisance, task_name in task_names.items():
+                task_metadata[task_name] = (cohort, public_time, nuisance, stage)
+                task_relevant_masks[task_name] = pair_mask.copy()
+
+    class_result = cross_fitter.fit_predict_class_probability_tasks(
+        X,
+        tasks=class_tasks,
+        strata=global_strata,
+        clusters=cluster_series,
+    )
+    outcome_result = cross_fitter.fit_predict_tasks(
+        X,
+        tasks=outcome_tasks,
+        strata=global_strata,
+        clusters=cluster_series,
+    )
+    if not class_result.fold.equals(outcome_result.fold):
+        raise RuntimeError(
+            "CrossFitter returned inconsistent folds for generalized-propensity and outcome tasks."
+        )
+
+    class_diagnostics = class_result.model_diagnostics.copy()
+    outcome_diagnostics = outcome_result.model_diagnostics.copy()
+    for diagnostics in (class_diagnostics, outcome_diagnostics):
+        parsed = diagnostics["task"].map(task_metadata)
+        diagnostics.insert(0, "cohort", parsed.map(lambda value: value[0]))
+        diagnostics.insert(1, "time", parsed.map(lambda value: value[1]))
+        diagnostics.insert(2, "nuisance", parsed.map(lambda value: value[2]))
+        diagnostics.insert(3, "comparison_stage", parsed.map(lambda value: value[3]))
+    outcome_relevant_holdout = [
+        int(
+            np.count_nonzero(
+                task_relevant_masks[str(row.task)]
+                & (outcome_result.fold.to_numpy(dtype=int) == int(row.fold))
+            )
+        )
+        for row in outcome_diagnostics.itertuples(index=False)
+    ]
+    outcome_diagnostics.insert(
+        outcome_diagnostics.columns.get_loc("holdout_nobs") + 1,
+        "relevant_holdout_nobs",
+        outcome_relevant_holdout,
+    )
+    diagnostic_frame = pd.concat(
+        [class_diagnostics, outcome_diagnostics],
+        ignore_index=True,
+        sort=False,
+    )
+
+    ordered_classes = pd.Index([0, 1, 2, 3], dtype="int64")
+    nuisance_columns: list[pd.Series] = []
+    nuisance_keys: list[tuple[float, float, str]] = []
+    group_cells: list[_RepeatedEffectCell] = []
+    placebo_cells: list[_RepeatedEffectCell] = []
+    weight_frames: list[pd.DataFrame] = []
+    weight_keys: list[tuple[float, float]] = []
+    pair_ledger_rows: list[dict[str, Any]] = []
+    n = len(sample.outcome)
+    for comparison in comparisons:
+        cohort = comparison.cohort
+        public_time = float(sample.times[comparison.target_position])
+        pair_mask = ((sample.cohorts == cohort) | comparison.comparison_mask) & (
+            (sample.time_positions == comparison.target_position)
+            | (sample.time_positions == comparison.base_position)
+        )
+        class_task_name = comparison.task_names["generalized_propensity"]
+        generalized_propensity = class_result.probabilities.loc[
+            :, pd.IndexSlice[class_task_name, :]
+        ].copy()
+        generalized_propensity.columns = ordered_classes.copy()
+        outcome_predictions = pd.DataFrame(
+            {
+                nuisance: outcome_result.predictions[comparison.task_names[nuisance]]
+                for nuisance in (
+                    "outcome_control_pre",
+                    "outcome_control_post",
+                    "outcome_treated_pre",
+                )
+            },
+            index=sample.index.copy(),
+        )
+        for label in ordered_classes:
+            nuisance_columns.append(
+                generalized_propensity[label]
+                .where(pair_mask)
+                .rename(f"generalized_propensity_{label // 2}{label % 2}")
+            )
+            nuisance_keys.append(
+                (cohort, public_time, f"generalized_propensity_{label // 2}{label % 2}")
+            )
+        for nuisance in outcome_predictions:
+            nuisance_columns.append(outcome_predictions[nuisance].where(pair_mask))
+            nuisance_keys.append((cohort, public_time, nuisance))
+
+        estimate, influence, counts, weights = _effect_from_composition_robust_score(
+            sample,
+            cohort=cohort,
+            target_position=comparison.target_position,
+            base_position=comparison.base_position,
+            comparison_mask=comparison.comparison_mask,
+            generalized_propensity=generalized_propensity,
+            outcome_predictions=outcome_predictions,
+            probability_floor=probability_floor,
+        )
+        cell = _RepeatedEffectCell(
+            cohort=cohort,
+            time=public_time,
+            event_time=comparison.target_position - sample.original_positions[cohort],
+            base_period=float(sample.times[comparison.base_position]),
+            att=estimate,
+            influence=influence,
+            n_treated_target=counts[0],
+            n_treated_base=counts[1],
+            n_comparison_target=counts[2],
+            n_comparison_base=counts[3],
+            comparison_cohorts=comparison.comparison_cohorts,
+            cohort_share=float(np.count_nonzero(sample.cohorts == cohort) / n),
+        )
+        (group_cells if comparison.stage == "group_time" else placebo_cells).append(cell)
+        weight_frames.append(weights)
+        weight_keys.append((cohort, public_time))
+        relevant_probabilities = generalized_propensity.loc[pair_mask].to_numpy(dtype=float)
+        pair_ledger_rows.append(
+            {
+                "cohort": cohort,
+                "time": public_time,
+                "base_period": float(sample.times[comparison.base_position]),
+                "stage": comparison.stage,
+                "comparison_cohorts": comparison.comparison_cohorts,
+                "n_treated_target": counts[0],
+                "n_treated_base": counts[1],
+                "n_comparison_target": counts[2],
+                "n_comparison_base": counts[3],
+                "pair_nobs": int(np.count_nonzero(pair_mask)),
+                "pair_sample_share": float(np.mean(pair_mask)),
+                "target_share": float(
+                    np.mean(
+                        (sample.cohorts == cohort)
+                        & (sample.time_positions == comparison.target_position)
+                    )
+                ),
+                "influence_embedding_scale": float(n / np.count_nonzero(pair_mask)),
+                "generalized_probability_min": float(relevant_probabilities.min()),
+                "generalized_probability_max": float(relevant_probabilities.max()),
+                "maximum_absolute_weight": float(weights.abs().to_numpy().max()),
+                "nuisance_task_keys": tuple(comparison.task_names.values()),
+            }
+        )
+
+    nuisance_predictions = pd.concat(nuisance_columns, axis=1)
+    nuisance_predictions.columns = pd.MultiIndex.from_tuples(
+        nuisance_keys,
+        names=["cohort", "time", "nuisance"],
+    )
+    if len(weight_frames) == 1:
+        composition_weights = weight_frames[0]
+    else:
+        composition_weights = pd.concat(weight_frames, axis=1, keys=weight_keys)
+        composition_weights.columns.names = ["cohort", "time", "weight"]
+    pretrend = _pretrend_diagnostic_from_cells(
+        sample,
+        placebo_cells,
+        covariance=covariance,
+        conditional=True,
+        covariates=covariate_names,
+        cross_fitted=True,
+        composition="robust",
+    )
+    pair_ledger = pd.DataFrame(pair_ledger_rows).set_index(["cohort", "time"]).sort_index()
+    return _assemble_result(
+        group_cells,
+        sample,
+        covariance=covariance,
+        control_group=control_group,
+        composition="robust",
+        anticipation=anticipation,
+        inference=inference,
+        bootstrap_iterations=bootstrap_iterations,
+        bootstrap_random_state=bootstrap_random_state,
+        simultaneous_level=simultaneous_level,
+        outcome_name=outcome,
+        time_name=time,
+        treatment_time_name=treatment_time,
+        cluster_name=cluster,
+        pretrend_override=pretrend,
+        covariate_names=covariate_names,
+        nuisance_predictions=nuisance_predictions,
+        nuisance_fold=class_result.fold,
+        nuisance_diagnostics=diagnostic_frame,
+        n_splits=class_result.n_splits,
+        nuisance_probability_floor=probability_floor,
+        composition_weights=composition_weights,
+        pair_ledger=pair_ledger,
+        design_fingerprint=_covariate_design_fingerprint(
+            sample,
+            X,
+            n_splits=class_result.n_splits,
+            probability_floor=probability_floor,
+        ),
+    )
+
+
+def did_rcs_composition_test(
+    robust: RepeatedCrossSectionDiDResult,
+    stationary: RepeatedCrossSectionDiDResult,
+    *,
+    level: float = 0.95,
+) -> RepeatedCrossSectionCompositionDiagnostic:
+    """Test equality of aligned composition-robust and stationary group-time paths.
+
+    The contrast is always robust minus stationary. Its covariance is computed from
+    the aligned difference influence directly; marginal covariance subtraction,
+    coordinate deletion, ridge regularization, and pseudoinverses are not used.
+    """
+
+    if (
+        type(robust) is not RepeatedCrossSectionDiDResult
+        or type(stationary) is not RepeatedCrossSectionDiDResult
+    ):
+        raise TypeError(
+            "robust and stationary must both be exact RepeatedCrossSectionDiDResult objects."
+        )
+    if robust.composition != "robust":
+        raise ValueError("The first argument must be a composition='robust' result.")
+    if stationary.composition != "stationary":
+        raise ValueError("The second argument must be a composition='stationary' result.")
+    if not isinstance(level, Real) or isinstance(level, (bool, np.bool_)):
+        raise TypeError("level must be a real number strictly between zero and one.")
+    if not np.isfinite(level) or not 0.0 < float(level) < 1.0:
+        raise ValueError("level must be strictly between zero and one.")
+    if not robust.cross_fitted or not stationary.cross_fitted:
+        raise ValueError(
+            "The composition diagnostic requires two cross-fitted covariate-adjusted results."
+        )
+    if robust.covariates != stationary.covariates or not robust.covariates:
+        raise ValueError("The composition diagnostic requires the same covariates, non-empty.")
+    if robust.design_fingerprint != stationary.design_fingerprint:
+        raise ValueError(
+            "The composition diagnostic requires the same estimation design and sample."
+        )
+    if not robust.estimation_index.equals(stationary.estimation_index):
+        raise ValueError("The composition diagnostic requires an identically ordered sample.")
+    if (
+        robust.times != stationary.times
+        or robust.anticipation != stationary.anticipation
+        or robust.control_group != stationary.control_group
+        or robust.time_name != stationary.time_name
+        or robust.outcome_name != stationary.outcome_name
+        or robust.treatment_time_name != stationary.treatment_time_name
+        or robust.cluster_name != stationary.cluster_name
+    ):
+        raise ValueError("The composition diagnostic requires identical role and timing contracts.")
+    if robust.covariance_type != stationary.covariance_type:
+        raise ValueError("The composition diagnostic requires the same covariance declaration.")
+    if not robust.inference_clusters.equals(stationary.inference_clusters):
+        raise ValueError("The composition diagnostic requires identical inference clusters.")
+    if robust.n_splits != stationary.n_splits:
+        raise ValueError("The composition diagnostic requires the same nuisance split count.")
+    if robust.nuisance_probability_floor != stationary.nuisance_probability_floor:
+        raise ValueError("The composition diagnostic requires the same probability floor.")
+    if not robust.nuisance_fold.equals(stationary.nuisance_fold):
+        raise ValueError("The composition diagnostic requires the same nuisance-fold roles.")
+
+    robust_support = robust.group_time.index
+    stationary_support = stationary.group_time.index
+    if (
+        robust_support.empty
+        or not robust_support.is_unique
+        or not stationary_support.is_unique
+        or not robust_support.equals(stationary_support)
+    ):
+        raise ValueError(
+            "The composition diagnostic requires the same non-empty group-time support."
+        )
+    required_ledger_columns = ("base_period", "comparison_cohorts")
+    if any(
+        column not in result.group_time.columns
+        for result in (robust, stationary)
+        for column in required_ledger_columns
+    ):
+        raise ValueError("Both results must retain baseline and comparison-cohort ledgers.")
+    for column in required_ledger_columns:
+        if not robust.group_time[column].equals(stationary.group_time[column]):
+            raise ValueError(
+                "The composition diagnostic requires identical baseline periods and fixed "
+                "comparison cohorts."
+            )
+    if (
+        not robust.group_time_influence.index.equals(robust.estimation_index)
+        or not stationary.group_time_influence.index.equals(stationary.estimation_index)
+        or not robust.group_time_influence.columns.equals(robust_support)
+        or not stationary.group_time_influence.columns.equals(stationary_support)
+    ):
+        raise ValueError(
+            "The composition diagnostic requires influence records exactly aligned to sample "
+            "rows and group-time coordinates."
+        )
+
+    robust_influence = robust.group_time_influence.to_numpy(dtype=float)
+    stationary_influence = stationary.group_time_influence.to_numpy(dtype=float)
+    if not np.isfinite(robust_influence).all() or not np.isfinite(stationary_influence).all():
+        raise ValueError("Composition diagnostic influence records must be finite.")
+    centering_tolerance = 1e-10
+    if (
+        np.max(np.abs(robust_influence.mean(axis=0))) > centering_tolerance
+        or np.max(np.abs(stationary_influence.mean(axis=0))) > centering_tolerance
+    ):
+        raise ValueError("Composition diagnostic influence records must be centered.")
+
+    robust_estimates = robust.group_time["att"].to_numpy(dtype=float)
+    stationary_estimates = stationary.group_time["att"].to_numpy(dtype=float)
+    if not np.isfinite(robust_estimates).all() or not np.isfinite(stationary_estimates).all():
+        raise ValueError("Composition diagnostic estimates must be finite.")
+    difference = robust_estimates - stationary_estimates
+    difference_influence = robust_influence - stationary_influence
+    clusters = (
+        None
+        if robust.covariance_type == "robust"
+        else robust.inference_clusters.to_numpy(copy=True)
+    )
+    robust_covariance, n_clusters = _score_cross_covariance(
+        robust_influence,
+        robust_influence,
+        covariance=robust.covariance_type,
+        clusters=clusters,
+    )
+    stationary_covariance, _ = _score_cross_covariance(
+        stationary_influence,
+        stationary_influence,
+        covariance=robust.covariance_type,
+        clusters=clusters,
+    )
+    cross_covariance, _ = _score_cross_covariance(
+        robust_influence,
+        stationary_influence,
+        covariance=robust.covariance_type,
+        clusters=clusters,
+    )
+    difference_covariance, _ = _score_cross_covariance(
+        difference_influence,
+        difference_influence,
+        covariance=robust.covariance_type,
+        clusters=clusters,
+    )
+    statistic, pvalue, distribution, denominator_df = _joint_wald(
+        difference,
+        difference_covariance,
+        covariance=robust.covariance_type,
+        n_clusters=n_clusters,
+    )
+
+    group_time = pd.DataFrame(
+        {
+            "robust": robust_estimates,
+            "stationary": stationary_estimates,
+            "difference": difference,
+        },
+        index=robust_support.copy(),
+    )
+
+    def covariance_frame(values: np.ndarray) -> pd.DataFrame:
+        return pd.DataFrame(
+            values,
+            index=robust_support.copy(),
+            columns=robust_support.copy(),
+        )
+
+    official_hc0_statistic: float | None = None
+    official_hc0_pvalue: float | None = None
+    official_hc0_mapping: str | None = None
+    if robust.covariance_type == "robust":
+        n = len(robust.estimation_index)
+        official_hc0_statistic = float(statistic * n / (n - 1))
+        official_hc0_pvalue = float(chi2.sf(official_hc0_statistic, len(difference)))
+        official_hc0_mapping = "W_HC0 = W_HC1 * n / (n - 1)"
+
+    return RepeatedCrossSectionCompositionDiagnostic(
+        statistic=statistic,
+        pvalue=pvalue,
+        reject=pvalue < 1.0 - float(level),
+        level=float(level),
+        group_time=group_time,
+        influence=pd.DataFrame(
+            difference_influence,
+            index=robust.estimation_index.copy(),
+            columns=robust_support.copy(),
+        ),
+        covariance=covariance_frame(difference_covariance),
+        robust_covariance=covariance_frame(robust_covariance),
+        stationary_covariance=covariance_frame(stationary_covariance),
+        cross_covariance=covariance_frame(cross_covariance),
+        n_restrictions=len(difference),
+        df_num=len(difference),
+        df_denom=denominator_df,
+        distribution=distribution,
+        covariance_type=robust.covariance_type,
+        n_clusters=n_clusters,
+        estimation_index=robust.estimation_index.copy(),
+        inference_clusters=robust.inference_clusters.copy(),
+        design_fingerprint=robust.design_fingerprint,
+        null_hypothesis=(
+            "The aligned composition-robust and stationary group-time effects are equal."
+        ),
+        notes=(
+            "The maintained contrast is robust minus stationary and its covariance is "
+            "computed from the aligned difference influence.",
+            "Rejection is evidence against equality; failure to reject does not verify "
+            "stationary composition.",
+            "The diagnostic provides no estimator-selection recommendation and ordinary "
+            "post-selection inference is not authorized.",
+            "Singular covariance is refused without coordinate deletion, ridge, or a "
+            "pseudoinverse.",
+        ),
+        official_hc0_statistic=official_hc0_statistic,
+        official_hc0_pvalue=official_hc0_pvalue,
+        official_hc0_mapping=official_hc0_mapping,
+    )
+
+
+class RepeatedCrossSectionDiD:
+    """Cohort-time DiD for repeated cross sections.
+
+    Supplying covariates and a provider-neutral :class:`CrossFitter` promotes the
+    stationary estimator to its locally efficient doubly robust score. The separate
+    ``composition="robust"`` path applies a pair-specific four-cell efficient score to
+    longer and staggered designs, embeds every influence column on one immutable global
+    sample, and targets each treated target-period population. CauseKit does not own,
+    copy, or silently select nuisance-model implementations.
+    """
+
+    control_group: ControlGroup
+    composition: RCSComposition
+    anticipation: int
+    covariance: DiDCovariance
+    inference: RCSInference
+    bootstrap_iterations: int
+    random_state: int | None
+    simultaneous_level: float
+    nuisance_probability_floor: float
+
+    def __init__(
+        self,
+        *,
+        control_group: ControlGroup = "never_treated",
+        composition: RCSComposition = "stationary",
+        anticipation: int = 0,
+        covariance: DiDCovariance = "robust",
+        inference: RCSInference = "analytic",
+        bootstrap_iterations: int = 999,
+        random_state: int | None = None,
+        simultaneous_level: float = 0.95,
+        nuisance_probability_floor: float = 1e-6,
+    ) -> None:
+        if control_group not in {"never_treated", "not_yet_treated"}:
+            raise ValueError("control_group must be 'never_treated' or 'not_yet_treated'.")
+        if composition not in {"stationary", "robust"}:
+            raise ValueError("composition must be 'stationary' or 'robust'.")
+        if not isinstance(anticipation, Integral) or isinstance(anticipation, (bool, np.bool_)):
+            raise TypeError("anticipation must be a non-negative integer.")
+        if anticipation < 0:
+            raise ValueError("anticipation must be a non-negative integer.")
+        if covariance not in {"robust", "clustered"}:
+            raise ValueError("covariance must be 'robust' or 'clustered'.")
+        if inference not in {"analytic", "multiplier_bootstrap"}:
+            raise ValueError("inference must be 'analytic' or 'multiplier_bootstrap'.")
+        if (
+            isinstance(bootstrap_iterations, (bool, np.bool_))
+            or not isinstance(bootstrap_iterations, Integral)
+            or int(bootstrap_iterations) < 99
+        ):
+            raise ValueError("bootstrap_iterations must be an integer of at least 99.")
+        if random_state is not None and (
+            isinstance(random_state, (bool, np.bool_)) or not isinstance(random_state, Integral)
+        ):
+            raise TypeError("random_state must be an integer or None.")
+        if isinstance(simultaneous_level, (bool, np.bool_)) or not isinstance(
+            simultaneous_level, Real
+        ):
+            raise TypeError("simultaneous_level must be a finite real number.")
+        if not np.isfinite(simultaneous_level) or not 0.0 < float(simultaneous_level) < 1.0:
+            raise ValueError("simultaneous_level must be strictly between zero and one.")
+        if not isinstance(nuisance_probability_floor, Real) or isinstance(
+            nuisance_probability_floor, (bool, np.bool_)
+        ):
+            raise TypeError("nuisance_probability_floor must be a finite real number.")
+        if (
+            not np.isfinite(nuisance_probability_floor)
+            or not 0.0 < float(nuisance_probability_floor) < 0.5
+        ):
+            raise ValueError(
+                "nuisance_probability_floor must be finite and strictly between zero and 0.5."
+            )
+        self.control_group = control_group
+        self.composition = composition
+        self.anticipation = int(anticipation)
+        self.covariance = covariance
+        self.inference = cast(RCSInference, inference)
+        self.bootstrap_iterations = int(bootstrap_iterations)
+        self.random_state = None if random_state is None else int(random_state)
+        self.simultaneous_level = float(simultaneous_level)
+        self.nuisance_probability_floor = float(nuisance_probability_floor)
+
+    def fit(
+        self,
+        data: pd.DataFrame,
+        *,
+        outcome: str,
+        time: str,
+        treatment_time: str,
+        never_treated: float = np.inf,
+        cluster: str | None = None,
+        covariates: Sequence[str] | None = None,
+        cross_fitter: CrossFitter | None = None,
+        sampling_weights: str | Sequence[float] | None = None,
+        survey_design: RepeatedCrossSectionSurveyDesign | None = None,
+        target_population: SurveyPopulationTarget = "sample",
+    ) -> RepeatedCrossSectionDiDResult:
+        """Estimate repeated-cross-section cohort-time effects and aggregations."""
+
+        if sampling_weights is not None:
+            raise NotImplementedError(
+                "bare sampling_weights / sampling weights are unsupported; declare their "
+                "semantics and roles with RepeatedCrossSectionSurveyDesign."
+            )
+        if target_population not in {"sample", "survey_population"}:
+            raise ValueError("target_population must be 'sample' or 'survey_population'.")
+        if survey_design is None and target_population != "sample":
+            raise ValueError(
+                "target_population='survey_population' requires an explicit survey_design."
+            )
+        if survey_design is not None and target_population != "survey_population":
+            raise ValueError(
+                "survey_design may be used only with target_population='survey_population'."
+            )
+        if survey_design is not None:
+            if not isinstance(survey_design, RepeatedCrossSectionSurveyDesign):
+                raise TypeError("survey_design must be a RepeatedCrossSectionSurveyDesign.")
+            if self.composition != "stationary":
+                raise NotImplementedError(
+                    "combining the survey design with composition robustness requires a separate "
+                    "composition-score contract."
+                )
+            if (covariates is None) != (cross_fitter is None):
+                raise ValueError(
+                    "survey covariates and a weighted cross_fitter must be supplied together."
+                )
+            if cross_fitter is not None and not isinstance(cross_fitter, CrossFitter):
+                raise TypeError("cross_fitter must be a CrossFitter instance.")
+            if self.inference != "analytic":
+                raise NotImplementedError(
+                    "survey-valid simultaneous inference requires a separately contracted design "
+                    "replication or joint-linearization procedure."
+                )
+            if cluster is not None or self.covariance != "robust":
+                raise ValueError(
+                    "cluster and ordinary covariance options cannot be combined with survey_design; "
+                    "PSU/strata roles own survey Taylor inference."
+                )
+            sample = _prepare_repeated_sample(
+                data,
+                outcome=outcome,
+                time=time,
+                treatment_time=treatment_time,
+                never_treated=never_treated,
+                anticipation=self.anticipation,
+                covariance="robust",
+                cluster=None,
+            )
+            resolved_design = _resolve_survey_design(
+                data,
+                sample,
+                survey_design,
+                protected_names=(outcome, time, treatment_time),
+            )
+            if covariates is not None:
+                if cross_fitter is None:  # defensive narrowing after the public contract
+                    raise ValueError("a weighted cross_fitter is required for survey covariates.")
+                return _fit_survey_covariate_repeated_cross_section(
+                    data,
+                    sample,
+                    resolved_design,
+                    outcome=outcome,
+                    time=time,
+                    treatment_time=treatment_time,
+                    covariates=covariates,
+                    cross_fitter=cross_fitter,
+                    control_group=self.control_group,
+                    anticipation=self.anticipation,
+                    probability_floor=self.nuisance_probability_floor,
+                )
+            survey_cells: list[_SurveyEffectCell] = []
+            total_weight = float(resolved_design.weights.sum())
+            for cohort in sample.treated_cohorts:
+                effective_position = sample.effective_positions[cohort]
+                base_position = effective_position - 1
+                cohort_mass = float(resolved_design.weights[sample.cohorts == cohort].sum())
+                for target_position in range(effective_position, len(sample.times)):
+                    estimate, linearized, components, comparison_cohorts = (
+                        _survey_effect_from_four_cells(
+                            sample,
+                            resolved_design,
+                            cohort=cohort,
+                            target_position=target_position,
+                            base_position=base_position,
+                            control_group=self.control_group,
+                        )
+                    )
+                    target_mass = components[0].weight_sum
+                    survey_cells.append(
+                        _SurveyEffectCell(
+                            cohort=cohort,
+                            time=float(sample.times[target_position]),
+                            event_time=target_position - sample.original_positions[cohort],
+                            base_period=float(sample.times[base_position]),
+                            att=estimate,
+                            linearized=linearized,
+                            n_treated_target=components[0].count,
+                            n_treated_base=components[1].count,
+                            n_comparison_target=components[2].count,
+                            n_comparison_base=components[3].count,
+                            comparison_cohorts=comparison_cohorts,
+                            cohort_share=cohort_mass / total_weight,
+                            target_share=target_mass / total_weight,
+                            target_weight_mass=target_mass,
+                        )
+                    )
+            return _assemble_survey_result(
+                survey_cells,
+                sample,
+                resolved_design,
+                control_group=self.control_group,
+                anticipation=self.anticipation,
+                outcome_name=outcome,
+                time_name=time,
+                treatment_time_name=treatment_time,
+            )
+        if self.composition == "robust" and covariates is None:
+            raise ValueError(
+                "composition='robust' requires non-empty covariates and an explicit cross_fitter."
+            )
+        if covariates is not None and cross_fitter is None:
+            raise ValueError(
+                "cross_fitter is required when covariates are supplied; "
+                "RepeatedCrossSectionDiD does not own or fit nuisance-model classes."
+            )
+        if covariates is None and cross_fitter is not None:
+            raise ValueError("cross_fitter is only used when covariates are supplied.")
+        sample = _prepare_repeated_sample(
+            data,
+            outcome=outcome,
+            time=time,
+            treatment_time=treatment_time,
+            never_treated=never_treated,
+            anticipation=self.anticipation,
+            covariance=self.covariance,
+            cluster=cluster,
+        )
+        if covariates is not None:
+            if cross_fitter is None:  # defensive narrowing after the public refusal above
+                raise ValueError("cross_fitter is required for covariate adjustment.")
+            if self.composition == "robust":
+                return _fit_composition_robust_lattice(
+                    data,
+                    sample,
+                    outcome=outcome,
+                    time=time,
+                    treatment_time=treatment_time,
+                    cluster=cluster,
+                    covariates=covariates,
+                    cross_fitter=cross_fitter,
+                    control_group=self.control_group,
+                    anticipation=self.anticipation,
+                    covariance=self.covariance,
+                    inference=self.inference,
+                    bootstrap_iterations=self.bootstrap_iterations,
+                    bootstrap_random_state=self.random_state,
+                    simultaneous_level=self.simultaneous_level,
+                    probability_floor=self.nuisance_probability_floor,
+                )
+            return _fit_covariate_repeated_cross_section(
+                data,
+                sample,
+                outcome=outcome,
+                time=time,
+                treatment_time=treatment_time,
+                cluster=cluster,
+                covariates=covariates,
+                cross_fitter=cross_fitter,
+                control_group=self.control_group,
+                composition=self.composition,
+                anticipation=self.anticipation,
+                covariance=self.covariance,
+                inference=self.inference,
+                bootstrap_iterations=self.bootstrap_iterations,
+                bootstrap_random_state=self.random_state,
+                simultaneous_level=self.simultaneous_level,
+                probability_floor=self.nuisance_probability_floor,
+            )
+        cells: list[_RepeatedEffectCell] = []
+        n = len(sample.outcome)
+        for cohort in sample.treated_cohorts:
+            effective_position = sample.effective_positions[cohort]
+            base_position = effective_position - 1
+            cohort_share = float(np.count_nonzero(sample.cohorts == cohort) / n)
+            for target_position in range(effective_position, len(sample.times)):
+                estimate, influence, counts, comparison_cohorts = _effect_from_four_cells(
+                    sample,
+                    cohort=cohort,
+                    target_position=target_position,
+                    base_position=base_position,
+                    control_group=self.control_group,
+                )
+                cells.append(
+                    _RepeatedEffectCell(
+                        cohort=cohort,
+                        time=float(sample.times[target_position]),
+                        event_time=target_position - sample.original_positions[cohort],
+                        base_period=float(sample.times[base_position]),
+                        att=estimate,
+                        influence=influence,
+                        n_treated_target=counts[0],
+                        n_treated_base=counts[1],
+                        n_comparison_target=counts[2],
+                        n_comparison_base=counts[3],
+                        comparison_cohorts=comparison_cohorts,
+                        cohort_share=cohort_share,
+                    )
+                )
+        return _assemble_result(
+            cells,
+            sample,
+            covariance=self.covariance,
+            control_group=self.control_group,
+            composition=self.composition,
+            anticipation=self.anticipation,
+            inference=self.inference,
+            bootstrap_iterations=self.bootstrap_iterations,
+            bootstrap_random_state=self.random_state,
+            simultaneous_level=self.simultaneous_level,
+            outcome_name=outcome,
+            time_name=time,
+            treatment_time_name=treatment_time,
+            cluster_name=cluster,
+        )
+
+
+__all__ = [
+    "RepeatedCrossSectionDiD",
+    "RepeatedCrossSectionCompositionDiagnostic",
+    "RepeatedCrossSectionDiDResult",
+    "RepeatedCrossSectionPretrendDiagnostic",
+    "RepeatedCrossSectionSurveyDesign",
+    "did_rcs_composition_test",
+]

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from causalkit import RandomizedATE, RandomizedATEResult
+from causekit import RandomizedATE, RandomizedATEResult
 
 
 def _experiment(nobs: int = 800, seed: int = 20260728):

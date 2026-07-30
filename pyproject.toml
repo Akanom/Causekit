@@ -3,8 +3,8 @@ requires = ["setuptools>=77,<82", "wheel>=0.41,<1"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "causalkit"
-version = "0.6.0a4"
+name = "causekit"
+version = "0.7.0a6"
 description = "Identification-aware causal inference and instrumental-variable workflows for Python."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,12 +14,15 @@ authors = [{ name = "Oluwajuwon Mayomi Akanbi" }]
 maintainers = [{ name = "Oluwajuwon Mayomi Akanbi" }]
 keywords = [
   "causal inference",
+  "causal machine learning",
+  "double machine learning",
   "econometrics",
   "instrumental variables",
   "randomized experiments",
   "inverse probability weighting",
   "difference-in-differences",
   "event studies",
+  "regression discontinuity",
   "2sls",
   "treatment effects",
   "identification",
@@ -44,14 +47,20 @@ dependencies = [
 
 [project.optional-dependencies]
 outputhub = ["universal-output-hub>=0.2.2,<1"]
+plot = ["matplotlib>=3.7,<4"]
 security = ["pip-audit>=2.7,<3"]
 validation = [
   "linearmodels>=5,<8",
+  "rdrobust==2.0.0",
   "statsmodels>=0.14,<1",
 ]
 test = [
   "linearmodels>=5,<8",
+  "mypy>=1.10,<2",
+  # NumPy 2.5 stubs use Python 3.12 syntax; mypy targets CauseKit's Python 3.10 floor.
+  "numpy<2.5",
   "pytest>=8,<10",
+  "rdrobust==2.0.0",
   "ruff>=0.6,<1",
   "statsmodels>=0.14,<1",
   "universal-output-hub>=0.2.2,<1",
@@ -60,8 +69,11 @@ dev = [
   "build>=1.2,<2",
   "linearmodels>=5,<8",
   "mypy>=1.10,<2",
+  # NumPy 2.5 stubs use Python 3.12 syntax; mypy targets CauseKit's Python 3.10 floor.
+  "numpy<2.5",
   "pip-audit>=2.7,<3",
   "pytest>=8,<10",
+  "rdrobust==2.0.0",
   "ruff>=0.6,<1",
   "statsmodels>=0.14,<1",
   "twine>=5,<7",
@@ -69,9 +81,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Akanom/causalkit"
-Repository = "https://github.com/Akanom/causalkit"
-Issues = "https://github.com/Akanom/causalkit/issues"
+Homepage = "https://github.com/Akanom/causekit"
+Repository = "https://github.com/Akanom/causekit"
+Issues = "https://github.com/Akanom/causekit/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

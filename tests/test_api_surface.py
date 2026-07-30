@@ -1,18 +1,23 @@
-"""Regression tests for the initial stable causalkit namespace."""
+"""Regression tests for the initial stable causekit namespace."""
 
 from __future__ import annotations
 
 import inspect
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-import causalkit
-from causalkit import IV2SLS, IV2SLSResult
+import causekit
+from causekit import IV2SLS, IV2SLSResult
 
 PUBLIC_EXPORTS = {
+    "CATEEstimatorProtocol",
+    "CATEResultProtocol",
     "IV2SLS",
     "IV2SLSResult",
+    "PanelIV2SLS",
+    "PanelIV2SLSResult",
     "RandomizedATE",
     "RandomizedATEResult",
     "IPWATE",
@@ -24,16 +29,42 @@ PUBLIC_EXPORTS = {
     "CrossFitTask",
     "CrossFitTaskResult",
     "ClassProbabilityCrossFitResult",
+    "ClassProbabilityCrossFitTask",
+    "ClassProbabilityTaskCrossFitResult",
     "NuisanceEstimatorProtocol",
+    "NuisanceDiagnosticsProtocol",
     "PropensityResultProtocol",
+    "WeightedCATEEstimatorProtocol",
+    "WeightedNuisanceEstimatorProtocol",
     "OutcomeResultProtocol",
     "NearestNeighborMatch",
     "NearestNeighborMatchResult",
     "PropensityScoreStatus",
     "FittedPropensityMLEProtocol",
     "DifferenceInDifferences",
+    "DRLearner",
+    "DRLearnerResult",
     "EfficientDiD",
+    "DiDHausmanDiagnostic",
+    "DiDPretrendDiagnostic",
     "DiDResult",
+    "did_hausman_test",
+    "PartiallyLinearDML",
+    "PartiallyLinearDMLResult",
+    "NativeSplineRidgeCATE",
+    "NativeSplineRidgeCATEResult",
+    "RLearner",
+    "RLearnerResult",
+    "RepeatedCrossSectionDiD",
+    "RepeatedCrossSectionCompositionDiagnostic",
+    "RepeatedCrossSectionDiDResult",
+    "RepeatedCrossSectionPretrendDiagnostic",
+    "RepeatedCrossSectionSurveyDesign",
+    "RDBandwidthSelection",
+    "RDManipulationDiagnostic",
+    "RegressionDiscontinuity",
+    "RegressionDiscontinuityResult",
+    "did_rcs_composition_test",
     "confint",
     "fitted_values",
     "predict",
@@ -44,10 +75,54 @@ PUBLIC_EXPORTS = {
 
 
 def test_initial_stable_namespace_exports_iv_and_postestimation_contract() -> None:
-    assert set(causalkit.__all__) >= PUBLIC_EXPORTS
-    assert all(hasattr(causalkit, name) for name in PUBLIC_EXPORTS)
-    assert "TreatmentEffect" not in causalkit.__all__
-    assert not hasattr(causalkit, "TreatmentEffect")
+    assert set(causekit.__all__) >= PUBLIC_EXPORTS
+    assert all(hasattr(causekit, name) for name in PUBLIC_EXPORTS)
+    assert "TreatmentEffect" not in causekit.__all__
+    assert not hasattr(causekit, "TreatmentEffect")
+    assert not hasattr(causekit, "NativeOrthogonalStackedCATE")
+    assert not hasattr(causekit, "PanelIVSpec")
+    assert not hasattr(causekit, "run_panel_2sls")
+
+
+def test_causekit_has_no_sibling_runtime_dependency_or_import() -> None:
+    repository_root = Path(__file__).resolve().parents[1]
+    metadata = (repository_root / "pyproject.toml").read_text(encoding="utf-8").lower()
+    assert "limiteddepkit" not in metadata
+    assert "systemgmmkit" not in metadata
+
+    import_roots = [
+        repository_root / "src",
+        repository_root / "tests",
+        repository_root / "benchmarks",
+    ]
+    imported = []
+    for root in import_roots:
+        for path in root.rglob("*.py"):
+            source = path.read_text(encoding="utf-8")
+            if any(
+                line.lstrip().startswith(
+                    (
+                        "import limiteddepkit",
+                        "from limiteddepkit",
+                        "import systemgmmkit",
+                        "from systemgmmkit",
+                    )
+                )
+                for line in source.splitlines()
+            ):
+                imported.append(path.relative_to(repository_root).as_posix())
+    assert imported == []
+
+
+def test_distribution_and_import_namespace_are_causekit_only() -> None:
+    repository_root = Path(__file__).resolve().parents[1]
+    metadata = (repository_root / "pyproject.toml").read_text(encoding="utf-8")
+
+    assert 'name = "causekit"' in metadata
+    assert 'version = "0.7.0a6"' in metadata
+    assert causekit.__version__ == "0.7.0a6"
+    assert (repository_root / "src" / "causekit" / "__init__.py").is_file()
+    assert not (repository_root / "src" / "causalkit").exists()
 
 
 def test_estimator_signatures_keep_identification_inputs_explicit() -> None:
@@ -70,7 +145,26 @@ def test_estimator_signatures_keep_identification_inputs_explicit() -> None:
     assert fit.parameters["exogenous"].default is None
     assert fit.parameters["clusters"].default is None
 
-    matching = inspect.signature(causalkit.NearestNeighborMatch)
+    panel_iv = inspect.signature(causekit.PanelIV2SLS)
+    assert panel_iv.parameters["covariance"].default == "clustered"
+    assert panel_iv.parameters["time_effects"].default is True
+    assert panel_iv.parameters["missing"].default == "raise"
+    panel_fit = inspect.signature(causekit.PanelIV2SLS.fit)
+    assert list(panel_fit.parameters) == [
+        "self",
+        "data",
+        "outcome",
+        "endogenous",
+        "instruments",
+        "entity",
+        "time",
+        "exogenous",
+        "cluster",
+    ]
+    assert panel_fit.parameters["outcome"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert panel_fit.parameters["cluster"].default is None
+
+    matching = inspect.signature(causekit.NearestNeighborMatch)
     assert matching.parameters["estimand"].default == "att"
     assert matching.parameters["replacement"].default is True
     assert matching.parameters["caliper"].default == "auto"
@@ -78,16 +172,16 @@ def test_estimator_signatures_keep_identification_inputs_explicit() -> None:
     assert matching.parameters["inference"].default == "none"
     assert matching.parameters["variance_neighbors"].default == 1
     assert matching.parameters["first_step_covariance_neighbors"].default == 2
-    assert matching.parameters["first_step_regression_neighbors"].default == 1
+    assert matching.parameters["first_step_regression_neighbors"].default == 2
     assert matching.parameters["first_step_covariate_neighbors"].default == 1
 
-    matching_fit = inspect.signature(causalkit.NearestNeighborMatch.fit)
+    matching_fit = inspect.signature(causekit.NearestNeighborMatch.fit)
     assert matching_fit.parameters["propensity_score_status"].default == "estimated"
     assert matching_fit.parameters["propensity"].default is None
     assert matching_fit.parameters["propensity_model"].default is None
     assert matching_fit.parameters["propensity_design"].default is None
 
-    conventional_did = inspect.signature(causalkit.DifferenceInDifferences)
+    conventional_did = inspect.signature(causekit.DifferenceInDifferences)
     assert conventional_did.parameters["control_group"].default == "never_treated"
     assert conventional_did.parameters["anticipation"].default == 0
     assert conventional_did.parameters["covariance"].default == "robust"
@@ -95,12 +189,81 @@ def test_estimator_signatures_keep_identification_inputs_explicit() -> None:
     assert conventional_did.parameters["bootstrap_iterations"].default == 999
     assert conventional_did.parameters["simultaneous_level"].default == 0.95
 
-    efficient_did = inspect.signature(causalkit.EfficientDiD)
+    efficient_did = inspect.signature(causekit.EfficientDiD)
     assert efficient_did.parameters["pre_periods"].default == "all"
     assert efficient_did.parameters["anticipation"].default == 0
     assert efficient_did.parameters["covariance"].default == "robust"
     assert efficient_did.parameters["inference"].default == "analytic"
     assert efficient_did.parameters["nuisance_probability_floor"].default == 1e-6
+    assert efficient_did.parameters["nuisance_ratio_floor"].default == 1e-6
+    assert efficient_did.parameters["nuisance_ratio_ceiling"].default == 1e6
+    assert efficient_did.parameters["nuisance_ratio_min_effective_n"].default == 2.0
+    assert efficient_did.parameters["nuisance_ratio_max_share"].default == 0.8
+    assert efficient_did.parameters["nuisance_ratio_min_psus"].default == 2
+
+    repeated_cross_section_did = inspect.signature(causekit.RepeatedCrossSectionDiD)
+    assert repeated_cross_section_did.parameters["control_group"].default == "never_treated"
+    assert repeated_cross_section_did.parameters["composition"].default == "stationary"
+    assert repeated_cross_section_did.parameters["anticipation"].default == 0
+    assert repeated_cross_section_did.parameters["covariance"].default == "robust"
+    assert repeated_cross_section_did.parameters["inference"].default == "analytic"
+    assert repeated_cross_section_did.parameters["bootstrap_iterations"].default == 999
+    assert repeated_cross_section_did.parameters["random_state"].default is None
+    assert repeated_cross_section_did.parameters["simultaneous_level"].default == 0.95
+    assert repeated_cross_section_did.parameters["nuisance_probability_floor"].default == 1e-6
+    repeated_cross_section_fit = inspect.signature(causekit.RepeatedCrossSectionDiD.fit)
+    assert "entity" not in repeated_cross_section_fit.parameters
+    assert "panel" not in repeated_cross_section_fit.parameters
+    assert repeated_cross_section_fit.parameters["cross_fitter"].default is None
+    assert repeated_cross_section_fit.parameters["survey_design"].default is None
+    assert repeated_cross_section_fit.parameters["target_population"].default == "sample"
+
+    partially_linear_dml = inspect.signature(causekit.PartiallyLinearDML)
+    assert partially_linear_dml.parameters["outcome_factory"].default is None
+    assert partially_linear_dml.parameters["treatment_factory"].default is None
+    assert partially_linear_dml.parameters["n_splits"].default == 5
+    assert partially_linear_dml.parameters["covariance"].default == "robust"
+
+    rlearner = inspect.signature(causekit.RLearner)
+    assert rlearner.parameters["outcome_factory"].default is None
+    assert rlearner.parameters["propensity_factory"].default is None
+    assert rlearner.parameters["cate_factory"].default is None
+    assert rlearner.parameters["n_splits"].default == 5
+    assert rlearner.parameters["evaluation_fraction"].default == 0.5
+    assert rlearner.parameters["overlap_floor"].default == 0.01
+    assert rlearner.parameters["covariance"].default == "robust"
+    assert rlearner.parameters["calibration_groups"].default == 5
+    assert rlearner.parameters["bootstrap_iterations"].default == 999
+
+    drlearner = inspect.signature(causekit.DRLearner)
+    assert drlearner.parameters["outcome_factory"].default is None
+    assert drlearner.parameters["propensity_factory"].default is None
+    assert drlearner.parameters["cate_factory"].default is None
+    assert drlearner.parameters["n_splits"].default == 5
+    assert drlearner.parameters["evaluation_fraction"].default == 0.5
+    assert drlearner.parameters["overlap_floor"].default == 0.01
+    assert drlearner.parameters["covariance"].default == "robust"
+    assert drlearner.parameters["calibration_groups"].default == 5
+    assert drlearner.parameters["bootstrap_iterations"].default == 999
+
+    nonlinear_cate = inspect.signature(causekit.NativeSplineRidgeCATE)
+    assert nonlinear_cate.parameters["knot_counts"].default == (0, 1, 3)
+    assert nonlinear_cate.parameters["include_pairwise_interactions"].default is False
+    assert nonlinear_cate.parameters["max_basis_features"].default == 512
+
+    rd = inspect.signature(causekit.RegressionDiscontinuity)
+    assert rd.parameters["design"].default == "sharp"
+    assert rd.parameters["cutoff"].default == 0.0
+    assert rd.parameters["bandwidth"].default == "native_mse"
+    assert rd.parameters["polynomial_order"].default == 1
+    assert rd.parameters["bias_order"].default is None
+    assert rd.parameters["kernel"].default == "triangular"
+    assert rd.parameters["covariance"].default == "robust"
+    assert rd.parameters["mass_points"].default == "check"
+    rd_fit = inspect.signature(causekit.RegressionDiscontinuity.fit)
+    assert rd_fit.parameters["running"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert rd_fit.parameters["treatment"].default is None
+    assert rd_fit.parameters["clusters"].default is None
 
 
 def test_fit_returns_the_public_result_type() -> None:

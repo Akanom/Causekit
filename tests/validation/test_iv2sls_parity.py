@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from causalkit import IV2SLS
+from causekit import IV2SLS
 
 linearmodels_iv = pytest.importorskip("linearmodels.iv")
 ReferenceIV2SLS = linearmodels_iv.IV2SLS
@@ -65,7 +65,7 @@ def test_iv2sls_parameters_and_covariance_match_linearmodels(covariance_type: st
     )
     reference_kwargs: dict[str, object] = {
         "cov_type": covariance_type,
-        # causalkit deliberately reports n-k/HC1/CR1 finite-sample corrections.
+        # causekit deliberately reports n-k/HC1/CR1 finite-sample corrections.
         "debiased": True,
     }
     if covariance_type == "clustered":
@@ -114,7 +114,7 @@ def test_iv2sls_parameters_and_covariance_match_linearmodels(covariance_type: st
         reference_first_stage["partial.rsquared"], rel=5e-10, abs=2e-10
     )
     # linearmodels reports the clustered joint test as chi-square even with
-    # debiasing. causalkit reports the algebraically equivalent F = chi-square/q
+    # debiasing. causekit reports the algebraically equivalent F = chi-square/q
     # with G-1 denominator degrees of freedom, matching its clustered result
     # inference contract.
     native_reference_scale_statistic = native_first_stage.excluded_instrument_statistic

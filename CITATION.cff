@@ -1,19 +1,21 @@
 cff-version: 1.2.0
-message: "If you use causalkit in research, please cite the software and the exact version used."
+message: "If you use causekit in research, please cite the software and the exact version used."
 type: software
-title: "causalkit: Identification-aware causal inference and instrumental variables for Python"
+title: "CauseKit: Identification-aware causal inference and instrumental variables for Python"
 abstract: >-
-  An identification-aware Python toolkit for causal inference. Version 0.6.0a4
+  An identification-aware Python toolkit for causal inference. Version 0.7.0a6
   provides IV, randomized effects, cross-fitted nuisance orchestration,
   IPW/AIPW ATE, ATT, and ATC, auditable nearest-neighbor matching with fixed- or
   supported estimated-score inference, conventional staggered difference-in-differences, and cross-fitted
-  covariate-adjusted efficient PT-All event-study estimation with strict contracts.
+  covariate-adjusted efficient PT-All event-study estimation, conventional stationary-
+  composition repeated-cross-section DiD, and native partially linear
+  double machine learning and separately contracted honest R-/DR-learning.
 authors:
   - family-names: Akanbi
     given-names: "Oluwajuwon Mayomi"
-version: 0.6.0a4
-repository-code: "https://github.com/Akanom/causalkit"
-url: "https://github.com/Akanom/causalkit"
+version: 0.7.0a6
+repository-code: "https://github.com/Akanom/causekit"
+url: "https://github.com/Akanom/causekit"
 license: MIT
 keywords:
   - causal inference
@@ -25,4 +27,6 @@ keywords:
   - inverse probability weighting
   - difference-in-differences
   - event studies
+  - causal machine learning
+  - double machine learning
   - identification

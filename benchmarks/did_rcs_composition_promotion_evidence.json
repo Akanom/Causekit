@@ -1,0 +1,293 @@
+{
+  "causekit_version": "0.7.0a6",
+  "coverage_simulation": {
+    "cells": [
+      {
+        "absolute_bias_gate": 0.08,
+        "bias": 0.009271387611496706,
+        "composition": "robust",
+        "coverage": 0.95,
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "coverage_mcse": 0.006892024376045114,
+        "design": "stationary_unequal",
+        "empirical_standard_deviation": 0.16753563854854917,
+        "maximum_probability": 0.5304568527918782,
+        "mean_estimate": 4.84260472094483,
+        "mean_standard_error": 0.1690526173884037,
+        "minimum_probability": 0.06067961165048544,
+        "nuisance_fold_fits_per_replication": 8,
+        "refusals": 0,
+        "replications": 1000,
+        "sampling_unit": "observation",
+        "standard_error_ratio": 1.009054663550973,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "status": "pass",
+        "target": "treated_target_period",
+        "truth": 4.833333333333333
+      },
+      {
+        "absolute_bias_gate": 0.08,
+        "bias": 0.005767982492729473,
+        "composition": "stationary",
+        "coverage": 0.947,
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "coverage_mcse": 0.007084560677981384,
+        "design": "stationary_unequal",
+        "empirical_standard_deviation": 0.13956554280425199,
+        "maximum_probability": 0.6700507614213198,
+        "mean_estimate": 4.8391013158260625,
+        "mean_standard_error": 0.13835365853017179,
+        "minimum_probability": 0.234375,
+        "nuisance_fold_fits_per_replication": 10,
+        "refusals": 0,
+        "replications": 1000,
+        "sampling_unit": "observation",
+        "standard_error_ratio": 0.9913167372853633,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "status": "pass",
+        "target": "pooled_treated",
+        "truth": 4.833333333333333
+      },
+      {
+        "absolute_bias_gate": 0.08,
+        "bias": 0.004317767565075847,
+        "composition": "robust",
+        "coverage": 0.953,
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "coverage_mcse": 0.00669260786241059,
+        "design": "stationary_unequal",
+        "empirical_standard_deviation": 0.18261231449069915,
+        "maximum_probability": 0.546916890080429,
+        "mean_estimate": 4.837651100898409,
+        "mean_standard_error": 0.1831524965656139,
+        "minimum_probability": 0.05384615384615385,
+        "nuisance_fold_fits_per_replication": 8,
+        "refusals": 0,
+        "replications": 1000,
+        "sampling_unit": "psu",
+        "standard_error_ratio": 1.0029580813124312,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "status": "pass",
+        "target": "treated_target_period",
+        "truth": 4.833333333333333
+      },
+      {
+        "absolute_bias_gate": 0.08,
+        "bias": -0.001787598615399233,
+        "composition": "stationary",
+        "coverage": 0.951,
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "coverage_mcse": 0.006826346021115546,
+        "design": "stationary_unequal",
+        "empirical_standard_deviation": 0.15256309552228195,
+        "maximum_probability": 0.6752577319587629,
+        "mean_estimate": 4.831545734717934,
+        "mean_standard_error": 0.15500712828964694,
+        "minimum_probability": 0.2398989898989899,
+        "nuisance_fold_fits_per_replication": 10,
+        "refusals": 0,
+        "replications": 1000,
+        "sampling_unit": "psu",
+        "standard_error_ratio": 1.016019816319262,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "status": "pass",
+        "target": "pooled_treated",
+        "truth": 4.833333333333333
+      },
+      {
+        "absolute_bias_gate": 0.08,
+        "bias": 0.0004761341292160992,
+        "composition": "robust",
+        "coverage": 0.947,
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "coverage_mcse": 0.007084560677981384,
+        "design": "composition_shift_unequal",
+        "empirical_standard_deviation": 0.16557335850411423,
+        "maximum_probability": 0.6183206106870229,
+        "mean_estimate": 5.500476134129216,
+        "mean_standard_error": 0.16447883677893366,
+        "minimum_probability": 0.05303030303030303,
+        "nuisance_fold_fits_per_replication": 8,
+        "refusals": 0,
+        "replications": 1000,
+        "sampling_unit": "observation",
+        "standard_error_ratio": 0.9933895058053475,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "status": "pass",
+        "target": "treated_target_period",
+        "truth": 5.5
+      },
+      {
+        "absolute_bias_gate": 0.08,
+        "bias": 0.0017202255653891996,
+        "composition": "stationary",
+        "coverage": 0.932,
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "coverage_mcse": 0.00796090447122687,
+        "design": "composition_shift_unequal",
+        "empirical_standard_deviation": 0.14323075251257503,
+        "maximum_probability": 0.7076923076923077,
+        "mean_estimate": 4.768386892232056,
+        "mean_standard_error": 0.13068329435379647,
+        "minimum_probability": 0.27525252525252525,
+        "nuisance_fold_fits_per_replication": 10,
+        "refusals": 0,
+        "replications": 1000,
+        "sampling_unit": "observation",
+        "standard_error_ratio": 0.9123968984406687,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "status": "pass",
+        "target": "pooled_treated",
+        "truth": 4.766666666666667
+      },
+      {
+        "absolute_bias_gate": 0.08,
+        "bias": -0.004002634549431505,
+        "composition": "robust",
+        "coverage": 0.943,
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "coverage_mcse": 0.007331507348424336,
+        "design": "composition_shift_unequal",
+        "empirical_standard_deviation": 0.19467547429868562,
+        "maximum_probability": 0.6203208556149733,
+        "mean_estimate": 5.4959973654505685,
+        "mean_standard_error": 0.1867469998296798,
+        "minimum_probability": 0.047872340425531915,
+        "nuisance_fold_fits_per_replication": 8,
+        "refusals": 0,
+        "replications": 1000,
+        "sampling_unit": "psu",
+        "standard_error_ratio": 0.9592733779251444,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "status": "pass",
+        "target": "treated_target_period",
+        "truth": 5.5
+      },
+      {
+        "absolute_bias_gate": 0.08,
+        "bias": -0.004026309268178707,
+        "composition": "stationary",
+        "coverage": 0.912,
+        "coverage_gate": [
+          0.9,
+          0.99
+        ],
+        "coverage_mcse": 0.008958571314668425,
+        "design": "composition_shift_unequal",
+        "empirical_standard_deviation": 0.1660892440207499,
+        "maximum_probability": 0.707196029776675,
+        "mean_estimate": 4.762640357398488,
+        "mean_standard_error": 0.14652788330240235,
+        "minimum_probability": 0.2658536585365854,
+        "nuisance_fold_fits_per_replication": 10,
+        "refusals": 0,
+        "replications": 1000,
+        "sampling_unit": "psu",
+        "standard_error_ratio": 0.8822237958052015,
+        "standard_error_ratio_gate": [
+          0.75,
+          1.25
+        ],
+        "status": "pass",
+        "target": "pooled_treated",
+        "truth": 4.766666666666667
+      }
+    ],
+    "designs": [
+      "stationary_unequal",
+      "composition_shift_unequal"
+    ],
+    "observation_sample_size": 1600,
+    "psu_count": 400,
+    "psu_size": 4,
+    "refusal_reasons": {},
+    "replications_per_cell": 1000,
+    "sampling_units": [
+      "observation",
+      "psu"
+    ],
+    "seed": 20260730,
+    "status": "pass",
+    "target_diagnostics": {
+      "composition_shift_bias_observation": {
+        "absolute_tolerance": 0.08,
+        "expected_stationary_bias_for_robust_target": -0.7333333333333333,
+        "observed_stationary_bias_for_robust_target": -0.7316131077679442,
+        "robust_estimator_bias_for_robust_target": 0.0004761341292160992,
+        "robust_target_truth": 5.5,
+        "stationary_pooled_target_truth": 4.766666666666667,
+        "status": "pass"
+      },
+      "composition_shift_bias_psu": {
+        "absolute_tolerance": 0.08,
+        "expected_stationary_bias_for_robust_target": -0.7333333333333333,
+        "observed_stationary_bias_for_robust_target": -0.7373596426015121,
+        "robust_estimator_bias_for_robust_target": -0.004002634549431505,
+        "robust_target_truth": 5.5,
+        "stationary_pooled_target_truth": 4.766666666666667,
+        "status": "pass"
+      },
+      "stationary_efficiency_observation": {
+        "interpretation": "values_above_one_favor_stationary_score_under_stationarity",
+        "robust_to_stationary_mean_se_ratio": 1.2218875827670084,
+        "status": "pass"
+      },
+      "stationary_efficiency_psu": {
+        "interpretation": "values_above_one_favor_stationary_score_under_stationarity",
+        "robust_to_stationary_mean_se_ratio": 1.1815746707040105,
+        "status": "pass"
+      }
+    },
+    "total_estimator_fits": 8000,
+    "total_nuisance_fold_fits": 72000
+  },
+  "generated_at_utc": "2026-07-30T09:08:04.728945+00:00",
+  "generator": "benchmarks/validate_did_rcs_composition_promotion.py",
+  "generator_sha256": "5de4faec5e5752164a6ad25f83ae8a8efdf830426fda2a471f4a621bce36278d",
+  "overall_status": "pass",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.6",
+  "schema_version": 1
+}
