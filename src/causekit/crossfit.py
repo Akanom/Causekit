@@ -436,9 +436,17 @@ def _class_probability_prediction(
             "Class-probability prediction index must match the held-out covariate index."
         )
     if isinstance(raw, pd.DataFrame):
+        if not raw.columns.is_unique:
+            raise ValueError("predict_proba must provide unique class columns.")
         missing = [label for label in classes if label not in raw.columns]
         if missing:
             raise ValueError(f"predict_proba is missing class column(s): {missing}.")
+        unexpected = [label for label in raw.columns if label not in classes]
+        if unexpected or len(raw.columns) != len(classes):
+            raise ValueError(
+                "predict_proba must contain exactly the observed classes; "
+                f"unexpected class column(s): {unexpected}."
+            )
         values = raw.loc[:, list(classes)].to_numpy(dtype=float)
     else:
         values = np.asarray(raw, dtype=float)
@@ -448,6 +456,17 @@ def _class_probability_prediction(
                 "Array-valued multiclass predict_proba requires fitted result.classes_."
             )
         fitted_index = pd.Index(np.asarray(fitted_classes))
+        if not fitted_index.is_unique:
+            raise ValueError("Fitted result.classes_ must contain unique class labels.")
+        missing = [label for label in classes if label not in fitted_index]
+        if missing:
+            raise ValueError(f"Fitted result.classes_ is missing observed class(es): {missing}.")
+        unexpected = [label for label in fitted_index if label not in classes]
+        if unexpected or len(fitted_index) != len(classes):
+            raise ValueError(
+                "Fitted result.classes_ must contain exactly the observed classes; "
+                f"unexpected class label(s): {unexpected}."
+            )
         positions = fitted_index.get_indexer(classes)
         if np.any(positions < 0):
             raise ValueError("predict_proba does not contain every observed class.")
@@ -619,7 +638,9 @@ class CrossFitter:
     ) -> ClassProbabilityCrossFitResult:
         """Cross-fit one multiclass model and return all class probabilities.
 
-        Optional cluster labels keep each cluster wholly within one outer fold.
+        Optional cluster labels keep each cluster wholly within one outer fold. Labelled
+        outputs may permute the observed classes and are realigned; missing, extra,
+        duplicate, or unlabeled class schemas refuse.
         """
 
         if self.propensity_factory is None:

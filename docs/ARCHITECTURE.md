@@ -257,6 +257,9 @@ probability task and three masked outcome tasks. `did_rcs.py` validates the fixe
 order, applies hard overlap refusal, constructs normalized `w_00`, `w_01`, `w_10`, and
 `w_11`, evaluates the target-period-treated efficient score and influence, and exposes the
 weights without fitting `m_11`. It deliberately refuses longer or multi-cohort designs.
+The reusable class-probability boundary accepts labelled column permutations and
+realigns them to the observed class order, but refuses missing, extra, duplicate, or
+unlabelled array schemas before a causal score can consume them.
 
 Survey support remains outside the runtime architecture and requires an explicit design
 object, weighted nuisance protocol, and design-based variance. A separate balanced-panel extension replaces

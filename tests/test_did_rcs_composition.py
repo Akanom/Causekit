@@ -60,6 +60,74 @@ class _KnownCellOutcome:
         return _KnownCellOutcomeResult(cells.pop())
 
 
+class _CompositionShiftGeneralizedPropensityResult:
+    def predict_proba(self, X: pd.DataFrame) -> pd.DataFrame:
+        x = X["x"].to_numpy(dtype=float)
+        low_to_high = 0.125 + 0.25 * x
+        high_to_low = 0.375 - 0.25 * x
+        return pd.DataFrame(
+            {
+                0: high_to_low,
+                1: low_to_high,
+                2: high_to_low,
+                3: low_to_high,
+            },
+            index=X.index,
+        )
+
+
+class _CompositionShiftGeneralizedPropensity:
+    def fit(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+    ) -> _CompositionShiftGeneralizedPropensityResult:
+        del X, y
+        return _CompositionShiftGeneralizedPropensityResult()
+
+
+class _CompositionShiftBinaryPropensityResult:
+    def predict_proba(self, X: pd.DataFrame) -> pd.DataFrame:
+        probability = np.full(len(X), 0.5)
+        return pd.DataFrame({0: 1.0 - probability, 1: probability}, index=X.index)
+
+
+class _CompositionShiftBinaryPropensity:
+    def fit(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+    ) -> _CompositionShiftBinaryPropensityResult:
+        del X, y
+        return _CompositionShiftBinaryPropensityResult()
+
+
+class _CompositionShiftOutcomeResult:
+    def __init__(self, cell: str) -> None:
+        self.cell = cell
+
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
+        x = X["x"].to_numpy(dtype=float)
+        if self.cell == "d0-s0":
+            return 1.0 + x
+        if self.cell == "d0-s1":
+            return 2.0 + 3.0 * x
+        if self.cell == "d1-s0":
+            return 4.0 + 2.0 * x
+        if self.cell == "d1-s1":
+            return 7.0 + 8.0 * x
+        raise AssertionError(f"Unexpected outcome cell {self.cell!r}.")
+
+
+class _CompositionShiftOutcome:
+    def fit(self, X: pd.DataFrame, y: pd.Series) -> _CompositionShiftOutcomeResult:
+        del y
+        cells = {"-".join(str(label).split("-")[:2]) for label in X.index}
+        if len(cells) != 1:
+            raise AssertionError("Each outcome nuisance must train within one group-period cell.")
+        return _CompositionShiftOutcomeResult(cells.pop())
+
+
 def _cross_fitter(
     *,
     propensity_factory: Callable[[], object] = _KnownGeneralizedPropensity,
@@ -128,6 +196,43 @@ def _composition_hand_sample() -> pd.DataFrame:
         },
         index=pd.Index(labels, name="row"),
     )
+
+
+def _composition_shift_sample() -> pd.DataFrame:
+    rows: list[dict[str, float | str]] = []
+    cell_x_counts = {
+        (0, 0): (6, 2),
+        (0, 1): (2, 6),
+        (1, 0): (6, 2),
+        (1, 1): (2, 6),
+    }
+    for (treated, post), counts in cell_x_counts.items():
+        x_values = [0.0] * counts[0] + [1.0] * counts[1]
+        for replicate, x in enumerate(x_values):
+            m00 = 1.0 + x
+            m01 = 2.0 + 3.0 * x
+            m10 = 4.0 + 2.0 * x
+            treatment_effect = 2.0 + 4.0 * x
+            untreated_treated_post = m10 + m01 - m00
+            if treated == 0 and post == 0:
+                outcome = m00
+            elif treated == 0 and post == 1:
+                outcome = m01
+            elif treated == 1 and post == 0:
+                outcome = m10
+            else:
+                outcome = untreated_treated_post + treatment_effect
+            rows.append(
+                {
+                    "row": f"d{treated}-s{post}-x{int(x)}-r{replicate}",
+                    "outcome": outcome,
+                    "time": float(post + 1),
+                    "treatment_time": 2.0 if treated else np.inf,
+                    "x": x,
+                    "true_effect": treatment_effect,
+                }
+            )
+    return pd.DataFrame(rows).set_index("row")
 
 
 def _fit_robust(
@@ -235,6 +340,45 @@ def test_hand_computed_composition_robust_score_eif_hc1_and_weights() -> None:
     assert result.nuisance_fold.index.equals(data.index)
 
 
+def test_composition_shift_recovers_target_att_and_exposes_stationary_bias() -> None:
+    data = _composition_shift_sample()
+    robust = _fit_robust(
+        data,
+        cross_fitter=_cross_fitter(
+            propensity_factory=_CompositionShiftGeneralizedPropensity,
+            outcome_factory=_CompositionShiftOutcome,
+        ),
+    )
+    stationary = RepeatedCrossSectionDiD(composition="stationary").fit(
+        data,
+        outcome="outcome",
+        time="time",
+        treatment_time="treatment_time",
+        covariates=["x"],
+        cross_fitter=_cross_fitter(
+            propensity_factory=_CompositionShiftBinaryPropensity,
+            outcome_factory=_CompositionShiftOutcome,
+        ),
+    )
+
+    treated = data["treatment_time"].eq(2.0)
+    target = treated & data["time"].eq(2.0)
+    baseline = treated & data["time"].eq(1.0)
+    target_truth = float(data.loc[target, "true_effect"].mean())
+    pooled_treated_truth = float(data.loc[treated, "true_effect"].mean())
+
+    assert data.loc[target, "x"].mean() == pytest.approx(0.75)
+    assert data.loc[baseline, "x"].mean() == pytest.approx(0.25)
+    assert target_truth == pytest.approx(5.0)
+    assert pooled_treated_truth == pytest.approx(4.0)
+    assert robust.estimate == pytest.approx(target_truth, abs=1e-14)
+    assert stationary.estimate == pytest.approx(pooled_treated_truth, abs=1e-14)
+    assert stationary.estimate - target_truth == pytest.approx(-1.0, abs=1e-14)
+    assert robust.target_population == "treated_target_period"
+    assert stationary.target_population == "pooled_treated_stationary_composition"
+    assert robust.overall_influence.mean() == pytest.approx(0.0, abs=1e-14)
+
+
 def test_robust_composition_refuses_missing_covariates_and_nonpairwise_designs() -> None:
     data = _composition_hand_sample()
     with pytest.raises(ValueError, match="composition='robust'.*covariates"):
@@ -305,6 +449,206 @@ def test_generalized_propensity_overlap_refuses_without_clipping() -> None:
                 propensity_factory=_NearBoundaryGeneralizedPropensity,
             ),
         )
+
+
+class _ExtraClassGeneralizedPropensityResult:
+    def predict_proba(self, X: pd.DataFrame) -> pd.DataFrame:
+        return pd.DataFrame(
+            np.tile([0.25, 0.25, 0.25, 0.25, 0.0], (len(X), 1)),
+            index=X.index,
+            columns=[0, 1, 2, 3, 4],
+        )
+
+
+class _ExtraClassGeneralizedPropensity:
+    def fit(self, X: pd.DataFrame, y: pd.Series) -> _ExtraClassGeneralizedPropensityResult:
+        del X, y
+        return _ExtraClassGeneralizedPropensityResult()
+
+
+class _MissingClassGeneralizedPropensityResult:
+    def predict_proba(self, X: pd.DataFrame) -> pd.DataFrame:
+        return pd.DataFrame(
+            np.tile([0.40, 0.30, 0.30], (len(X), 1)),
+            index=X.index,
+            columns=[0, 1, 2],
+        )
+
+
+class _MissingClassGeneralizedPropensity:
+    def fit(self, X: pd.DataFrame, y: pd.Series) -> _MissingClassGeneralizedPropensityResult:
+        del X, y
+        return _MissingClassGeneralizedPropensityResult()
+
+
+class _DuplicateClassGeneralizedPropensityResult:
+    def predict_proba(self, X: pd.DataFrame) -> pd.DataFrame:
+        return pd.DataFrame(
+            np.tile([0.25, 0.25, 0.25, 0.25, 0.0], (len(X), 1)),
+            index=X.index,
+            columns=[0, 1, 2, 3, 3],
+        )
+
+
+class _DuplicateClassGeneralizedPropensity:
+    def fit(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+    ) -> _DuplicateClassGeneralizedPropensityResult:
+        del X, y
+        return _DuplicateClassGeneralizedPropensityResult()
+
+
+class _ExtraArrayClassGeneralizedPropensityResult:
+    classes_ = np.array([0, 1, 2, 3, 4])
+
+    def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
+        return np.tile([0.25, 0.25, 0.25, 0.25, 0.0], (len(X), 1))
+
+
+class _ExtraArrayClassGeneralizedPropensity:
+    def fit(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+    ) -> _ExtraArrayClassGeneralizedPropensityResult:
+        del X, y
+        return _ExtraArrayClassGeneralizedPropensityResult()
+
+
+class _DuplicateArrayClassGeneralizedPropensityResult:
+    classes_ = np.array([0, 1, 2, 3, 3])
+
+    def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
+        return np.tile([0.25, 0.25, 0.25, 0.25, 0.0], (len(X), 1))
+
+
+class _DuplicateArrayClassGeneralizedPropensity:
+    def fit(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+    ) -> _DuplicateArrayClassGeneralizedPropensityResult:
+        del X, y
+        return _DuplicateArrayClassGeneralizedPropensityResult()
+
+
+class _UnlabeledGeneralizedPropensityResult:
+    def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
+        return np.tile([0.40, 0.20, 0.25, 0.15], (len(X), 1))
+
+
+class _UnlabeledGeneralizedPropensity:
+    def fit(self, X: pd.DataFrame, y: pd.Series) -> _UnlabeledGeneralizedPropensityResult:
+        del X, y
+        return _UnlabeledGeneralizedPropensityResult()
+
+
+class _PermutedGeneralizedPropensityResult:
+    def predict_proba(self, X: pd.DataFrame) -> pd.DataFrame:
+        probabilities = _KnownGeneralizedPropensityResult().predict_proba(X)
+        return probabilities.loc[:, [3, 1, 0, 2]]
+
+
+class _PermutedGeneralizedPropensity:
+    def fit(self, X: pd.DataFrame, y: pd.Series) -> _PermutedGeneralizedPropensityResult:
+        del X, y
+        return _PermutedGeneralizedPropensityResult()
+
+
+class _PermutedArrayGeneralizedPropensityResult:
+    classes_ = np.array([3, 1, 0, 2])
+
+    def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
+        probabilities = _KnownGeneralizedPropensityResult().predict_proba(X)
+        return probabilities.loc[:, self.classes_].to_numpy(dtype=float)
+
+
+class _PermutedArrayGeneralizedPropensity:
+    def fit(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+    ) -> _PermutedArrayGeneralizedPropensityResult:
+        del X, y
+        return _PermutedArrayGeneralizedPropensityResult()
+
+
+@pytest.mark.parametrize(
+    ("propensity_factory", "message"),
+    [
+        (_MissingClassGeneralizedPropensity, "missing class column"),
+        (_ExtraClassGeneralizedPropensity, "exactly the observed classes"),
+        (_DuplicateClassGeneralizedPropensity, "unique class columns"),
+        (_ExtraArrayClassGeneralizedPropensity, "exactly the observed classes"),
+        (_DuplicateArrayClassGeneralizedPropensity, "unique class labels"),
+        (_UnlabeledGeneralizedPropensity, "requires fitted result.classes_"),
+    ],
+)
+def test_generalized_propensity_refuses_invalid_or_ambiguous_class_schema(
+    propensity_factory: Callable[[], object],
+    message: str,
+) -> None:
+    with pytest.raises((TypeError, ValueError), match=message):
+        _fit_robust(
+            _composition_hand_sample(),
+            cross_fitter=_cross_fitter(propensity_factory=propensity_factory),
+        )
+
+
+@pytest.mark.parametrize(
+    "propensity_factory",
+    [_PermutedGeneralizedPropensity, _PermutedArrayGeneralizedPropensity],
+)
+def test_labeled_generalized_propensity_order_is_realigned_without_changing_result(
+    propensity_factory: Callable[[], object],
+) -> None:
+    data = _composition_hand_sample()
+    expected = _fit_robust(data)
+    permuted = _fit_robust(
+        data,
+        cross_fitter=_cross_fitter(propensity_factory=propensity_factory),
+    )
+
+    assert permuted.estimate == pytest.approx(expected.estimate, abs=1e-14)
+    pd.testing.assert_frame_equal(
+        permuted.composition_weights,
+        expected.composition_weights,
+        atol=1e-14,
+    )
+    pd.testing.assert_series_equal(
+        permuted.overall_influence,
+        expected.overall_influence,
+        atol=1e-14,
+    )
+
+
+def test_composition_robust_result_is_invariant_to_row_permutation() -> None:
+    data = _composition_hand_sample()
+    permuted_data = data.sample(frac=1.0, random_state=2_026_073)
+    expected = _fit_robust(data)
+    permuted = _fit_robust(permuted_data)
+
+    assert permuted.estimate == pytest.approx(expected.estimate, abs=1e-14)
+    assert permuted.standard_error == pytest.approx(expected.standard_error, abs=1e-14)
+    assert permuted.design_fingerprint == expected.design_fingerprint
+    pd.testing.assert_frame_equal(permuted.group_time, expected.group_time, atol=1e-14)
+    pd.testing.assert_frame_equal(
+        permuted.composition_weights.sort_index(),
+        expected.composition_weights.sort_index(),
+        atol=1e-14,
+    )
+    pd.testing.assert_series_equal(
+        permuted.overall_influence.sort_index(),
+        expected.overall_influence.sort_index(),
+        atol=1e-14,
+    )
+    pd.testing.assert_frame_equal(
+        permuted.nuisance_predictions.sort_index(),
+        expected.nuisance_predictions.sort_index(),
+        atol=1e-14,
+    )
 
 
 class _AuditResult:

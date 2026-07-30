@@ -145,8 +145,9 @@ The robust path must refuse:
 - missing or empty covariates, or covariates without an explicit `CrossFitter`;
 - fewer than the required observations or independent PSUs in any of the four cells,
   globally or within a training fold;
-- generalized probabilities with missing classes, wrong order, index drift, nonfinite
-  values, row sums outside tolerance, or any cell at/below the probability floor;
+- generalized probabilities with missing, extra, or duplicate classes, ambiguous or
+  unlabeled column order, index drift, nonfinite values, row sums outside tolerance, or
+  any cell at/below the probability floor; labelled permutations are realigned safely;
 - own-observation predictions, mutable row/PSU roles, or cross-task fold drift;
 - a target-period treated cell with a nonpositive denominator;
 - direct-ratio-only or binary-propensity nuisances presented as the four-cell score;
@@ -169,18 +170,26 @@ of an unused `m_11` fit, non-empty-covariate and pairwise-scope refusals, hard f
 overlap refusal without clipping, and immutable row/whole-PSU cross-fitting. Existing
 stationary tests remain unchanged apart from allowing the now-supported robust label.
 
+The next deterministic gate uses 32 observations with binary `X` and exact four-cell
+probabilities. Treated baseline composition has `E[X]=0.25`, while treated target-period
+composition has `E[X]=0.75`; the heterogeneous effect is `2+4X`. The robust score exactly
+recovers target-period ATT `5`, whereas the stationary score equals its distinct pooled-
+treated target `4`, demonstrating one unit of target bias if it is misreported as the
+post-period ATT. A second failing-first run recorded two intended failures: extra class
+columns were silently ignored and duplicates produced only an incidental shape error.
+The reusable protocol now refuses missing, extra, duplicate, and unlabeled class schemas,
+safely realigns labelled permutations, and preserves estimates, standard errors, weights,
+influences, nuisance predictions, and design fingerprint under row permutation.
+
 ## Remaining promotion sequence
 
-Promotion beyond the implemented first slice still requires:
+Promotion beyond the implemented pairwise evidence still requires:
 
-1. exact recovery when four-cell composition changes under the maintained conditional
-   parallel-trends restriction and a contrasting stationary-score bias example;
-2. row-permutation invariance and broader generalized-propensity class/order refusals;
-3. hand-computed scalar and vector composition diagnostics, including singular and
+1. hand-computed scalar and vector composition diagnostics, including singular and
    misaligned-input refusals;
-4. conditional pre-trends for longer designs and fixed-seed max-t identities using robust
+2. conditional pre-trends for longer designs and fixed-seed max-t identities using robust
    influence records without nuisance refitting; and
-5. staggered group-time aggregation only after the pairwise evidence below passes.
+3. staggered group-time aggregation only after the pairwise evidence below passes.
 
 Promotion requires separate favorable-stationarity and composition-change simulations,
 including nonlinear nuisances and unequal period sizes. Preregistered cells must cover

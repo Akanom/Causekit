@@ -70,7 +70,10 @@ versions may refine APIs, but breaking changes must still be documented explicit
   regressions used by the efficient score, retains all four normalized weights, and
   reuses observation/PSU analytical and multiplier inference. Hand-computed estimate,
   EIF, HC1, overlap, scope, leakage, whole-PSU role, and OutputHub contracts were observed
-  failing first and now pass without clipping, trimming, or an unused `m_11` fit.
+  failing first and now pass without clipping, trimming, or an unused `m_11` fit. A
+  deterministic composition-shift design recovers target-period ATT `5` while the
+  stationary score targets the pooled-treated value `4`; full result records are invariant
+  to row order and labelled probability-column order.
 - Design-only contracts remain for calibrated direct pairwise cohort odds in balanced-
   panel PT-All, the composition diagnostic and staggered composition-robust extension,
   and repeated-section survey-design/population targets. Unsupported combinations keep
@@ -85,6 +88,10 @@ versions may refine APIs, but breaking changes must still be documented explicit
   completed no-covariate and covariate pointwise promotion evidence plus the opt-in
   observation/PSU simultaneous-band contract, and links the three independently gated
   next-stage designs.
+- Multiclass `CrossFitter` predictions now require an exact unique class schema. Labelled
+  DataFrame columns are safely realigned, while missing, extra, duplicate, or unlabeled
+  array order refuses with an actionable error instead of dropping columns or failing by
+  incidental shape mismatch.
 
 ### Known limitations
 

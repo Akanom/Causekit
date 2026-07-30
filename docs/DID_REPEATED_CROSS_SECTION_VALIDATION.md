@@ -37,6 +37,17 @@ unused target-cell outcome regression is fitted. This evidence promotes only the
 pairwise score; it is not staggered, external-package, real-data, or publication-scale
 evidence.
 
+The next 32-row deterministic design changes treated `X` composition from `0.25` at
+baseline to `0.75` in the target period and sets the conditional effect to `2+4X`.
+CauseKit's robust score recovers the target-period ATT `5`; the stationary score recovers
+its different pooled-treated target `4`, so using it as the post-period target creates a
+known bias of `-1`. The class-schema suite was observed with two intended failures before
+protocol hardening: extra probability columns were ignored and duplicate labels reached
+a generic matrix-shape error. Missing, extra, duplicate, and unlabeled probability
+schemas now refuse explicitly; labelled column permutations realign safely. A complete
+row permutation leaves the estimate, standard error, group-time result, weights,
+influence, nuisance predictions, and design fingerprint unchanged.
+
 ## Cross-language hand reference
 
 Run the independent base-R reconstruction:

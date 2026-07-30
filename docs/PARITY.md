@@ -37,7 +37,7 @@ uses different estimands or moments. Neither counts as a pass.
 | Conventional staggered DiD | hand/influence identities pass | real hospital group-time/influence contract passes | Stata/IC 17 same group-time/influence contract passes; `didregress` common-effect aggregation is non-comparable | pass for aligned contract |
 | Repeated-cross-section DiD, stationary composition | hand, aggregation, HC1/CR1, and 32-cell publication coverage contracts pass | pinned `did` 2.5.0 `att_gt(panel = FALSE, est_method = "reg")` passes both control rules after explicit HC0-to-HC1 mapping | reviewed Stata/IC 17 `csdid` matches group-time estimates/SEs and aggregate points; aggregate SEs use non-comparable cell-share influence | pass for available aligned fields |
 | Repeated-cross-section DiD, covariate adjusted | hand score/influence, leakage, double-robustness, hash-verified real-data, and 44-cell publication coverage contracts pass | fixed-OOF base-R score/HC1 reconstruction passes; estimator-level implementation unavailable | reviewed estimators target different moments: unavailable | internal publication evidence and score parity pass; estimator-level external unavailable |
-| Repeated-cross-section DiD, composition-robust pairwise | hand estimate/EIF/HC1/weights, overlap, scope, and whole-PSU fold-role contracts pass | official `compdid` point/influence comparator pending | no reviewed estimator targeting the same treated-target-period moment: unavailable | internal hand contract passes; external parity pending |
+| Repeated-cross-section DiD, composition-robust pairwise | hand estimate/EIF/HC1/weights, composition-shift recovery, stationary-target contrast, class schema, row permutation, overlap, scope, and whole-PSU fold-role contracts pass | official `compdid` point/influence comparator pending | no reviewed estimator targeting the same treated-target-period moment: unavailable | expanded internal deterministic contract passes; external parity pending |
 | Efficient DiD, no covariates | native result checked on fixture and real data | pinned public `edid` commit passes fixture and real hospital data | unavailable: Stata heterogeneous DiD does not implement PT-All optimal weighting | pass for available aligned comparator |
 | Efficient DiD, covariate adjusted | deterministic equation, refusal, and simulation evidence pass | unavailable: pinned public `edid` explicitly excludes covariates | unavailable: no identified Chen–Sant'Anna–Xie PT-All implementation | internal validation; external unavailable |
 | `PartiallyLinearDML` residual stage | hand score plus independent Statsmodels HC1 pass | base R 4.5.1 matrix/HC1 contract passes | reviewed Stata/IC 17 no-intercept HC1 contract passes | pass |
@@ -139,6 +139,10 @@ outcome residual terms and target-cell contrast, and compares every retained wei
 EIF coordinate. The official R `compdid` score/influence comparator remains a promotion
 gate. No Stata command is labelled comparable without evidence that it targets the same
 treated target-period population and influence moment.
+The added composition-shift fixture recovers robust target ATT `5` and the distinct
+stationary pooled-treated target `4`; it is a target-definition test rather than an
+external parity claim. Exact class-schema refusals and row/labelled-column permutation
+invariance pass before the official comparator is attempted.
 
 The fixed-score matching R harness is `benchmarks/validate_matching_reference.R`. It
 pins CRAN `Matching` commit `1208eaa7bfa888b1fc903481dddfb8c0dffa40d5`

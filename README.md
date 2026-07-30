@@ -96,7 +96,9 @@ The same orchestrator exposes multiclass class-probability prediction and masked
 regression tasks. Those operations let panel estimators request cohort-specific outcome
 changes and conditional second moments without owning or copying model implementations.
 Every task receives a fresh model per fold. A separate `second_moment_factory=` is
-optional; when omitted, the outcome factory is reused.
+optional; when omitted, the outcome factory is reused. Multiclass DataFrame outputs must
+have exactly one labelled column per observed class. Labelled column permutations are
+realigned safely; missing, extra, duplicate, or unlabeled array order refuses.
 
 ### Native causal machine learning
 
@@ -506,9 +508,12 @@ print(robust_composition.composition_weights)  # normalized w_00, w_01, w_10, w_
 ```
 
 The generalized-propensity result must expose all four `(group, period)` class
-probabilities. The first robust slice refuses more than two periods, multiple treated
-cohorts, empty covariates, weak four-cell overlap, survey weights, and any clipping or
-fallback. A runnable provider-neutral example is
+probabilities with exact, unique class labels. The first robust slice refuses more than
+two periods, multiple treated cohorts, empty covariates, weak four-cell overlap, survey
+weights, and any clipping or fallback. Its deterministic composition-shift contract
+recovers target-period ATT `5` while the deliberately miss-targeted stationary score
+equals the pooled-treated value `4`; row permutation and labelled probability-column
+permutation leave the robust result unchanged. A runnable provider-neutral example is
 [`examples/composition_robust_repeated_cross_section_did.py`](examples/composition_robust_repeated_cross_section_did.py).
 
 There is intentionally no `entity=` role and no `panel=False` switch. Every result records

@@ -255,6 +255,11 @@ future task can resume without reconstructing intent from chat history.
     retains the four normalized cell weights, and reuses HC1/CR1 and multiplier inference.
     Four failing-first tests now pass the exact hand estimate, EIF, HC1, overlap, scope,
     leakage, PSU-role, nuisance-schema, and OutputHub contracts. No `m11` nuisance is fit.
+    A later 32-row composition-shift gate recovers target ATT `5` while the stationary
+    score targets pooled-treated value `4`. Two additional failing-first protocol gaps
+    were closed: class predictions now refuse missing, extra, duplicate, or unlabeled
+    schemas, safely realign labelled permutations, and the complete robust result is row-
+    permutation invariant.
     Staggered aggregation, longer-design conditional pre-trends, the composition
     diagnostic, external `compdid` parity, real-data sensitivity, publication-scale
     coverage, and survey combinations remain open.
@@ -321,9 +326,10 @@ future task can resume without reconstructing intent from chat history.
 ## Next development order
 
 1. Promote the implemented pairwise [composition-change](docs/DID_RCS_COMPOSITION_CHANGE_CONTRACT.md)
-   score through class/order and permutation refusals, composition-shift recovery,
-   official `compdid` parity, real-data sensitivity, performance, and preregistered
-   coverage before adding its diagnostic or staggered wrapper. Keep the separate
+   score through official `compdid` point/influence parity next, followed by real-data
+   sensitivity, performance, and preregistered coverage before adding its diagnostic or
+   staggered wrapper. Composition-shift recovery, stationary-target contrast, exact class
+   schemas, and row/labelled-column permutation gates now pass. Keep the separate
    [survey-design](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md) contract design-only until that
    base evidence is complete. The balanced-panel
    [direct-ratio](docs/DID_DIRECT_RATIO_CONTRACT.md) nuisance is a separate PT-All option;
