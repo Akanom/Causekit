@@ -185,7 +185,7 @@ rlearner = RLearner(
     covariates=X,
 )
 
-print(rlearner.summary_frame())          # differential calibration
+print(rlearner.summary_frame())  # differential calibration
 print(rlearner.honest_r_loss)
 print(rlearner.honest_constant_r_loss)
 print(rlearner.calibration_plot_data())  # pointwise and simultaneous group bands
@@ -546,7 +546,7 @@ adjusted = RepeatedCrossSectionDiD(covariance="clustered").fit(
 
 print(adjusted.group_time)
 print(adjusted.pretrend.placebo_effects)  # the aligned conditional score
-print(adjusted.nuisance_diagnostics)      # task-by-fold audit; no refitting
+print(adjusted.nuisance_diagnostics)  # task-by-fold audit; no refitting
 ```
 
 Survey-population transport requires an immutable design object; a bare weight vector still
@@ -562,7 +562,7 @@ from causekit import RepeatedCrossSectionDiD, RepeatedCrossSectionSurveyDesign
 
 survey_design = RepeatedCrossSectionSurveyDesign(
     weights="analysis_weight",
-    psu="sampling_psu",       # use None only to explicitly declare independent rows
+    psu="sampling_psu",  # use None only to explicitly declare independent rows
     strata="sampling_stratum",
     weight_type="inverse_inclusion",  # or calibrated_analysis
 )
@@ -614,8 +614,8 @@ robust_composition = RepeatedCrossSectionDiD(
     ),
 )
 
-print(robust_composition.target_population)    # treated_target_period
-print(robust_composition.pair_ledger)           # pair support, overlap, shares, task keys
+print(robust_composition.target_population)  # treated_target_period
+print(robust_composition.pair_ledger)  # pair support, overlap, shares, task keys
 print(robust_composition.composition_weights)  # pair-labelled w_00, w_01, w_10, w_11
 print(robust_composition.event_study)
 print(robust_composition.simultaneous_event_study)
