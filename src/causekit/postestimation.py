@@ -10,21 +10,24 @@ import pandas as pd
 from scipy.stats import chi2, f, norm, t
 
 from .iv import IV2SLSResult
+from .rd import RegressionDiscontinuityResult
+
+InferenceResult = IV2SLSResult | RegressionDiscontinuityResult
 
 
-def summary_frame(result: IV2SLSResult, *, level: float = 0.95) -> pd.DataFrame:
+def summary_frame(result: InferenceResult, *, level: float = 0.95) -> pd.DataFrame:
     """Return a defensive coefficient summary."""
 
     return result.summary_frame(level=level).copy()
 
 
-def vcov(result: IV2SLSResult) -> pd.DataFrame:
+def vcov(result: InferenceResult) -> pd.DataFrame:
     """Return a defensive copy of the full fitted covariance matrix."""
 
     return result.covariance.copy()
 
 
-def confint(result: IV2SLSResult, *, level: float = 0.95) -> pd.DataFrame:
+def confint(result: InferenceResult, *, level: float = 0.95) -> pd.DataFrame:
     """Return confidence intervals using the fitted reference distribution."""
 
     return result.conf_int(level=level).copy()
@@ -52,7 +55,7 @@ def fitted_values(result: IV2SLSResult) -> pd.Series:
     return result.fitted_values.copy()
 
 
-def _critical_value(result: IV2SLSResult, level: float) -> float:
+def _critical_value(result: InferenceResult, level: float) -> float:
     if not 0.0 < level < 1.0:
         raise ValueError("level must be strictly between zero and one.")
     probability = 0.5 + level / 2.0
@@ -64,7 +67,7 @@ def _critical_value(result: IV2SLSResult, level: float) -> float:
 
 
 def lincom(
-    result: IV2SLSResult,
+    result: InferenceResult,
     weights: Mapping[str, float],
     *,
     value: float = 0.0,
@@ -105,7 +108,7 @@ def lincom(
 
 
 def wald_test(
-    result: IV2SLSResult,
+    result: InferenceResult,
     restrictions: Mapping[str, float] | Sequence[Mapping[str, float]],
     *,
     values: float | Sequence[float] = 0.0,

@@ -1,0 +1,33 @@
+{
+  "artifact": "causekit_regression_discontinuity_performance_v1",
+  "generated_on": "2026-07-30",
+  "generator": "benchmarks/benchmark_rd.py",
+  "reproduction_command": "python benchmarks/benchmark_rd.py",
+  "causekit_version": "0.7.0a6",
+  "python_version": "3.14.6",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "design": {
+    "nobs": 200000,
+    "truth": 1.5,
+    "bandwidth": 1.0,
+    "bias_bandwidth": 1.4,
+    "polynomial_order": 1,
+    "bias_order": 2,
+    "kernel": "triangular"
+  },
+  "result": {
+    "elapsed_seconds": 0.5668054000052507,
+    "peak_memory_mib": 101.4388599395752,
+    "bias_corrected_estimate": 1.4979482835783942,
+    "robust_standard_error": 0.013732301882977171,
+    "absolute_error": 0.0020517164216058426,
+    "n_effective": 140303
+  },
+  "gates": {
+    "maximum_seconds": 8.0,
+    "maximum_peak_mib": 300.0,
+    "maximum_absolute_error": 0.05,
+    "no_quadratic_matrix": true
+  },
+  "status": "pass"
+}

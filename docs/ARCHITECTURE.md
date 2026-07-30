@@ -84,6 +84,7 @@ The installed source tree assigns one primary responsibility to each module:
 | `causekit.did` | Balanced-panel validation, conventional group-time DiD, cross-fitted covariate PT-All scores/conditional weights, pointwise and simultaneous influence inference, and cohort/event/calendar aggregation |
 | `causekit.did_rcs` | Stationary repeated-section validation, marginal/cross-fitted doubly robust scores, observation/PSU pointwise and multiplier max-t inference, conditional placebos, and cohort/event/calendar aggregation |
 | `causekit.ml` | Native ridge-GCV nuisance fitting, shared-fold partially linear DML2 score, influence inference, fold-level tuning diagnostics, and fitted result |
+| `causekit.rd` | Sharp/fuzzy local-polynomial RD, bounded native bandwidth selection, robust bias correction, local score inference, support/manipulation diagnostics, and fitted result |
 | `causekit.postestimation` | Summary, covariance, confidence interval, prediction, residual, fitted-value, linear-combination, and Wald helpers |
 | `causekit.integrations.outputhub` | Lazy optional conversion and insertion into Universal Output Hub |
 | `causekit.datasets` | Opt-in HTTPS-only, SHA-256-pinned real-data cache used by examples and parity; source datasets are not redistributed |

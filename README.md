@@ -7,7 +7,9 @@ ATT, and ATC, scalar propensity-score matching with separate fixed- and estimate
 analytical inference paths, conventional staggered panel and repeated-cross-section DiD,
 cross-fitted covariate-adjusted Chen-Sant'Anna-Xie efficient DiD for short panels,
 CauseKit-native partially linear double machine learning, and separately contracted honest
-heterogeneous-effect R- and DR-learning.
+heterogeneous-effect R- and DR-learning. It also provides sharp and fuzzy continuity-based
+regression discontinuity with explicit bandwidth, bias-correction, manipulation-diagnostic,
+and local-estimand contracts.
 
 This is alpha research software. A successful fit is not evidence that an instrument is
 valid, and an IV coefficient is not automatically an average treatment effect. State the
@@ -650,6 +652,46 @@ See [Package scope](docs/PACKAGE_SCOPE.md),
 [Architecture](docs/ARCHITECTURE.md). The package-wide Python/R/Stata evidence status is
 tracked in the [cross-software parity register](docs/PARITY.md).
 
+### Regression discontinuity
+
+`RegressionDiscontinuity` estimates a cutoff-local sharp effect or fuzzy local-Wald
+complier effect using separate local polynomials on each side. Local linear point fits,
+local quadratic robust bias correction, triangular weights, and the bounded native MSE
+grid are defaults. Manual left/right point and bias bandwidths remain available for
+preregistered analysis and cross-software reproduction.
+
+```python
+from causekit import RegressionDiscontinuity
+
+sharp = RegressionDiscontinuity(
+    design="sharp",
+    cutoff=0.0,
+    bandwidth="native_mse",
+).fit(outcome, running=score)
+
+fuzzy = RegressionDiscontinuity(
+    design="fuzzy",
+    cutoff=0.0,
+    bandwidth=(1.2, 1.4),
+    bias_bandwidth=(1.6, 1.7),
+).fit(outcome, running=score, treatment=take_up)
+
+print(sharp.summary_frame())
+print(sharp.bandwidth_selection.candidates)
+print(sharp.manipulation)
+print(fuzzy.first_stage)
+```
+
+The primary result is the robust bias-corrected effect; the conventional estimate and
+standard error remain separately labelled. A fuzzy design refuses nonbinary treatment or
+a nonpositive local first stage. The density statistic is a screening diagnostic rather
+than proof of no sorting, and a native bandwidth selected at a grid boundary is flagged
+by side. Optional `result.plot()` uses the retained local data through the `plot` extra.
+See the [RD contract](docs/RD_CONTRACT.md) and runnable
+[`examples/regression_discontinuity.py`](examples/regression_discontinuity.py). Frozen simulation,
+real-data, performance, and comparator records are indexed in the
+[RD promotion evidence](docs/RD_PROMOTION_EVIDENCE.md).
+
 ## Randomized-experiment example
 
 ```python
@@ -934,7 +976,8 @@ The causal-ML alpha includes native partially linear DML and separately contract
 [honest DR-learner](docs/DR_LEARNER_CONTRACT.md) paths, with immutable
 construction/evaluation roles, held-out loss/calibration, group inference, and graph data.
 Available aligned Python/R/Stata parity rows are recorded, while unavailable comparator
-cells remain explicit. Later releases may add regression discontinuity and panel IV. Each family
+cells remain explicit. The sharp/fuzzy [RD contract](docs/RD_CONTRACT.md) is now public
+with reviewed Python/R/Stata parity. Later releases may add panel IV. Each family
 must define its estimand, assumptions, failure behavior, diagnostics, and independent
 validation evidence before promotion.
 

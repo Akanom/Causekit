@@ -14,6 +14,7 @@ from causekit import (
     NearestNeighborMatch,
     PartiallyLinearDML,
     RandomizedATE,
+    RegressionDiscontinuity,
     RepeatedCrossSectionDiD,
     RepeatedCrossSectionSurveyDesign,
     RLearner,
@@ -411,4 +412,27 @@ def test_matching_converts_and_adds_design_tables_without_reestimating() -> None
     assert [table.name for table in hub.tables] == [
         "Nearest-neighbor matching matches",
         "Nearest-neighbor matching balance",
+    ]
+
+
+def test_regression_discontinuity_exports_contract_and_diagnostics_without_refit() -> None:
+    running = pd.Series(np.r_[-np.linspace(0.05, 1.0, 40), np.linspace(0.05, 1.0, 40)])
+    outcome = pd.Series(1.0 + 0.5 * running + 2.0 * (running >= 0.0))
+    result = RegressionDiscontinuity(bandwidth=0.9, bias_bandwidth=1.0).fit(
+        outcome, running=running
+    )
+
+    model = to_outputhub_model(result)
+
+    assert model.name == "Sharp RD"
+    assert model.metadata["estimator"] == "local_polynomial_regression_discontinuity"
+    assert model.metadata["design"] == "sharp"
+    assert model.metadata["estimand"] == "cutoff_average_treatment_effect"
+    assert model.metadata["primary_inference"] == "robust_bias_corrected"
+    assert model.params.index.tolist() == ["rd_effect"]
+    hub = outputhub.OutputHub("Cutoff design")
+    add_to_outputhub(hub, result)
+    assert [table.name for table in hub.tables] == [
+        "Sharp RD bandwidth selection",
+        "Sharp RD manipulation diagnostic",
     ]

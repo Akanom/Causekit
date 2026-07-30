@@ -22,6 +22,7 @@ keywords = [
   "inverse probability weighting",
   "difference-in-differences",
   "event studies",
+  "regression discontinuity",
   "2sls",
   "treatment effects",
   "identification",
@@ -50,11 +51,13 @@ plot = ["matplotlib>=3.7,<4"]
 security = ["pip-audit>=2.7,<3"]
 validation = [
   "linearmodels>=5,<8",
+  "rdrobust==2.0.0",
   "statsmodels>=0.14,<1",
 ]
 test = [
   "linearmodels>=5,<8",
   "pytest>=8,<10",
+  "rdrobust==2.0.0",
   "ruff>=0.6,<1",
   "statsmodels>=0.14,<1",
   "universal-output-hub>=0.2.2,<1",
@@ -67,6 +70,7 @@ dev = [
   "numpy<2.5",
   "pip-audit>=2.7,<3",
   "pytest>=8,<10",
+  "rdrobust==2.0.0",
   "ruff>=0.6,<1",
   "statsmodels>=0.14,<1",
   "twine>=5,<7",

@@ -16,6 +16,7 @@ from ..matching import NearestNeighborMatchResult
 from ..ml import DRLearnerResult, PartiallyLinearDMLResult, RLearnerResult
 from ..observational import ObservationalATEResult
 from ..randomized import RandomizedATEResult
+from ..rd import RegressionDiscontinuityResult
 
 
 def _regression_model_class() -> Any:
@@ -47,6 +48,7 @@ def to_outputhub_model(
         | PartiallyLinearDMLResult
         | DRLearnerResult
         | RLearnerResult
+        | RegressionDiscontinuityResult
     ),
     *,
     name: str | None = None,
@@ -66,6 +68,7 @@ def to_outputhub_model(
             PartiallyLinearDMLResult,
             DRLearnerResult,
             RLearnerResult,
+            RegressionDiscontinuityResult,
         ),
     ):
         raise TypeError(
@@ -73,7 +76,8 @@ def to_outputhub_model(
             "ObservationalATEResult, DiDResult, RepeatedCrossSectionDiDResult, "
             "RepeatedCrossSectionCompositionDiagnostic, "
             "NearestNeighborMatchResult, or "
-            "PartiallyLinearDMLResult, DRLearnerResult, or RLearnerResult."
+            "PartiallyLinearDMLResult, DRLearnerResult, RLearnerResult, or "
+            "RegressionDiscontinuityResult."
         )
     RegressionModel = _regression_model_class()
     if isinstance(result, RepeatedCrossSectionCompositionDiagnostic):
@@ -475,6 +479,71 @@ def to_outputhub_model(
             },
             source="causekit",
         )
+    if isinstance(result, RegressionDiscontinuityResult):
+        rd_diagnostics: dict[str, Any] = {
+            "Conventional estimate": result.conventional_estimate,
+            "Conventional standard error": result.conventional_standard_error,
+            "Bias-corrected estimate": result.bias_corrected_estimate,
+            "Robust standard error": result.robust_standard_error,
+            "Outcome jump": result.outcome_jump,
+            "Treatment jump": result.treatment_jump,
+            "Mass points": result.mass_points_detected,
+        }
+        if result.manipulation.available:
+            rd_diagnostics.update(
+                {
+                    "Log-density jump": result.manipulation.log_density_jump,
+                    "Density diagnostic p-value": result.manipulation.pvalue,
+                }
+            )
+        if result.first_stage is not None:
+            rd_diagnostics.update(
+                {
+                    "First-stage standard error": result.first_stage["standard_error"],
+                    "First-stage p-value": result.first_stage["pvalue"],
+                    "Weak first-stage warning": result.first_stage["weak_first_stage_warning"],
+                }
+            )
+        return RegressionModel(
+            name=name or ("Sharp RD" if result.design == "sharp" else "Fuzzy RD"),
+            depvar=result.outcome_name,
+            params=result.params.rename("coef"),
+            std_errors=result.standard_errors.rename("se"),
+            pvalues=result.pvalues.rename("pvalue"),
+            statistics={
+                "N": result.nobs,
+                "Local N": result.n_effective,
+                "Left N": result.n_left,
+                "Right N": result.n_right,
+                "Converged": result.converged,
+            },
+            diagnostics=rd_diagnostics,
+            metadata={
+                "estimator": result.method,
+                "backend": result.backend,
+                "design": result.design,
+                "estimand": result.estimand,
+                "cutoff": result.cutoff,
+                "bandwidth_left": result.bandwidth_left,
+                "bandwidth_right": result.bandwidth_right,
+                "bias_bandwidth_left": result.bias_bandwidth_left,
+                "bias_bandwidth_right": result.bias_bandwidth_right,
+                "bandwidth_method": result.bandwidth_selection.method,
+                "bandwidth_selected_at_boundary": result.bandwidth_selection.selected_at_boundary,
+                "bandwidth_boundary_sides": list(result.bandwidth_selection.boundary_sides),
+                "polynomial_order": result.polynomial_order,
+                "bias_order": result.bias_order,
+                "kernel": result.kernel,
+                "primary_inference": result.primary_inference,
+                "covariance_type": result.covariance_type,
+                "inference_distribution": result.inference_distribution,
+                "n_clusters": result.n_clusters,
+                "manipulation_method": result.manipulation.method,
+                "causal_interpretation_requires_assumptions": True,
+                "assumptions": list(result.assumptions),
+            },
+            source="causekit",
+        )
     if isinstance(result, RandomizedATEResult):
         return RegressionModel(
             name=name or "Randomized ATE",
@@ -559,6 +628,7 @@ def add_to_outputhub(
         | PartiallyLinearDMLResult
         | DRLearnerResult
         | RLearnerResult
+        | RegressionDiscontinuityResult
     ),
     *,
     name: str | None = None,
@@ -578,6 +648,10 @@ def add_to_outputhub(
         if isinstance(result, DRLearnerResult)
         else "Nearest-neighbor matching"
         if isinstance(result, NearestNeighborMatchResult)
+        else "Sharp RD"
+        if isinstance(result, RegressionDiscontinuityResult) and result.design == "sharp"
+        else "Fuzzy RD"
+        if isinstance(result, RegressionDiscontinuityResult)
         else "Repeated-cross-section DiD"
         if isinstance(result, RepeatedCrossSectionDiDResult)
         else "RCS composition equality diagnostic"
@@ -592,7 +666,53 @@ def add_to_outputhub(
     )
     model = to_outputhub_model(result, name=model_name)
     hub.add_model(model)
-    if isinstance(result, RepeatedCrossSectionCompositionDiagnostic) and hasattr(hub, "add_table"):
+    if isinstance(result, RegressionDiscontinuityResult) and hasattr(hub, "add_table"):
+        table_metadata = {
+            "source": "causekit",
+            "estimator": result.method,
+            "design": result.design,
+            "estimand": result.estimand,
+        }
+        hub.add_table(
+            f"{model_name} bandwidth selection",
+            result.bandwidth_selection.candidates.copy(),
+            caption=(
+                "Bounded native design-conditional MSE grid or the single declared manual "
+                "bandwidth. Selection does not validate the RD identifying assumptions."
+            ),
+            metadata={
+                **table_metadata,
+                "method": result.bandwidth_selection.method,
+            },
+        )
+        hub.add_table(
+            f"{model_name} manipulation diagnostic",
+            pd.DataFrame(
+                {
+                    "available": [result.manipulation.available],
+                    "bandwidth": [result.manipulation.bandwidth],
+                    "density_left": [result.manipulation.density_left],
+                    "density_right": [result.manipulation.density_right],
+                    "log_density_jump": [result.manipulation.log_density_jump],
+                    "standard_error": [result.manipulation.standard_error],
+                    "statistic": [result.manipulation.statistic],
+                    "pvalue": [result.manipulation.pvalue],
+                    "reject": [result.manipulation.reject],
+                    "reason": [result.manipulation.reason],
+                }
+            ),
+            caption=(
+                "One-sided boundary-kernel density diagnostic. It is not the Cattaneo-Jansson-Ma "
+                "test and cannot by itself establish or refute RD validity."
+            ),
+            metadata={
+                **table_metadata,
+                "method": result.manipulation.method,
+            },
+        )
+    elif isinstance(result, RepeatedCrossSectionCompositionDiagnostic) and hasattr(
+        hub, "add_table"
+    ):
         metadata = {
             "source": "causekit",
             "estimator": "rcs_composition_equality_diagnostic",

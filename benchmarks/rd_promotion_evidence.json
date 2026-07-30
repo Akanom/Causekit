@@ -1,0 +1,130 @@
+{
+  "artifact": "causekit_regression_discontinuity_promotion_v1",
+  "generated_on": "2026-07-30",
+  "generator": "benchmarks/validate_rd_promotion.py",
+  "reproduction_command": "python benchmarks/validate_rd_promotion.py",
+  "causekit_version": "0.7.0a6",
+  "python_version": "3.14.6",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "design": "Nonlinear smooth cubic conditional mean, triangular p=1/q=2 RBC, fixed seeds; fuzzy take-up follows a nonlinear logistic first stage.",
+  "gates": {
+    "fixed": {
+      "replications": 1000,
+      "zero_refusals": true,
+      "absolute_bias_max": 0.075,
+      "standard_error_ratio": [
+        0.88,
+        1.12
+      ],
+      "pointwise_coverage_95": [
+        0.925,
+        0.98
+      ]
+    },
+    "native_selector": {
+      "replications": 250,
+      "zero_refusals": true,
+      "absolute_bias_max": 0.1,
+      "standard_error_ratio": [
+        0.75,
+        1.25
+      ],
+      "pointwise_coverage_95": [
+        0.9,
+        0.99
+      ],
+      "boundary_fraction_is_diagnostic_not_a_pass_gate": true
+    }
+  },
+  "results": [
+    {
+      "name": "sharp_fixed_rbc",
+      "design": "sharp",
+      "nobs": 1200,
+      "truth": 2.0,
+      "bandwidth": 1.3,
+      "bias_bandwidth": 1.7,
+      "bandwidth_candidates": 15,
+      "replications_requested": 1000,
+      "replications_successful": 1000,
+      "seed": 2026073000,
+      "refusals": 0,
+      "refusal_messages": {},
+      "mean_estimate": 2.005700164409663,
+      "absolute_bias": 0.005700164409662811,
+      "empirical_standard_deviation": 0.20087393534501696,
+      "mean_standard_error": 0.1983669978780652,
+      "standard_error_ratio": 0.9875198468997687,
+      "pointwise_coverage_95": 0.936,
+      "boundary_selection_fraction": 0.0,
+      "status": "pass"
+    },
+    {
+      "name": "fuzzy_fixed_rbc",
+      "design": "fuzzy",
+      "nobs": 1600,
+      "truth": 2.2,
+      "bandwidth": 1.2,
+      "bias_bandwidth": 1.6,
+      "bandwidth_candidates": 15,
+      "replications_requested": 1000,
+      "replications_successful": 1000,
+      "seed": 2026083000,
+      "refusals": 0,
+      "refusal_messages": {},
+      "mean_estimate": 2.210420151021488,
+      "absolute_bias": 0.010420151021487634,
+      "empirical_standard_deviation": 0.29271274346727855,
+      "mean_standard_error": 0.2774411553036342,
+      "standard_error_ratio": 0.9478273887814129,
+      "pointwise_coverage_95": 0.947,
+      "boundary_selection_fraction": 0.0,
+      "status": "pass"
+    },
+    {
+      "name": "sharp_native_selector",
+      "design": "sharp",
+      "nobs": 1000,
+      "truth": 2.0,
+      "bandwidth": "native_mse",
+      "bias_bandwidth": null,
+      "bandwidth_candidates": 7,
+      "replications_requested": 250,
+      "replications_successful": 250,
+      "seed": 2026093000,
+      "refusals": 0,
+      "refusal_messages": {},
+      "mean_estimate": 2.0063998164414714,
+      "absolute_bias": 0.006399816441471362,
+      "empirical_standard_deviation": 0.22541948048286337,
+      "mean_standard_error": 0.21994164762084267,
+      "standard_error_ratio": 0.9756993812145835,
+      "pointwise_coverage_95": 0.948,
+      "boundary_selection_fraction": 1.0,
+      "status": "pass"
+    },
+    {
+      "name": "fuzzy_native_selector",
+      "design": "fuzzy",
+      "nobs": 1600,
+      "truth": 2.2,
+      "bandwidth": "native_mse",
+      "bias_bandwidth": null,
+      "bandwidth_candidates": 7,
+      "replications_requested": 250,
+      "replications_successful": 250,
+      "seed": 2026103000,
+      "refusals": 0,
+      "refusal_messages": {},
+      "mean_estimate": 2.2248339690802887,
+      "absolute_bias": 0.024833969080288565,
+      "empirical_standard_deviation": 0.3037178602485913,
+      "mean_standard_error": 0.28284389669319465,
+      "standard_error_ratio": 0.9312718602116075,
+      "pointwise_coverage_95": 0.944,
+      "boundary_selection_fraction": 0.996,
+      "status": "pass"
+    }
+  ],
+  "status": "pass"
+}

@@ -66,6 +66,12 @@ from .postestimation import (
     wald_test,
 )
 from .randomized import CovariateBalance, RandomizedATE, RandomizedATEResult
+from .rd import (
+    RDBandwidthSelection,
+    RDManipulationDiagnostic,
+    RegressionDiscontinuity,
+    RegressionDiscontinuityResult,
+)
 
 __all__ = [
     "CATEEstimatorProtocol",
@@ -118,6 +124,10 @@ __all__ = [
     "SarganTest",
     "RandomizedATE",
     "RandomizedATEResult",
+    "RDBandwidthSelection",
+    "RDManipulationDiagnostic",
+    "RegressionDiscontinuity",
+    "RegressionDiscontinuityResult",
     "add_to_outputhub",
     "confint",
     "fitted_values",

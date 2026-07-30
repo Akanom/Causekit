@@ -8,6 +8,27 @@ versions may refine APIs, but breaking changes must still be documented explicit
 
 ### Added
 
+- Public `RegressionDiscontinuity`, immutable result/bandwidth/manipulation records, and
+  a native continuity-based local-polynomial path for sharp cutoff effects and fuzzy
+  local-Wald complier effects. The default triangular local-linear estimate uses a
+  higher-order robust bias correction, explicit HC1 or one-way CR1 score inference,
+  strict running-support/rank/mass-point/index refusals, and exact sharp-assignment or
+  positive fuzzy-first-stage audits. Results retain point/bias weights, local support,
+  influence contributions, condition numbers, optional diagnostic plots, and OutputHub
+  bandwidth/manipulation tables.
+- A deterministic bounded native MSE grid with robust-scale local-support caps, complete
+  candidate objectives, fuzzy first-stage admissibility, and side-specific boundary
+  flags. The separate one-sided boundary-kernel density statistic remains explicitly
+  diagnostic and is not relabelled as the Cattaneo-Jansson-Ma manipulation test.
+- Fixed-bandwidth sharp/fuzzy conventional points, ratio bias correction, robust HC1
+  standard errors, and corrected fuzzy treatment jumps match Python `rdrobust` 2.0.0 and
+  R `rdrobust` 4.0.0 at numerical precision. Hash-pinned Head Start fixed-bandwidth
+  parity passes with maximum difference `8.09e-14`; the native sensitivity records its
+  left grid-boundary selection rather than hiding it. Nonlinear promotion completes
+  2,500 fixed-seed fits with zero refusals and coverage `0.936–0.948`; a 200,000-row
+  smoke completes in `0.567` seconds with `101.44 MiB` Python peak. Reviewed Stata/IC 17
+  `rdrobust` 11.1.0 parity passes every aligned sharp/fuzzy field with maximum absolute
+  difference `2.31e-14` at tolerance `1e-8`.
 - Public `CohortOddsRatioResultProtocol`, pair-labelled
   `CohortOddsRatioCrossFitResult`, and
   `CrossFitter.fit_predict_cohort_odds_ratios()` for calibrated ordered posterior cohort

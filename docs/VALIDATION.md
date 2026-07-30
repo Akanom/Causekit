@@ -160,6 +160,21 @@ the public R implementation returns candidate effects `(10, 10, 10)`, weights
 `0.46656947481584343`. `benchmarks/validate_edid_reference.R` reproduces the reference
 values, and the optional validation test compares them with the native result.
 
+Regression discontinuity has a separate continuity-based gate. Hand tests reconstruct a
+local-constant sharp mean difference and HC1 variance, a sharp assignment audit, and a
+fuzzy local-Wald ratio. Refusals cover cutoff support, local rank/unique values,
+mass-point policy, polynomial and bandwidth order, missing/index drift, fuzzy binary and
+positive-first-stage requirements, and cluster support. The fixed-bandwidth triangular
+`p=1`, `q=2`, HC1 fixture matches Python `rdrobust` 2.0.0 and R `rdrobust` 4.0.0 for
+conventional points, first-order ratio bias correction, robust standard errors, and the
+corrected fuzzy treatment jump. The native selector has a distinct 250-replication-per-
+design coverage gate and reports candidate-boundary selection rather than claiming CCT
+bandwidth parity. The hash-pinned Head Start sensitivity and 200,000-row performance
+record are generated without redistributing source data. Artifact hashes and exact results are
+listed in [Regression discontinuity promotion evidence](RD_PROMOTION_EVIDENCE.md).
+The reviewed Stata/IC 17 `rdrobust` 11.1.0 artifact passes all aligned fields at `1e-8`; its
+maximum absolute difference is `2.31e-14`.
+
 ## Claim boundary
 
 Validation can provide evidence that:
@@ -299,6 +314,7 @@ passing only after its tests have executed successfully in the recorded environm
 | Partially linear DML | Binary/continuous treatment, native/custom nuisance, robust/clustered inference | DML2 score, OOF fold alignment, native ridge-GCV, fold tuning audit, direct GCV identity, influence/Jacobian identities, strict weak-signal refusal |
 | Honest R-learner | Binary treatment, row/cluster honesty, native/custom learners, overlap, robust/clustered calibration | Leakage/refusals, exact R-objective, held-out loss/constant gain, HC1/CR1 differential calibration, tie-preserving group moments/influence/max-t bands, simulations, R/Stata fixed-evaluation parity, real-data comparator record |
 | Causal-ML performance | One hash-verified real dataset, one identically folded run per model | Estimate, standard error, OOF outcome/treatment RMSE, elapsed time, Python peak memory, versions, no runtime comparator dependency |
+| Regression discontinuity | Sharp/fuzzy, fixed/native bandwidth, nonlinear support, mass points, robust/clustered inference | Hand point/HC1/local-Wald identities, ratio RBC, support/refusal tests, Python/R/Stata fixed-bandwidth parity, real-data sensitivity, coverage, performance |
 
 ## Cross-software parity matrix
 
@@ -368,6 +384,10 @@ python benchmarks/benchmark_ml.py --dataset nsw_mixtape --models all
 python benchmarks/benchmark_rlearner.py --models all
 python benchmarks/benchmark_rlearner_hillstrom.py --data /path/to/reviewed/hillstrom.csv
 Rscript benchmarks/validate_dml_reference.R
+Rscript benchmarks/validate_rd_reference.R
+python benchmarks/validate_rd_real_data.py
+python benchmarks/validate_rd_promotion.py
+python benchmarks/benchmark_rd.py
 ```
 
 The ML/R-learner commands are separate one-run real-data records, not benchmark
@@ -379,6 +399,15 @@ repetitions. Their frozen results and interpretation limits are documented in
 Stata is manual: from the repository root run
 `do "benchmarks/validate_dml_stata.do"`. The harness persists
 `benchmarks/validate_dml_stata_output.txt` before any parity assertion.
+
+RD Stata parity is also manual: run `do "benchmarks/validate_rd_stata.do"`. If the
+official comparator is absent, use the versioned installation command in the do-file
+header. If Stata's Java certificate store refuses GitHub, run
+`python benchmarks/prepare_rd_stata.py` and install from its printed, hash-verified local
+Stata site instead. If Stata cannot load the distributed Mata library, pass that local
+site as the do-file's first argument; the harness compiles the pinned official Mata source
+with the running Stata version inside the cache. The harness writes
+`benchmarks/validate_rd_stata_output.txt` before assertions.
 
 Prepare and run the pinned real-data certificate against the exact R reference checkouts:
 

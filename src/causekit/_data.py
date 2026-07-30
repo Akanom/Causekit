@@ -28,6 +28,21 @@ class PreparedIVData:
     dropped_rows: int
 
 
+@dataclass(frozen=True)
+class PreparedRDData:
+    """Numerical RD arrays with their validated labels and estimation index."""
+
+    y: np.ndarray
+    running: np.ndarray
+    treatment: np.ndarray | None
+    clusters: np.ndarray | None
+    index: pd.Index
+    y_name: str
+    running_name: str
+    treatment_name: str | None
+    dropped_rows: int
+
+
 def _string_names(columns: Any, *, kind: str) -> tuple[str, ...]:
     names = tuple(str(column) for column in columns)
     if len(set(names)) != len(names):
@@ -234,6 +249,104 @@ def prepare_iv_data(
         endogenous_names=endog_names,
         exogenous_names=exog_names,
         instrument_names=instrument_names,
+        dropped_rows=dropped_rows,
+    )
+
+
+def prepare_rd_data(
+    y: Any,
+    running: Any,
+    treatment: Any | None,
+    *,
+    clusters: Any | None,
+    missing: MissingPolicy,
+) -> PreparedRDData:
+    """Validate, align, and jointly filter a regression-discontinuity sample."""
+
+    if missing not in {"raise", "drop"}:
+        raise ValueError("missing must be 'raise' or 'drop'.")
+
+    y_array, y_name, y_index = _as_outcome(y)
+    running_frame, running_names, running_index = _as_numeric_frame(
+        running, kind="running", prefix="running"
+    )
+    if running_frame.shape[1] != 1:
+        raise ValueError("running must contain exactly one column.")
+
+    treatment_array: np.ndarray | None = None
+    treatment_name: str | None = None
+    treatment_index: pd.Index | None = None
+    if treatment is not None:
+        treatment_frame, treatment_names, treatment_index = _as_numeric_frame(
+            treatment, kind="treatment", prefix="treatment"
+        )
+        if treatment_frame.shape[1] != 1:
+            raise ValueError("treatment must contain exactly one column.")
+        treatment_array = treatment_frame[:, 0]
+        treatment_name = treatment_names[0]
+
+    cluster_array: np.ndarray | None = None
+    cluster_index: pd.Index | None = None
+    if clusters is not None:
+        cluster_array, cluster_index = _as_clusters(clusters)
+
+    nobs = len(y_array)
+    lengths = {"running": len(running_frame)}
+    if treatment_array is not None:
+        lengths["treatment"] = len(treatment_array)
+    if cluster_array is not None:
+        lengths["clusters"] = len(cluster_array)
+    mismatched = {kind: size for kind, size in lengths.items() if size != nobs}
+    if mismatched:
+        raise ValueError(f"All inputs must have the same number of rows as y; got {mismatched}.")
+
+    pandas_index = _validate_pandas_indices(
+        [
+            ("y", y_index),
+            ("running", running_index),
+            ("treatment", treatment_index),
+            ("clusters", cluster_index),
+        ]
+    )
+    index = pandas_index if pandas_index is not None else pd.RangeIndex(nobs)
+
+    running_array = running_frame[:, 0]
+    invalid = ~np.isfinite(y_array) | ~np.isfinite(running_array)
+    if treatment_array is not None:
+        invalid |= ~np.isfinite(treatment_array)
+    if cluster_array is not None:
+        invalid |= pd.isna(cluster_array)
+
+    dropped_rows = int(invalid.sum())
+    if dropped_rows and missing == "raise":
+        raise ValueError(
+            f"Inputs contain missing or non-finite values in {dropped_rows} row(s); "
+            "set missing='drop' to remove them jointly."
+        )
+    if dropped_rows:
+        keep = ~invalid
+        y_array = y_array[keep]
+        running_array = running_array[keep]
+        index = index[keep]
+        if treatment_array is not None:
+            treatment_array = treatment_array[keep]
+        if cluster_array is not None:
+            cluster_array = cluster_array[keep]
+
+    if len(y_array) == 0:
+        raise ValueError("No complete observations remain after applying the missing-value policy.")
+
+    return PreparedRDData(
+        y=np.asarray(y_array, dtype=float),
+        running=np.asarray(running_array, dtype=float),
+        treatment=(
+            np.asarray(treatment_array, dtype=float) if treatment_array is not None else None
+        ),
+        clusters=cluster_array,
+        index=index,
+        y_name=y_name,
+        running_name=running_names[0],
+        treatment_name=treatment_name,
         dropped_rows=dropped_rows,
     )
 

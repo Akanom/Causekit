@@ -44,6 +44,15 @@ uses different estimands or moments. Neither counts as a pass.
 | `PartiallyLinearDML` residual stage | hand score plus independent Statsmodels HC1 pass | base R 4.5.1 matrix/HC1 contract passes | reviewed Stata/IC 17 no-intercept HC1 contract passes | pass |
 | `RLearner` fixed honest evaluation | hand loss/calibration/group/max-t identities pass | base R 4.5.1 loss, HC1 calibration, and group covariance pass | reviewed Stata/IC 17 loss/calibration/group HC1 fixture passes | pass |
 | `DRLearner` fixed honest evaluation | hand pseudo-outcome/loss/calibration/group/max-t identities pass | base R 4.5.1 loss, HC1 calibration, and group covariance pass | reviewed Stata/IC 17 loss/calibration/group HC1 fixture passes | pass |
+| Sharp/fuzzy fixed-bandwidth RD | CauseKit hand/refusal identities and Python `rdrobust` 2.0.0 conventional point/RBC/robust-HC1 parity pass | R `rdrobust` 4.0.0 passes conventional point, RBC, robust-HC1, and fuzzy corrected first-stage fields within `2e-14` | reviewed Stata/IC 17 `rdrobust` 11.1.0 passes all aligned fields within `2.31e-14` | pass |
+
+The RD parity fixture fixes triangular `p=1`, `q=2`, left/right point bandwidths
+`(1.2, 1.4)`, bias bandwidths `(1.6, 1.7)`, HC1, and 800 deterministic observations.
+`benchmarks/validate_rd_reference.R` writes the passing R artifact before assertions;
+`benchmarks/validate_rd_stata.do` follows the same rule. Its reviewed output SHA-256 is
+`29591cdf4a4ea3c4269838aafb02fec7942df8b870774c3aa221e04fbf429a0d`.
+Native bandwidth selection is CauseKit-specific and is validated by recovery/coverage,
+not represented as parity with `rdrobust` bandwidth selectors.
 
 The DML parity fixture fixes already out-of-fold nuisance predictions and compares the
 aligned residual-on-residual coefficient and HC1 standard error. It validates the public

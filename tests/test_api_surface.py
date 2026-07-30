@@ -58,6 +58,10 @@ PUBLIC_EXPORTS = {
     "RepeatedCrossSectionDiDResult",
     "RepeatedCrossSectionPretrendDiagnostic",
     "RepeatedCrossSectionSurveyDesign",
+    "RDBandwidthSelection",
+    "RDManipulationDiagnostic",
+    "RegressionDiscontinuity",
+    "RegressionDiscontinuityResult",
     "did_rcs_composition_test",
     "confint",
     "fitted_values",
@@ -215,6 +219,20 @@ def test_estimator_signatures_keep_identification_inputs_explicit() -> None:
     assert nonlinear_cate.parameters["knot_counts"].default == (0, 1, 3)
     assert nonlinear_cate.parameters["include_pairwise_interactions"].default is False
     assert nonlinear_cate.parameters["max_basis_features"].default == 512
+
+    rd = inspect.signature(causekit.RegressionDiscontinuity)
+    assert rd.parameters["design"].default == "sharp"
+    assert rd.parameters["cutoff"].default == 0.0
+    assert rd.parameters["bandwidth"].default == "native_mse"
+    assert rd.parameters["polynomial_order"].default == 1
+    assert rd.parameters["bias_order"].default is None
+    assert rd.parameters["kernel"].default == "triangular"
+    assert rd.parameters["covariance"].default == "robust"
+    assert rd.parameters["mass_points"].default == "check"
+    rd_fit = inspect.signature(causekit.RegressionDiscontinuity.fit)
+    assert rd_fit.parameters["running"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert rd_fit.parameters["treatment"].default is None
+    assert rd_fit.parameters["clusters"].default is None
 
 
 def test_fit_returns_the_public_result_type() -> None:

@@ -88,6 +88,16 @@ singleton refusal. Covariate adjustment requires weighted nuisance providers thr
 FPCs, replicate weights, singleton adjustment, and survey-valid simultaneous bands remain
 outside this release.
 
+The regression-discontinuity surface adds `RegressionDiscontinuity` for a known cutoff
+under sharp deterministic assignment or binary fuzzy take-up. Separate left/right
+local-polynomial point and bias fits provide conventional and robust bias-corrected
+effects, HC1 or one-way CR1 inference, running-support and mass-point audits, a bounded
+native MSE grid, a separate boundary-density manipulation diagnostic, optional graphing,
+and OutputHub records. Fuzzy effects are local-Wald complier effects and require a
+positive treatment jump, exclusion, and monotonicity. Covariate adjustment, kink,
+multi-score/multi-cutoff, local-randomization, survey, and discrete-running-variable
+contracts remain unavailable.
+
 The causal-ML surface adds `PartiallyLinearDML` for the scalar DML2 coefficient in a
 declared constant-effect partially linear model. CauseKit owns its default standardized
 ridge-GCV nuisance learner, performs selection independently inside each outer training
@@ -123,6 +133,8 @@ The current alpha does not provide:
 - ordinary least squares as a general regression package;
 - limited-dependent-variable likelihoods;
 - panel fixed effects, dynamic-panel GMM, or panel IV;
+- covariate-adjusted, kink, geographic, multi-score, multi-cutoff, survey, or
+  discrete-running-variable RD;
 - weak-IV-robust confidence sets or a complete identification-robust testing suite;
 - heteroskedasticity-robust overidentification tests;
 - multiway clustering, general-purpose bootstrap inference, general survey designs beyond
@@ -230,7 +242,7 @@ and validation gates:
 | Matching extensions | Publication-scale sensitivity/coverage and available Python/R/Stata evidence pass; generic-score, selected-target, tie-expanded, clustered, survey, and bootstrap inference remain separately prohibited or deferred |
 | DiD promotion | Covariate-adjusted balanced-panel PT-All and stationary repeated-section paths are implemented; composition robustness passes pairwise and longer/staggered diagnostic, pointwise, and simultaneous promotion, while direct PT-All cohort ratios and survey designs retain separate gates |
 | Causal ML promotion | Implement the frozen construction-cross-fitted native orthogonal-stack contract, then harden R-/DR-learners with repeated-split and publication-scale evidence; unit-level intervals, RATE, and policy evaluation retain separate contracts |
-| Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
+| Regression-discontinuity extensions | Covariate adjustment, discrete running variables, local randomization, kink/multi-cutoff designs, official density testing, and survey inference |
 | Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |
 
 Roadmap status is not an implementation promise. A family remains experimental or absent

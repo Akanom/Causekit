@@ -312,6 +312,21 @@ future task can resume without reconstructing intent from chat history.
     `22.23` MiB Python peak. This evidence remains separate from the model-based
     multiplier-band path.
 
+28. `0.7.0a6` regression-discontinuity alpha: public `RegressionDiscontinuity`
+    implements separately declared sharp cutoff and fuzzy local-Wald complier effects with
+    separate side-specific local-polynomial point/bias fits, robust bias correction,
+    HC1/one-way CR1 score inference, deterministic bounded native-MSE bandwidth selection,
+    support/rank/mass-point/first-stage refusals, a separately labelled boundary-density
+    diagnostic, graph data, post-estimation, and OutputHub. Hand identities and refusals,
+    official Python `rdrobust` 2.0.0, R `rdrobust` 4.0.0, and reviewed Stata/IC 17
+    `rdrobust` 11.1.0 fixed-bandwidth parity pass. The Stata maximum absolute difference is
+    `2.31e-14` at tolerance `1e-8`; the reviewed output SHA-256 is
+    `29591cdf4a4ea3c4269838aafb02fec7942df8b870774c3aa221e04fbf429a0d`.
+    Hash-pinned Head Start sensitivity, 2,500 nonlinear sharp/fuzzy coverage fits with zero
+    refusals, and a 200,000-row performance certificate also pass. Covariate, discrete,
+    local-randomization, kink/multi-cutoff, official density-test, and survey RD remain
+    separately unavailable rather than being inferred from this contract.
+
 ## Open promotion gates
 
 - Matching still defaults to `inference="none"`. Known-score reuse-aware inference and a
@@ -381,9 +396,7 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
-   manipulation checks, bias correction, and local estimand.
-2. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
+1. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
    effects, and clustered covariance contracts.
 
 The stationary repeated-section survey and balanced-panel direct-ratio gates are
