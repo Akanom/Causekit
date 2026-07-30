@@ -21,7 +21,7 @@ versions may refine APIs, but breaking changes must still be documented explicit
 - A release-only PyPI Trusted Publishing workflow separates distribution construction
   from the OIDC-authorized upload, verifies that the release tag matches package
   metadata, pins every action by commit, and publishes PyPI attestations without a
-  stored API token.
+  stored API token. CI and artifact-transfer actions use their current Node 24 majors.
 - A cross-platform parity portability gate. Hash-bound Python/R/Stata generator sources
   now have explicit LF checkout rules, the saved-artifact validation suite passes with
   `core.autocrlf` enabled, and a matrix-completeness test refuses unregistered public
