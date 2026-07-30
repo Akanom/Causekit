@@ -780,6 +780,7 @@ The complete example index is in [`examples/README.md`](examples/README.md). A s
 reviewed notebook serves both Kaggle and Google Colab:
 
 - [`notebooks/kaggle/causekit_quickstart.ipynb`](notebooks/kaggle/causekit_quickstart.ipynb)
+- [Run the published notebook on Kaggle](https://www.kaggle.com/code/akanom/causekit-quickstart)
 - [Open the notebook in Google Colab](https://colab.research.google.com/github/Akanom/Causekit/blob/main/notebooks/kaggle/causekit_quickstart.ipynb)
 - [Cloud notebook publication and security guide](docs/CLOUD_NOTEBOOKS.md)
 - [Maintainer release procedure](docs/RELEASING.md)
