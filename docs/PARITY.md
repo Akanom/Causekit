@@ -24,6 +24,20 @@ Use `pass`, `fail`, `pending`, `unavailable`, or `non-comparable`. `Unavailable`
 ecosystem has no identified implementation. `Non-comparable` means an apparent analogue
 uses different estimands or moments. Neither counts as a pass.
 
+The repository-level saved-artifact gate is:
+
+```bash
+python -m pytest tests/validation
+```
+
+It validates every checked-in Python/R/Stata certificate and every promotion record
+without requiring proprietary software during CI. Live R reruns remain opt-in because
+they require the exact pinned external source checkout; Stata scripts remain manual and
+write their diagnostic output before assertions. A skipped live rerun is not relabelled
+as a new pass, but its reviewed immutable output is still checked by the saved-artifact
+gate. Generator sources are checked out with canonical LF line endings so SHA-256
+certificates are identical on Windows and Linux.
+
 ## Current matrix
 
 | CauseKit family | Python comparator | R comparator | Stata comparator | Current status |

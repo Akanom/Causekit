@@ -9,6 +9,17 @@ This document defines the validation gate and how to report it. It does **not**
 assert that the commands below have passed for the current checkout. Release notes and
 review records must state the actual execution environment and outcome.
 
+Run the complete saved Python/R/Stata evidence gate on every supported operating system:
+
+```bash
+python -m pytest tests/validation
+```
+
+The gate verifies reviewed external output, numerical tolerances, generator and input
+hashes, promotion certificates, and explicit unavailable/non-comparable boundaries. Live
+external reruns are separate opt-in checks; they must not silently replace the saved
+artifacts or turn an unavailable comparator into a parity claim.
+
 For supplied-nuisance IPW/AIPW, maintained tests must include the exact score identity,
 influence-function centering and variance identity, deterministic recovery under a known
 data-generating process, propensity-bound refusal, clipping disclosure, exact index

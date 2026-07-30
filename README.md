@@ -765,6 +765,29 @@ python -m pip install -e ".[dev]"
 
 Python 3.10 through 3.13 is supported by the package metadata.
 
+## Examples and cloud notebooks
+
+Start with the deterministic, dependency-light workflow, then move to the pinned
+real-data workflow or one of the design-specific examples:
+
+```bash
+python examples/00_quickstart.py
+python -m pip install -e ".[validation]"
+python examples/real_world_causal_workflow.py --download
+```
+
+The complete example index is in [`examples/README.md`](examples/README.md). A single
+reviewed notebook serves both Kaggle and Google Colab:
+
+- [`notebooks/kaggle/causekit_quickstart.ipynb`](notebooks/kaggle/causekit_quickstart.ipynb)
+- [Open the notebook in Google Colab](https://colab.research.google.com/github/Akanom/Causekit/blob/main/notebooks/kaggle/causekit_quickstart.ipynb)
+- [Cloud notebook publication and security guide](docs/CLOUD_NOTEBOOKS.md)
+
+The notebook downloads only registered hash-pinned public data, exercises randomized,
+observational ML, matching, conventional DiD, RD/graphing, and OutputHub paths, and keeps
+identification caveats beside the output. It is an executable example, not a replacement
+for the formal parity harness.
+
 ## Real-world workflow
 
 The runnable workflow covers IV, randomized effects, cross-fitted IPW/AIPW, matching,

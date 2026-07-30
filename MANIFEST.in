@@ -1,3 +1,4 @@
+include .gitattributes
 include CHANGELOG.md
 include CITATION.cff
 include CONTRIBUTING.md
@@ -7,5 +8,6 @@ include README.md
 include SECURITY.md
 recursive-include benchmarks *.py *.R *.do *.txt *.csv *.json
 recursive-include docs *.md
-recursive-include examples *.py
+recursive-include examples *.py *.md
+recursive-include notebooks *.ipynb *.json
 recursive-include tests *.py
