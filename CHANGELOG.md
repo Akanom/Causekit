@@ -14,6 +14,10 @@ versions may refine APIs, but breaking changes must still be documented explicit
   conventional DiD, RD graphing, and OutputHub while keeping identification boundaries
   visible. Kaggle metadata, stale-module eviction, empty-output checks, and a cloud
   publication/security guide are included.
+- The cloud install cell now consumes an exact locally built wheel, discovers Colab
+  uploads and Kaggle inputs, and enforces a three-minute installation timeout. It no
+  longer attempts an unauthenticated VCS installation from the private development
+  repository.
 - A cross-platform parity portability gate. Hash-bound Python/R/Stata generator sources
   now have explicit LF checkout rules, the saved-artifact validation suite passes with
   `core.autocrlf` enabled, and a matrix-completeness test refuses unregistered public
