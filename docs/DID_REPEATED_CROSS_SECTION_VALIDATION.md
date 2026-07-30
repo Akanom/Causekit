@@ -13,8 +13,16 @@ The focused contracts also reconstruct staggered never-treated and not-yet-treat
 effects, pooled estimated-share contributions, event/calendar/ESavg aggregation,
 anticipation, independent-cell placebos, unequal sample sizes, row permutation, and
 cluster-summed CR1 variance. Malformed roles, unsupported composition and inference,
-missing clean baselines, weak cells, invalid PSUs, covariates, and sampling weights refuse
-without row deletion or numerical repair.
+missing clean baselines, weak cells, invalid PSUs, covariates without an explicit
+`CrossFitter`, and sampling weights refuse without row deletion or numerical repair.
+
+The covariate contract in `tests/test_did_rcs_covariate.py` was also observed failing
+before implementation. Its fixed-OOF fixture has ATT `2.4875`, influence
+`[-.975, -.575, .225, 1.025, -.775, -.175, .425, .825, 0, ..., 0]`, and HC1 standard
+error `0.12706625568314087`. It reconstructs all eight normalized score components and
+ratio influence terms. Separate contracts verify both double-robustness legs, shared
+folds, row/PSU non-leakage, hard overlap refusal, conditional placebos, staggered
+never/not-yet-treated aggregation, fixed-seed reproduction, and OutputHub transport.
 
 ## Cross-language hand reference
 
@@ -33,6 +41,16 @@ that package's five-observation-per-group guard, and calls
 event, calendar, and ES-average point estimate agrees. Multiplying the R analytical
 standard errors by `sqrt(54/53)` maps its convention exactly to CauseKit observation HC1;
 the saved artifact and live comparator tests pass.
+
+Run the independent fixed-OOF covariate-score reconstruction:
+
+```bash
+Rscript benchmarks/validate_did_rcs_covariate_reference.R
+```
+
+Base R reconstructs the eight-component locally efficient repeated-cross-section score,
+ATT, full influence vector, and HC1 at `1e-12`. It validates the causal score with fixed
+out-of-fold nuisance predictions, not any particular nuisance-model implementation.
 
 Stata must be run manually from the repository root:
 
@@ -90,5 +108,23 @@ python benchmarks/benchmark_did_rcs.py --n-observations 100000 --periods 6 --mea
 
 On Python 3.14.6 / Windows 11, the 2026-07-30 run completed in `0.2551` seconds with
 `34.656` MiB Python-managed peak memory, six group-time effects, and four event-time
-effects. These figures are descriptive and environment-specific. Covariate adjustment,
-compositional-change robustness, survey weights, and simultaneous bands remain open.
+effects. These figures are descriptive and environment-specific.
+
+The covariate real-data test uses the same hash-verified 7,368 rows, `frequency` as an
+observed covariate, two whole-hospital folds, and hospital CR1 inference. It returns ESavg
+`0.8676486723638247`, standard error `0.04274270577554287`, 46 PSUs, and 60 fold/task
+diagnostic rows. The source is artificial and the affine/empirical nuisances are an
+execution contract, not evidence that the nuisance models or identifying assumptions are
+substantively correct. Composition-change robustness, survey weights, covariate
+publication-scale coverage, and simultaneous bands remain open.
+
+Reproduce the covariate large-sample path with:
+
+```bash
+python benchmarks/benchmark_did_rcs_covariate.py --n-observations 100000 --periods 6 --folds 2 --measure-memory
+```
+
+The 2026-07-30 Python 3.14.6 / Windows 11 run completed the 100,000-row, 100-fit task plan
+in `1.270` seconds with `244.743` MiB Python-managed peak memory. This is a fixed-period
+vectorization smoke with deliberately simple nuisance providers, not a learner benchmark;
+time and memory are environment-specific.

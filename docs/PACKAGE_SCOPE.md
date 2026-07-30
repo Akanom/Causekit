@@ -54,13 +54,15 @@ diagnostic compares aligned no-covariate PT-All and PT-Post event-study paths fr
 difference influence function. Efficient DiD is an opt-in stronger-assumption estimator,
 not a replacement default.
 
-The separate `RepeatedCrossSectionDiD` surface implements conventional no-covariate
-cohort-time effects under declared stationary composition. It uses four independent
-group-period means, fixed comparison membership at target and baseline, pooled
-cohort-share aggregation, cell-count audits, HC1 observation or one-way CR1 PSU
-inference, and independent-cell pre-trend placebos. It has no entity role and refuses
-covariates, sampling weights, composition-change-robust labels, and simultaneous bands in
-this first slice.
+The separate `RepeatedCrossSectionDiD` surface implements conventional no-covariate and
+opt-in cross-fitted covariate-adjusted cohort-time effects under declared stationary
+composition. The adjusted path consumes public `CrossFitter` factories for one propensity
+and four group-period outcome regressions per comparison, implements the locally efficient
+doubly robust repeated-cross-section score, and aligns conditional pre-trend placebos to
+that score. Both paths retain fixed comparison membership, pooled cohort-share
+aggregation, cell-count audits, and HC1 observation or one-way CR1 PSU inference. It has
+no entity role and still refuses sampling weights, composition-change-robust labels, and
+simultaneous bands.
 
 The causal-ML surface adds `PartiallyLinearDML` for the scalar DML2 coefficient in a
 declared constant-effect partially linear model. CauseKit owns its default standardized
@@ -201,7 +203,7 @@ and validation gates:
 | Family | Required design questions before promotion |
 | --- | --- |
 | Matching extensions | Publication-scale sensitivity/coverage and available Python/R/Stata evidence pass; generic-score, selected-target, tie-expanded, clustered, survey, and bootstrap inference remain separately prohibited or deferred |
-| DiD promotion | Implement covariate-adjusted repeated-cross-section DiD with aligned conditional pre-trends; composition robustness, survey weights, and simultaneous bands retain separate contracts |
+| DiD promotion | Covariate-adjusted repeated-cross-section DiD and aligned conditional pre-trends are implemented; composition robustness, survey weights, and simultaneous bands retain separate contracts |
 | Causal ML promotion | Implement the frozen construction-cross-fitted native orthogonal-stack contract, then harden R-/DR-learners with repeated-split and publication-scale evidence; unit-level intervals, RATE, and policy evaluation retain separate contracts |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
 | Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |

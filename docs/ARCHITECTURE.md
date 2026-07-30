@@ -241,6 +241,15 @@ requires an explicit stationary-composition declaration, and never synthesizes a
 entity. Only the generic score-covariance and joint-Wald kernels are shared with `did.py`;
 the panel validator, within-entity changes, and panel pre-trend helper are not reused.
 
+Its covariate path plans every group-time and conditional-placebo comparison together,
+then sends one propensity and four masked group-period outcome tasks per comparison through
+one public `CrossFitter` call. A single cohort-period-stratified fold vector is therefore
+shared across tasks; declared PSUs remain whole. `did_rcs.py` owns the normalized locally
+efficient doubly robust score, ratio influence contributions, overlap refusal,
+aggregation, and uncertainty. It does not own a nuisance learner, import the panel
+outcome-change machinery, clip probabilities, or expose irrelevant comparison-row
+predictions as meaningful values.
+
 No nuisance learner lives in `did.py`. The covariate-adjusted efficient path expresses
 cohort classification, group-specific outcome changes, and conditional residual products
 as public `CrossFitter` operations. `did.py` owns the causal score, equation (3.12)

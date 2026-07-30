@@ -3,13 +3,13 @@
 ## Status
 
 This document freezes the identification, data, API, inference, and validation decisions
-for repeated-cross-section DiD. The no-covariate stationary-composition first slice is now
-implemented as `RepeatedCrossSectionDiD`; it was exported only after the hand identities
-and refusal tests had been written and observed failing. Publication-scale coverage and
-available estimator-level R/Stata parity now pass. Stata aggregate standard errors remain
-non-comparable because their estimated-share influence differs. Covariate adjustment,
-composition-change robustness, and simultaneous bands remain promotion gates rather than
-implicit features.
+for repeated-cross-section DiD. The no-covariate stationary-composition slice and the
+opt-in cross-fitted covariate-adjusted slice are implemented as
+`RepeatedCrossSectionDiD`. Each was added only after its hand identities and refusal tests
+had been written and observed failing. The covariate path implements the locally efficient
+doubly robust repeated-cross-section score of Sant'Anna and Zhao (2020), not the balanced-
+panel PT-All machinery. Composition-change robustness, survey weights, and simultaneous
+bands remain separate promotion gates rather than implicit features.
 
 Repeated cross sections are not an option on the balanced-panel classes. The observations,
 influence functions, nuisance tasks, and composition assumptions differ materially from a
@@ -31,13 +31,15 @@ RepeatedCrossSectionDiD(
     anticipation=0,
     covariance="robust",
     inference="analytic",
+    nuisance_probability_floor=1e-6,
 )
 ```
 
 The implemented `fit` roles are `outcome`, `time`, and `treatment_time`, with optional
-`cluster`. `covariates` and `sampling_weights` are accepted only to return explicit
-first-slice refusals. There is no `entity` role. Supplying an entity identifier cannot
-silently turn repeated observations into a panel or change the sampling unit.
+`cluster`. Supplying `covariates` requires an explicit provider-neutral `CrossFitter` with
+fresh `propensity_factory` and `outcome_factory` products. `sampling_weights` still
+refuse. There is no `entity` role. Supplying an entity identifier cannot silently turn
+repeated observations into a panel or change the sampling unit.
 
 ## Estimand and identification
 
@@ -116,17 +118,47 @@ pair are separately contracted.
 
 ## Covariate-adjusted phase
 
-Covariate adjustment will be a second phase, after the no-covariate contract passes. It
-will consume provider-neutral nuisance factories through `CrossFitter`; no classifier or
-regression class will be copied into the DiD module. Folds will be assigned at the
-observation level or kept whole by declared cluster. Required nuisances include the
-relevant group-period probabilities and period/group outcome regressions for the chosen
-doubly robust repeated-cross-section score.
+The implemented covariate phase consumes provider-neutral nuisance factories through
+`CrossFitter`; no classifier or regression class is copied into the DiD module. A single
+global fold assignment is shared by every reported group-time and conditional-placebo
+task. Folds are stratified by observed cohort-period cell and assigned at observation
+level, or kept whole by the declared cluster. Consequently, each cohort-period cell must
+occur in every requested fold (and in enough distinct clusters for clustered fitting).
 
-Every public nuisance prediction must be out of fold. Overlap failures will refuse rather
-than clip. The score must use the repeated-cross-section efficient influence function and
-variance contribution; the panel outcome-change regression and panel PT-All conditional
-covariance machinery are not valid substitutes.
+For each fixed two-group, two-period comparison, CauseKit cross-fits:
+
+- `p(X) = P(G=g | G in {g,C(g,t)}, X)` over the pooled two periods; and
+- four outcome regressions `m(d,s,X) = E[Y | D=d,T=s,X]` for treated/comparison by
+  baseline/target period.
+
+Let `D=1` identify cohort `g`, `S=1` the target period, `w=D`, and
+`q=p(X)/(1-p(X))`. With `m0 = S*m(0,1,X) + (1-S)*m(0,0,X)`, the maintained estimate is the
+sample mean of the eight normalized components
+
+```text
+ D*S*(Y-m0) / E[D*S]
+-D*(1-S)*(Y-m0) / E[D*(1-S)]
+-q*(1-D)*S*(Y-m0) / E[q*(1-D)*S]
++q*(1-D)*(1-S)*(Y-m0) / E[q*(1-D)*(1-S)]
++D*(m(1,1,X)-m(0,1,X)) / E[D]
+-D*S*(m(1,1,X)-m(0,1,X)) / E[D*S]
+-D*(m(1,0,X)-m(0,0,X)) / E[D]
++D*(1-S)*(m(1,0,X)-m(0,0,X)) / E[D*(1-S)].
+```
+
+Every ratio contributes its centered numerator/denominator influence term. The pair score
+is rescaled back to the full observation sample before group/event/calendar/ESavg
+aggregation and HC1/CR1 inference. Orthogonality plus cross-fitting removes first-order
+nuisance-estimation terms; this is not a claim of exact finite-sample covariance parity
+with a particular parametric nuisance fit.
+
+Every relevant public nuisance prediction is out of fold; irrelevant comparison rows are
+stored as missing rather than presented as meaningful extrapolations. Probabilities at or
+beyond the declared floor refuse. CauseKit does not clip probabilities, trim rows, repair
+denominators, or silently change the estimand. Adjacent pre-treatment placebos use the
+same five cross-fitted nuisances and eight-component score, so the diagnostic tests the
+declared conditional parallel-trends restriction rather than an inconsistent marginal
+one. Failure to reject remains non-confirmatory.
 
 ## Refusals
 
@@ -143,7 +175,7 @@ ridge, pseudoinverse, or generic bootstrap will be introduced merely to produce 
 ## Validation and promotion gates
 
 The validation sequence started with tests that failed before estimator code existed.
-Current first-slice status is:
+Current promotion status is:
 
 1. The hand-computed two-period 2-by-2 ATT, full observation influence, and HC1 identity
    pass in Python, an independent base-R 4.5.1 reconstruction, and a reviewed Stata 17
@@ -164,6 +196,15 @@ Current first-slice status is:
    `did::att_gt(panel = FALSE)` passes for both control rules after the explicit HC0-to-HC1
    mapping. Reviewed Stata `csdid` matches group-time estimates/SEs and aggregate points;
    aggregate SEs remain explicitly non-comparable. Unavailable cells must stay explicit.
+7. The covariate hand contract reproduces all eight normalized score components, the full
+   influence vector, and HC1 in Python and an independent base-R reconstruction. Tests
+   verify both double-robustness legs, no row/PSU leakage, hard overlap refusal, shared
+   folds, conditional placebos, and never/not-yet-treated staggered aggregation.
+8. A seeded 40-replication conditional-score smoke checks bias and HC1 coverage. The
+   hash-verified 7,368-row `hospdd` application exercises two-fold PSU-preserving fitting,
+   60 fold/task audit rows, conditional placebos, and a real observed covariate. The source
+   labels these data artificial, so this remains execution evidence rather than a
+   substantive causal result.
 
 ## Alternatives considered
 
@@ -171,8 +212,9 @@ Current first-slice status is:
   sampling-unit and influence-function contracts behind one deceptively small switch.
 - Treating synthetic entity IDs as a panel was rejected because it creates invalid
   within-entity changes and uncertainty.
-- Implementing the covariate doubly robust score first was rejected because the simpler
-  cell-mean identities are needed to validate the data and aggregation layer independently.
+- Implementing the covariate doubly robust score before the no-covariate slice was rejected
+  because the simpler cell-mean identities were needed to validate the data and
+  aggregation layer independently. The covariate score now reuses that promoted layer.
 - Assuming away compositional changes without an explicit result field was rejected. The
   first slice may impose stationarity, but it must say so at construction and in output.
 

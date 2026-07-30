@@ -419,11 +419,13 @@ promotion gates.
 
 ### Repeated-cross-section difference-in-differences
 
-`RepeatedCrossSectionDiD` is a separate observation-level estimator. It compares four
-independent cohort-period cell means, holds the eligible comparison-cohort rule fixed at
-the target and baseline periods, and permits unequal period and cell sizes. The first
-slice requires `composition="stationary"`, no covariates or sampling weights, and either
-HC1 observation inference or one-way CR1 inference at a declared PSU.
+`RepeatedCrossSectionDiD` is a separate observation-level estimator. Without covariates it
+compares four independent cohort-period cell means. With covariates it uses the locally
+efficient doubly robust repeated-cross-section score with one propensity and four group-
+period outcome regressions per comparison. Both paths hold the eligible comparison rule
+fixed at target and baseline and permit unequal period and cell sizes. The current surface
+requires `composition="stationary"`, no sampling weights, and either HC1 observation
+inference or one-way CR1 inference at a declared PSU.
 
 ```python
 from causekit import RepeatedCrossSectionDiD
@@ -446,11 +448,41 @@ print(repeated.event_study)
 print(repeated.pretrend.placebo_effects)
 ```
 
+Covariate adjustment is explicit and provider-neutral. Each factory must return a fresh
+fit-capable model; propensity results expose `predict_proba`, outcome results expose
+`predict`, and custom adapters can be configured on `CrossFitter`.
+
+```python
+from causekit import CrossFitter, RepeatedCrossSectionDiD
+
+cross_fitter = CrossFitter(
+    propensity_factory=propensity_factory,
+    outcome_factory=outcome_factory,
+    n_splits=5,
+    random_state=20260730,
+)
+
+adjusted = RepeatedCrossSectionDiD(covariance="clustered").fit(
+    repeated_samples,
+    outcome="outcome",
+    time="period",
+    treatment_time="first_treated",
+    cluster="sampling_psu",
+    covariates=["baseline_risk", "age"],
+    cross_fitter=cross_fitter,
+)
+
+print(adjusted.group_time)
+print(adjusted.pretrend.placebo_effects)  # the aligned conditional score
+print(adjusted.nuisance_diagnostics)      # task-by-fold audit; no refitting
+```
+
 There is intentionally no `entity=` role and no `panel=False` switch. Every result records
 that stationary composition is an identifying assumption rather than a verified
-diagnostic. Pre-trend placebos use independent adjacent cells; failure to reject proves
-neither parallel trends nor stable composition. Simultaneous bands, survey weights,
-composition-change-robust scores, and covariate adjustment remain separate gates. See the
+diagnostic. Adjusted placebos use the same cross-fitted conditional score as the reported
+effects; failure to reject proves neither parallel trends nor stable composition. Strict
+overlap failures refuse without clipping or dropping rows. Simultaneous bands, survey
+weights, and composition-change-robust scores remain separate gates. See the
 [repeated-cross-section contract](docs/DID_REPEATED_CROSS_SECTION_CONTRACT.md).
 
 There is no formula API yet. Prepare numeric arrays, `Series`, or `DataFrame` objects

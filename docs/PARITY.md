@@ -36,6 +36,7 @@ uses different estimands or moments. Neither counts as a pass.
 | `NearestNeighborMatch` estimated-Logit ATT/ATC/ATE | hand formulas and independent `statsmodels.Logit` pass | `Matching` conditions on supplied scores: non-comparable | Stata/IC 17 `teffects psmatch` fixture passes | pass for available estimand-aligned comparators |
 | Conventional staggered DiD | hand/influence identities pass | real hospital group-time/influence contract passes | Stata/IC 17 same group-time/influence contract passes; `didregress` common-effect aggregation is non-comparable | pass for aligned contract |
 | Repeated-cross-section DiD, stationary composition | hand, aggregation, HC1/CR1, and 32-cell publication coverage contracts pass | pinned `did` 2.5.0 `att_gt(panel = FALSE, est_method = "reg")` passes both control rules after explicit HC0-to-HC1 mapping | reviewed Stata/IC 17 `csdid` matches group-time estimates/SEs and aggregate points; aggregate SEs use non-comparable cell-share influence | pass for available aligned fields |
+| Repeated-cross-section DiD, covariate adjusted | hand score/influence, leakage, double-robustness, simulation, and hash-verified real-data contracts pass | fixed-OOF base-R score/HC1 reconstruction passes; estimator-level implementation unavailable | reviewed estimators target different moments: unavailable | score parity passes; estimator-level external unavailable |
 | Efficient DiD, no covariates | native result checked on fixture and real data | pinned public `edid` commit passes fixture and real hospital data | unavailable: Stata heterogeneous DiD does not implement PT-All optimal weighting | pass for available aligned comparator |
 | Efficient DiD, covariate adjusted | deterministic equation, refusal, and simulation evidence pass | unavailable: pinned public `edid` explicitly excludes covariates | unavailable: no identified Chen–Sant'Anna–Xie PT-All implementation | internal validation; external unavailable |
 | `PartiallyLinearDML` residual stage | hand score plus independent Statsmodels HC1 pass | base R 4.5.1 matrix/HC1 contract passes | reviewed Stata/IC 17 no-intercept HC1 contract passes | pass |
@@ -107,6 +108,15 @@ difference is zero. Aggregate SEs are non-comparable because `csdid` propagates 
 specific cell-share influence while CauseKit/R use pooled cohort-share influence. The
 saved output SHA-256 is
 `ad250fa9cdfd042e1989460ebcec6b1bac57ed301fae390f2c69331ccf47fd57`.
+
+The covariate repeated-cross-section fixed-OOF harness is
+`benchmarks/validate_did_rcs_covariate_reference.R`. Independent base R reconstructs all
+eight normalized Sant'Anna-Zhao locally efficient score components, the ratio influence
+terms, ATT, and CauseKit HC1 mapping at `1e-12`. This is score-level evidence under fixed
+OOF nuisance predictions, not estimator-level equivalence to a particular classifier or
+regressor. The audited pinned `did` path does not offer this covariate score, and reviewed
+Stata repeated-cross-section estimators target different maintained moments, so those
+estimator-level cells remain explicitly unavailable rather than labelled passing.
 
 The fixed-score matching R harness is `benchmarks/validate_matching_reference.R`. It
 pins CRAN `Matching` commit `1208eaa7bfa888b1fc903481dddfb8c0dffa40d5`

@@ -289,15 +289,17 @@ against the additional PT-All restrictions; non-rejection does not prove them or
 mechanical estimator selection.
 
 Neither panel class has a repeated-cross-section interpretation. The separate
-`RepeatedCrossSectionDiD` first slice targets the same cohort-time ATT logic using four
-independently sampled means: treated target minus treated baseline, less fixed-comparison
-target minus fixed-comparison baseline. It requires stationary composition of the
-relevant cohort populations across samples, enough observations in every used cell, and
-the same consistency, no-interference, overlap, no-anticipation, and repeated-cross-
-section parallel-trends conditions. Stationarity is recorded as an assumption, not
-inferred from cell counts or a pre-trend test. Observation-level HC1 or declared-PSU CR1
-scores replace entity-level panel changes. Composition-change-robust and covariate-
-adjusted scores are not approximated by the no-covariate estimator.
+`RepeatedCrossSectionDiD` surface targets cohort-time ATT from independent period samples.
+Its unadjusted path uses treated target minus treated baseline, less fixed-comparison target
+minus fixed-comparison baseline. Its adjusted path replaces those marginal means with the
+cross-fitted locally efficient doubly robust repeated-cross-section score and tests
+pre-trends with the aligned conditional score. Both require stationary composition of the
+relevant cohort populations, enough support in every used cell, consistency, no
+interference, overlap, no anticipation, and the declared marginal or conditional parallel-
+trends restriction. Stationarity is recorded as an assumption, not inferred from cell
+counts, nuisance fit, or a pre-trend test. Observation-level HC1 or declared-PSU CR1 scores
+replace entity-level panel changes. Composition-change robustness is not approximated by
+either stationary-composition path.
 
 ## Honest heterogeneous effects
 

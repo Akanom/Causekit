@@ -141,6 +141,11 @@ def to_outputhub_model(
                 "Event-time effects": len(result.event_study),
                 "Pre-trend restrictions": result.pretrend.n_restrictions,
                 **(
+                    {"Nuisance fold fits": len(result.nuisance_diagnostics)}
+                    if result.cross_fitted
+                    else {}
+                ),
+                **(
                     {
                         "Pre-trend joint statistic": result.pretrend.statistic,
                         "Pre-trend joint p-value": result.pretrend.pvalue,
@@ -165,6 +170,9 @@ def to_outputhub_model(
                 "n_clusters": result.n_clusters,
                 "covariates": list(result.covariates),
                 "nuisance_cross_fitted": result.cross_fitted,
+                "nuisance_n_splits": result.n_splits,
+                "nuisance_probability_floor": result.nuisance_probability_floor,
+                "conditional_pretrend": result.pretrend.conditional,
                 "pretrend_available": result.pretrend.available,
                 "pretrend_unavailable_reason": result.pretrend.reason,
                 "causal_interpretation_requires_assumptions": True,
@@ -672,6 +680,20 @@ def add_to_outputhub(
         )
     elif isinstance(result, RepeatedCrossSectionDiDResult) and hasattr(hub, "add_table"):
         table_metadata = {"source": "causekit", "estimator": result.method}
+        if result.cross_fitted:
+            hub.add_table(
+                f"{model_name} nuisance fitting diagnostics",
+                result.nuisance_diagnostics.copy(),
+                caption=(
+                    "Provider-neutral fold-local fits for the propensity and four "
+                    "group-period outcome regressions; every reported prediction is out of fold."
+                ),
+                metadata={
+                    **table_metadata,
+                    "n_splits": result.n_splits,
+                    "probability_floor": result.nuisance_probability_floor,
+                },
+            )
         if not result.pretrend.placebo_effects.empty:
             hub.add_table(
                 f"{model_name} pre-trend placebos",
@@ -696,7 +718,12 @@ def add_to_outputhub(
         hub.add_table(
             f"{model_name} group-time effects",
             result.group_time.reset_index(),
-            caption="Four-cell cohort-time effects with pointwise observation/PSU inference.",
+            caption=(
+                "Cross-fitted locally efficient doubly robust cohort-time effects with "
+                "pointwise observation/PSU inference."
+                if result.cross_fitted
+                else "Four-cell cohort-time effects with pointwise observation/PSU inference."
+            ),
             metadata=table_metadata,
         )
         hub.add_table(

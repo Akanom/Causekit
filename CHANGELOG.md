@@ -32,6 +32,15 @@ versions may refine APIs, but breaking changes must still be documented explicit
   Stata/IC 17 `csdid` artifact exactly matches all 16 point estimates and six group-time
   analytical standard errors; aggregate SEs are recorded as non-comparable because
   `csdid` propagates period-specific cell-share rather than pooled cohort-share influence.
+- Opt-in covariate-adjusted repeated-cross-section DiD through the public `CrossFitter`
+  boundary. The path cross-fits one comparison propensity and four group-period outcome
+  regressions on shared observation/whole-PSU folds, implements the normalized locally
+  efficient doubly robust score, refuses overlap violations without clipping, and exposes
+  nuisance predictions, folds, task diagnostics, and aligned conditional pre-trends.
+- Failing-first hand score/influence, leakage, overlap, conditional-pretrend, and refusal
+  contracts; both double-robustness legs; staggered aggregation identities; seeded
+  simulation; fixed-OOF base-R parity; OutputHub diagnostics; and a hash-verified 7,368-row
+  real-data/PSU execution smoke.
 
 ### Changed
 
@@ -43,9 +52,10 @@ versions may refine APIs, but breaking changes must still be documented explicit
 
 ### Known limitations
 
-- Stationary composition is declared but not testable from the estimator. Covariate-
-  adjusted doubly robust scores, compositional-change-robust estimation, sampling or
-  survey weights, and simultaneous event-study bands remain unimplemented and refuse.
+- Stationary composition is declared but not testable from the estimator.
+  Compositional-change-robust estimation, sampling or survey weights, and simultaneous
+  event-study bands remain unimplemented and refuse. Covariate estimator-level parity is
+  unavailable where reviewed R/Stata public paths target different moments.
 - Stata `csdid` aggregate standard errors are non-comparable to the maintained pooled-
   cohort-share uncertainty contract. Observation/PSU simultaneous bands remain separately
   unimplemented.

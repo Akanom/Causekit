@@ -80,6 +80,14 @@ def test_hand_computed_two_by_two_att_and_observation_influence() -> None:
     assert result.inference_distribution == "normal"
     assert result.sampling_unit == "observation"
     assert result.composition == "stationary"
+    assert result.cross_fitted is False
+    assert result.covariates == ()
+    assert result.nuisance_predictions.empty
+    assert result.nuisance_fold.empty
+    assert result.nuisance_diagnostics.empty
+    assert result.n_splits is None
+    assert result.nuisance_probability_floor is None
+    assert result.pretrend.conditional is False
     assert result.nobs == len(data)
     assert result.n_periods == 2
     assert result.cell_counts["nobs"].to_dict() == {
@@ -259,7 +267,7 @@ def test_fit_refuses_malformed_roles_and_unsupported_cells(mutate, message: str)
         _fit(mutate(_two_by_two()))
 
 
-def test_fit_refuses_sampling_weights_and_covariates() -> None:
+def test_fit_refuses_sampling_weights_and_covariates_without_cross_fitter() -> None:
     data = _two_by_two().assign(weight=1.0, baseline=np.arange(8.0))
     estimator = RepeatedCrossSectionDiD()
 
@@ -271,7 +279,7 @@ def test_fit_refuses_sampling_weights_and_covariates() -> None:
             treatment_time="treatment_time",
             sampling_weights="weight",
         )
-    with pytest.raises(NotImplementedError, match="covariate-adjusted"):
+    with pytest.raises(ValueError, match="cross_fitter is required"):
         estimator.fit(
             data,
             outcome="outcome",

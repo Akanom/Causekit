@@ -161,9 +161,11 @@ def test_estimator_signatures_keep_identification_inputs_explicit() -> None:
     assert repeated_cross_section_did.parameters["anticipation"].default == 0
     assert repeated_cross_section_did.parameters["covariance"].default == "robust"
     assert repeated_cross_section_did.parameters["inference"].default == "analytic"
+    assert repeated_cross_section_did.parameters["nuisance_probability_floor"].default == 1e-6
     repeated_cross_section_fit = inspect.signature(causekit.RepeatedCrossSectionDiD.fit)
     assert "entity" not in repeated_cross_section_fit.parameters
     assert "panel" not in repeated_cross_section_fit.parameters
+    assert repeated_cross_section_fit.parameters["cross_fitter"].default is None
 
     partially_linear_dml = inspect.signature(causekit.PartiallyLinearDML)
     assert partially_linear_dml.parameters["outcome_factory"].default is None

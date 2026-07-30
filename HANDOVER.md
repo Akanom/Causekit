@@ -201,6 +201,21 @@ future task can resume without reconstructing intent from chat history.
     shares. Covariates, compositional-change robustness, survey weights, and simultaneous
     bands remain open.
 
+21. `0.7.0a6` covariate repeated-cross-section DiD promotion: the same separate public
+    surface now accepts covariates only with an explicit provider-neutral `CrossFitter`.
+    One propensity and four group-period outcome regressions are fitted out of fold on a
+    shared cohort-period-stratified observation/whole-PSU split for every group-time and
+    conditional-placebo comparison. The normalized eight-component Sant'Anna-Zhao locally
+    efficient score, ratio influence terms, pooled-share aggregation, HC1/CR1 inference,
+    strict overlap refusal, diagnostics, and OutputHub are integrated. Hand tests were
+    observed failing first. Both double-robustness legs, row/PSU leakage, staggered
+    never/not-yet-treated identities, conditional pre-trends, seeded reproducibility, a
+    40-replication bias/coverage smoke, independent base-R score parity, and a hash-
+    verified 7,368-row hospital/PSU covariate smoke pass. A separate 100,000-row,
+    six-period, 100-fit benchmark completes in 1.270 seconds with 244.743 MiB Python-
+    managed peak memory on the recorded environment. The hospital source is artificial
+    and is execution evidence, not a substantive causal result.
+
 ## Open promotion gates
 
 - Matching still defaults to `inference="none"`. Known-score reuse-aware inference and a
@@ -213,13 +228,13 @@ future task can resume without reconstructing intent from chat history.
 - Efficient DiD owns no nuisance model classes. The implemented covariate path must keep
   consuming public cross-fitting factories; direct density-ratio regression remains a
   possible future stability enhancement over ratios of multiclass probabilities.
-- Repeated-cross-section DiD's no-covariate stationary-composition implementation is
-  public. Publication-scale coverage and available estimator-level R `did`/Stata `csdid`
-  parity pass, with Stata aggregate SEs recorded as non-comparable. Observation/PSU
-  multiplier bands, compositional-change robustness, and the covariate-adjusted path with
-  an aligned conditional pre-trend diagnostic remain open. Covariate-efficient external
-  parity was audited: the pinned public R implementation has no covariate path and reviewed
-  Stata estimators target different moments, so those cells remain explicitly unavailable.
+- Repeated-cross-section DiD's no-covariate and explicit CrossFitter covariate-adjusted
+  stationary-composition paths are public. Publication-scale no-covariate coverage and
+  available estimator-level R `did`/Stata `csdid` parity pass, with Stata aggregate SEs
+  recorded as non-comparable. The covariate score has independent fixed-OOF base-R parity;
+  pinned R/Stata estimator-level cells remain unavailable because their maintained public
+  paths do not implement the same score. Observation/PSU multiplier bands,
+  compositional-change robustness, and survey weights remain open.
 - The R-learner alpha is public with honest evaluation, calibration, groups, bands, graph
   data, simulations, base-R/Stata parity, performance, native nonlinear support, and two
   real-data CATE records. The next native nonlinear stage is frozen as a separate
