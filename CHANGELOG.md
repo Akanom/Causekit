@@ -8,6 +8,17 @@ versions may refine APIs, but breaking changes must still be documented explicit
 
 ### Added
 
+- A tested offline quickstart, indexed design-specific example guide, and one shared
+  Kaggle/Google Colab notebook. The cloud workflow uses three hash-pinned real datasets,
+  native DML and honest nonlinear R-learning, point-only estimated-score matching,
+  conventional DiD, RD graphing, and OutputHub while keeping identification boundaries
+  visible. Kaggle metadata, stale-module eviction, empty-output checks, and a cloud
+  publication/security guide are included.
+- A cross-platform parity portability gate. Hash-bound Python/R/Stata generator sources
+  now have explicit LF checkout rules, the saved-artifact validation suite passes with
+  `core.autocrlf` enabled, and a matrix-completeness test refuses unregistered public
+  estimator families or unresolved `pending` rows.
+
 - Public `PanelIV2SLS` and immutable result for static entity-fixed-effects 2SLS with
   optional time effects. The compact path handles balanced panels exactly and connected
   unbalanced panels through deterministic alternating projections, refuses absorbed or

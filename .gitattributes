@@ -1,3 +1,9 @@
 # Reviewed parity outputs are byte-pinned artifacts. Preserve the exact line endings
 # written by the originating R or Stata run so SHA-256 certificates survive checkout.
 benchmarks/validate_*_output.txt -text -diff
+
+# Promotion certificates hash their generator source. Force a platform-independent
+# working-tree representation so those hashes remain valid with core.autocrlf enabled.
+benchmarks/*.py text eol=lf
+benchmarks/*.R text eol=lf
+benchmarks/*.do text eol=lf
