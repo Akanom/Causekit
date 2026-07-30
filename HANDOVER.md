@@ -263,9 +263,15 @@ future task can resume without reconstructing intent from chat history.
     influence-coordinate comparisons pass at pinned commit
     `894bd65a952c30f01a4e0005efba4cb335065eb7`; the relevant R source blobs, nuisance
     column mappings, fixture, and saved output are pinned and audited.
-    Staggered aggregation, longer-design conditional pre-trends, the composition
-    diagnostic, real-data sensitivity, performance, publication-scale coverage, and
-    survey combinations remain open.
+    Hash-pinned Sequeira robust/stationary sensitivity, the 100,000-row eight-task
+    performance gate, and eight observation/PSU publication-scale coverage cells now
+    pass. The certificate records 8,000 estimator fits, 72,000 fold-level nuisance fits,
+    zero refusals, stationary efficiency costs, and the analytical shift bias. Staggered
+    aggregation, longer-design conditional pre-trends/bands, the composition diagnostic,
+    and survey combinations remain open.
+    The repaired project-scoped `python -m pip_audit .` now completes and reports no
+    known vulnerabilities; the broader host environment separately flags Pillow and
+    Starlette versions that are not CauseKit project dependencies.
 
 ## Open promotion gates
 
@@ -288,10 +294,11 @@ future task can resume without reconstructing intent from chat history.
   pinned R/Stata estimator-level cells remain unavailable because their maintained public
   paths do not implement the same score. Observation/PSU multiplier mechanics and the
   16-cell publication-scale joint-band certificate pass. The narrow pairwise composition-
-  robust score passes its hand/refusal contracts and official R `compdid` point/influence
-  parity. Its staggered, diagnostic, real-data, performance, and publication-scale gates
-  remain open. Survey designs remain a separate design-only contract and continue to
-  refuse.
+  robust score passes its hand/refusal contracts, official R `compdid` point/influence
+  parity, hash-pinned real-data sensitivity, fixed-size performance, and pairwise
+  publication-scale pointwise coverage. Its staggered, diagnostic, and longer-design
+  simultaneous gates remain open. Survey designs remain a separate design-only contract
+  and continue to refuse.
 - The R-learner alpha is public with honest evaluation, calibration, groups, bands, graph
   data, simulations, base-R/Stata parity, performance, native nonlinear support, and two
   real-data CATE records. The next native nonlinear stage is frozen as a separate
@@ -329,11 +336,11 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Promote the implemented pairwise [composition-change](docs/DID_RCS_COMPOSITION_CHANGE_CONTRACT.md)
-   score through hash-pinned real-data sensitivity, performance, and preregistered
-   coverage before adding its diagnostic or staggered wrapper. Official `compdid`
-   point/influence parity, composition-shift recovery, stationary-target contrast, exact
-   class schemas, and row/labelled-column permutation gates now pass. Keep the separate
+1. Extend the promoted pairwise [composition-change](docs/DID_RCS_COMPOSITION_CHANGE_CONTRACT.md)
+   score only through separately contracted diagnostics and longer/staggered designs.
+   Official `compdid` parity, real-data sensitivity, performance, and pairwise
+   publication-scale coverage now pass; do not rerun them for an unrelated extension.
+   Keep the separate
    [survey-design](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md) contract design-only until that
    base evidence is complete. The balanced-panel
    [direct-ratio](docs/DID_DIRECT_RATIO_CONTRACT.md) nuisance is a separate PT-All option;

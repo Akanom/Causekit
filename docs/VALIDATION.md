@@ -114,6 +114,12 @@ verifies the relevant Git blobs, explicitly maps `(00,01,10,11)` CauseKit nuisan
 columns into `(11,10,01,00)`, and compares ATT, the HC1-equivalent standard error, and
 every ordered influence coordinate. Stata remains unavailable for this exact treated-
 target-period moment rather than being represented by a non-aligned command.
+Its separate pairwise promotion evidence verifies the official Sequeira source hash and
+derived analysis hash, fits all nuisances within five whole-PSU folds, records robust and
+stationary sensitivity jointly, passes a 100,000-row performance gate, and completes
+8,000 publication-scale estimator fits plus 72,000 nuisance fold fits with zero refusals.
+All eight observation/PSU pointwise coverage cells pass. Longer robust event-study bands,
+the composition diagnostic, and staggered aggregation remain separate gates.
 
 The repeated-section covariate path additionally reconstructs its normalized eight-term
 score and ratio influence, requires a shared observation/whole-PSU fold assignment, and

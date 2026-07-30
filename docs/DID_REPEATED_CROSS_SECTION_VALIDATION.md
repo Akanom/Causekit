@@ -220,10 +220,11 @@ observed covariate, two whole-hospital folds, and hospital CR1 inference. It ret
 `0.8676486723638247`, standard error `0.04274270577554287`, 46 PSUs, and 60 fold/task
 diagnostic rows. The source is artificial and the affine/empirical nuisances are an
 execution contract, not evidence that the nuisance models or identifying assumptions are
-substantively correct. The narrow pairwise composition-robust path has hand-contract and
-official R `compdid` point/influence evidence; real-data sensitivity, performance,
-publication-scale coverage, staggered composition robustness, its aligned diagnostic,
-and survey weights remain open. Covariate stationary-composition publication-scale
+substantively correct. The narrow pairwise composition-robust path has hand-contract,
+official R `compdid` point/influence evidence, hash-pinned real-data sensitivity,
+fixed-size performance, and eight-cell observation/PSU publication-scale coverage.
+Staggered composition robustness, longer robust bands, its aligned diagnostic, and
+survey weights remain open. Covariate stationary-composition publication-scale
 pointwise and simultaneous
 joint-coverage evidence is promoted separately above.
 

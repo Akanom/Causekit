@@ -1,0 +1,30 @@
+{
+  "causekit_version": "0.7.0a6",
+  "cell_counts": [
+    25000,
+    25000,
+    25000,
+    25000
+  ],
+  "elapsed_gate_seconds": 10.0,
+  "elapsed_seconds": 0.22863649999635527,
+  "estimate": 4.177158127761248,
+  "finite": true,
+  "generated_at_utc": "2026-07-30T09:04:42.225130+00:00",
+  "generator": "benchmarks/benchmark_did_rcs_composition.py",
+  "generator_sha256": "4dc96f0080f7b408fef5d25f8ffd98d8e3ae48c82927a6295f1a38328f8e0616",
+  "maximum_probability": 0.2512230331221429,
+  "minimum_probability": 0.2487830181150746,
+  "n_observations": 100000,
+  "n_splits": 2,
+  "nuisance_task_fits": 8,
+  "overlap": true,
+  "peak_python_mib": 44.245455741882324,
+  "peak_python_mib_gate": 512.0,
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.6",
+  "schema_version": 1,
+  "seed": 20260730,
+  "standard_error": 0.01740647520038585,
+  "status": "pass"
+}

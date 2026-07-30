@@ -191,29 +191,38 @@ absolute tolerance `2e-14`. The official API's required `m11` column cancels alg
 between its target residual and regression contrast, matching CauseKit's deliberate
 three-outcome-nuisance execution path.
 
-## Remaining promotion sequence
+The pairwise promotion gates now also pass. The hash-pinned Sequeira sensitivity reports
+robust and stationary estimates together under five whole-PSU folds; it deliberately
+shows material nuisance-and-target sensitivity rather than claiming reproduction of the
+paper's different local-polynomial contract. The 100,000-row benchmark completes the
+eight-fit nonlinear task graph without a quadratic observation matrix. The fixed-seed
+publication certificate completes 8,000 estimator fits and 72,000 fold-level nuisance
+fits with zero refusals; all eight bias, SE-calibration, and pointwise-coverage cells pass.
+See [the full promotion evidence](DID_RCS_COMPOSITION_PROMOTION_EVIDENCE.md).
 
-Promotion beyond the implemented pairwise evidence still requires:
+## Remaining extension sequence
+
+The base pairwise pointwise-inference gates are complete. Extensions still require:
 
 1. hand-computed scalar and vector composition diagnostics, including singular and
    misaligned-input refusals;
 2. conditional pre-trends for longer designs and fixed-seed max-t identities using robust
    influence records without nuisance refitting; and
-3. staggered group-time aggregation only after the pairwise evidence below passes.
+3. staggered group-time aggregation only after the diagnostic and longer-design score
+   have independent hand and coverage contracts.
 
-Promotion requires separate favorable-stationarity and composition-change simulations,
-including nonlinear nuisances and unequal period sizes. Preregistered cells must cover
-bias, empirical/analytical SE calibration, pointwise and simultaneous coverage,
-composition-test size and power, overlap, support, audit counts, zero silent fallbacks,
-runtime, and peak memory. Efficiency loss under true stationarity must be reported rather
-than hidden.
+The completed base simulations cover favorable stationarity and composition change,
+nonlinear fitted nuisances, unequal cell probabilities, observation/PSU inference, bias,
+SE calibration, pointwise coverage, overlap, audit counts, zero fallbacks, runtime, and
+peak memory. They report the efficiency loss under true stationarity. Simultaneous robust
+event-study coverage and diagnostic size/power remain longer-design extension gates.
 
 The primary external comparator is the authors' official R `compdid` implementation.
 Its pinned point/influence gate and subsequent standard-error comparison now pass through
 `benchmarks/validate_did_rcs_compdid_reference.R`; the saved artifact is validated in
 `tests/validation/test_did_rcs_compdid_parity.py`. Stata is recorded unavailable unless a
-reviewed command targets the same post-period treated ATT and influence moment. A hash-
-pinned real-data sensitivity example must report robust and stationary estimates together
+reviewed command targets the same post-period treated ATT and influence moment. The hash-
+pinned real-data sensitivity example reports robust and stationary estimates together
 without pretest-based selection.
 
 Staggered group-time aggregation becomes a later promotion gate after the pairwise score

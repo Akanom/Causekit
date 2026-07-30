@@ -519,6 +519,10 @@ The exact point estimate, HC1-equivalent standard error, and all 16 influence co
 also match the official R `compdid` 0.1.0 `drdid_nonstationary()` source at pinned commit
 `894bd65a952c30f01a4e0005efba4cb335065eb7`. Reproduce that source-level comparator with
 `Rscript benchmarks/validate_did_rcs_compdid_reference.R PATH_TO_COMPDID_CHECKOUT`.
+The separate [promotion evidence](docs/DID_RCS_COMPOSITION_PROMOTION_EVIDENCE.md) records
+the hash-pinned Sequeira robust/stationary sensitivity, a 100,000-row performance gate,
+and eight passing publication-scale pointwise-coverage cells across observation and PSU
+inference. These runs do not select between targets after inspecting the data.
 
 There is intentionally no `entity=` role and no `panel=False` switch. Every result records
 that stationary composition is an identifying assumption rather than a verified
@@ -828,8 +832,9 @@ cross-fitted covariate paths. The next stages are now separately frozen as desig
 contracts for [composition-change robustness](docs/DID_RCS_COMPOSITION_CHANGE_CONTRACT.md)
 and [survey designs](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md). The balanced-panel PT-All
 path separately freezes [direct cohort-ratio nuisances](docs/DID_DIRECT_RATIO_CONTRACT.md).
-The composition contract now has an implemented pairwise first slice; its staggered and
-diagnostic gates remain open. The direct-ratio and survey contracts add no placeholder API,
+The composition contract now has a promoted pairwise pointwise-inference slice; its
+staggered, longer-design simultaneous, and diagnostic gates remain open. The direct-ratio
+and survey contracts add no placeholder API,
 and raw survey weights still refuse.
 The causal-ML alpha includes native partially linear DML and separately contracted public
 [honest R-learner](docs/R_LEARNER_CONTRACT.md) and

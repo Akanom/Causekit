@@ -79,6 +79,18 @@ versions may refine APIs, but breaking changes must still be documented explicit
   `894bd65a952c30f01a4e0005efba4cb335065eb7`. The harness verifies the relevant Git blob
   IDs, explicitly maps CauseKit `(00,01,10,11)` nuisances to R `(11,10,01,00)`, records
   why the unused `m11` algebraically cancels, and hash-binds the fixture and saved output.
+- Hash-pinned Sequeira real-data sensitivity under five immutable HS-code folds. The
+  benchmark reports robust and stationary targets together for four outcomes, audits 20
+  and 25 nuisance fold fits per result, and retains overlap/weight diagnostics. It does
+  not claim numerical parity with the paper's different local-polynomial contract or use
+  the comparison for pretest selection.
+- A 100,000-row composition-robust performance certificate and a fixed-seed 1,000-
+  replication-per-cell promotion certificate. The latter completes 8,000 estimator fits
+  and 72,000 fold-local nonlinear nuisance fits across favorable stationarity,
+  composition shift, observation inference, and indivisible-PSU inference with zero
+  refusals. All eight bias, SE-calibration, and pointwise-coverage cells pass; the record
+  separately quantifies stationary efficiency and stationary-score target bias under
+  shift.
 - Design-only contracts remain for calibrated direct pairwise cohort odds in balanced-
   panel PT-All, the composition diagnostic and staggered composition-robust extension,
   and repeated-section survey-design/population targets. Unsupported combinations keep
@@ -103,8 +115,9 @@ versions may refine APIs, but breaking changes must still be documented explicit
 - Stationary composition is declared but not testable from the estimator. Composition-
   robust estimation is currently restricted to a covariate-adjusted two-period design
   with one treated cohort; staggered aggregation, longer-design pre-trends, the aligned
-  composition diagnostic, real-data sensitivity, performance, and publication-scale
-  coverage remain open. Sampling or survey weights remain unimplemented and refuse.
+  composition diagnostic, and longer-design simultaneous coverage remain open. Pairwise
+  real-data sensitivity, performance, and pointwise coverage now pass. Sampling or survey
+  weights remain unimplemented and refuse.
   Direct cohort-ratio nuisances are also design-only; the implemented PT-All path
   continues to use multiclass probabilities. Covariate estimator-level parity is
   unavailable where reviewed R/Stata public paths target different moments.
