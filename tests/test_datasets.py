@@ -21,6 +21,7 @@ def test_real_dataset_registry_is_https_and_sha256_pinned() -> None:
         "hospdd",
         "hsng",
         "nsw_mixtape",
+        "wage_panel",
         "yrbs_beverage_tax",
     }
     for name, specification in REAL_DATASETS.items():

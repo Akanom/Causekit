@@ -77,6 +77,7 @@ The installed source tree assigns one primary responsibility to each module:
 | `causekit._covariance` | Homoskedastic, HC1, and one-way CR1 covariance kernels and inference metadata |
 | `causekit.diagnostics` | First-stage diagnostic records and homoskedastic Sargan testing |
 | `causekit.iv` | Public `IV2SLS`, 2SLS execution path, and fitted `IV2SLSResult` |
+| `causekit.panel_iv` | Long-panel validation, compact fixed-effect absorption, Panel 2SLS, absorbed-rank HC1/CR1 inference, and fixed-effect-adjusted diagnostics |
 | `causekit.randomized` | Two-arm difference-in-means and Lin-adjusted ATE execution path, balance records, and fitted result |
 | `causekit.observational` | Supplied-nuisance IPW/AIPW scores, overlap diagnostics, vectorized influence-function and cluster inference |
 | `causekit.crossfit` | Public nuisance protocols, deterministic stratified fold orchestration, binary/multiclass probabilities, masked scalar tasks, fresh-model fitting, prediction adaptation, and aligned out-of-fold records |
@@ -112,6 +113,14 @@ The public model stores covariance, intercept, and missing-data choices. Validat
 Validation produces a normalized internal bundle rather than making downstream layers
 repeat coercion. `missing="drop"` is the only row-removal path: it applies one mask to every
 input and records the removal count. No downstream component may drop or reorder rows.
+
+Panel IV owns a separate long-form bundle because entity/time identity is part of its
+estimand and covariance contract. It sorts one unique entity-time index, applies one joint
+complete-case mask, factors entity/time/cluster labels once, checks two-way graph
+connectivity, and residualizes the outcome plus every structural and excluded-instrument
+column together. Balanced two-way data use double demeaning; connected unbalanced data use
+deterministic alternating projections with an explicit convergence audit. The estimator
+never constructs fixed-effect dummies or an observation projection matrix.
 
 ### 2SLS core
 
@@ -190,6 +199,16 @@ Compatibility is structural rather than inheritance-based:
 - no private sibling module is imported;
 - no result class is promised to be interchangeable where estimator semantics differ; and
 - shared conventions are verified through public fields and adapter behavior.
+
+`PanelIV2SLS` follows the reviewed SystemGMMKit panel-validation, indexing, compact-within,
+and clustering meanings without importing sibling code. CauseKit strengthens the causal
+boundary with excluded-instrument-only roles, strict absorbed/rank refusals, full
+absorbed-rank covariance corrections, fixed-effect-adjusted first stages, and no silent
+column dropping. It is static Panel IV, not a second dynamic-panel GMM implementation.
+An ownership audit confirmed that LimitedDepKit exposes no active causal estimator to
+migrate. Its stale archived 2SLS snapshot and test were removed after CauseKit's maintained
+IV contract passed promotion. Historical cross-package comparison text is not part of
+either package's executable API.
 
 Limited-outcome estimators are not copied into this package. `CrossFitter` targets a
 provider-neutral fit/predict protocol with no sibling-package import or validation

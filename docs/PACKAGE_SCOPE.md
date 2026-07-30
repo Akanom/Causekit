@@ -21,6 +21,18 @@ the following contract:
 | Overidentification | Sargan only for overidentified `"unadjusted"` fits |
 | Results | Labelled estimates and inference, fitted values, residuals, diagnostics, prediction, tables, Markdown, and optional reporting adaptation |
 
+The fixed-effects Panel IV alpha is a separate long-form contract:
+
+| Capability | Supported contract |
+| --- | --- |
+| Estimator | `PanelIV2SLS` with mandatory entity and optional time effects |
+| Instruments | Explicit excluded instruments with nonzero variation after the same fixed-effect absorption as the outcome and structural regressors |
+| Panel | Balanced or connected unbalanced long panels, unique sortable entity/time index, at least two retained rows per entity |
+| Covariance | Full-rank-adjusted homoskedastic, HC1, or one-way CR1; entity clustering is the default and higher-level clusters must be constant within entity |
+| Fixed effects | Compact entity demeaning, exact balanced double demeaning, or converged unbalanced alternating projections; no dummy matrix in production |
+| Diagnostics | Within/partial first-stage fit, classical F, covariance-aligned exclusion test, and raw/within instrument variation |
+| Results | Labelled slope inference, level and within fitted values, structural residuals, absorbed component, panel audit, post-estimation, Markdown, and OutputHub |
+
 The randomized-experiment family supports two-arm individual-level assignment through
 `RandomizedATE`: exact difference in means or fully interacted Lin adjustment, HC1/CR1
 inference, arm counts, and pre-treatment covariate-balance diagnostics. It requires both
@@ -132,7 +144,7 @@ The current alpha does not provide:
   deletion occurs only through the explicit joint `missing="drop"` policy;
 - ordinary least squares as a general regression package;
 - limited-dependent-variable likelihoods;
-- panel fixed effects, dynamic-panel GMM, or panel IV;
+- general panel regression, random-effects IV, Hausman-Taylor, or dynamic-panel GMM;
 - covariate-adjusted, kink, geographic, multi-score, multi-cutoff, survey, or
   discrete-running-variable RD;
 - weak-IV-robust confidence sets or a complete identification-robust testing suite;
@@ -153,18 +165,30 @@ a different statistic merely to fill a result field.
 
 The three packages are separated by their main estimand and data structure:
 
-- `causekit` owns identification-aware causal estimators and cross-sectional IV;
+- `causekit` owns identification-aware causal estimators plus cross-sectional and explicitly
+  contracted fixed-effects Panel IV;
 - `limiteddepkit` owns models defined by limited outcomes, censoring, truncation, duration,
   choice, or another limited observation rule; and
-- `systemgmmkit` owns panel estimators and dynamic-panel GMM workflows.
+- `systemgmmkit` owns the broader static/dynamic panel-model suite and GMM workflows.
 
-Shared conventions are intentional: labelled pandas results, explicit covariance metadata,
+The Panel IV overlap is purpose-specific rather than a copied general panel API: CauseKit
+owns the instrument-identification and causal-interpretation boundary, while SystemGMMKit
+retains broader panel-model orchestration. Shared conventions are intentional: labelled pandas results, explicit covariance metadata,
 strict alignment, diagnostic objects, post-estimation tables, and optional OutputHub
 adaptation. Where future work overlaps panel validation, entity/time indexing, fixed
 effects, clustered covariance, post-estimation, plotting, or reporting, the design should
 reuse applicable `systemgmmkit` contracts instead of creating a disconnected parallel
 framework. Reuse does not require importing private sibling internals or adding a runtime
 dependency.
+
+The July 2026 ownership audit found no active treatment-effect, matching, DiD, RDD, or IV
+estimator in LimitedDepKit's installed `src/limiteddepkit` surface. Its stale
+`_out_of_scope/treatment_effect.py` snapshot and test were deleted after migration; the
+remaining CauseKit mentions are ecosystem documentation, not executable duplicates.
+SystemGMMKit's existing Panel IV remains
+there because it is an integrated member of that package's general static/dynamic panel
+suite; CauseKit does not import, wrap, or re-export it. Deleting that implementation would
+break a sibling package without strengthening CauseKit's independent causal contract.
 
 Binary logit/probit, count, censoring/truncation, duration, ordinal, and related
 limited-outcome likelihoods do not move into `causekit` merely to obtain nuisance
@@ -243,7 +267,6 @@ and validation gates:
 | DiD promotion | Covariate-adjusted balanced-panel PT-All and stationary repeated-section paths are implemented; composition robustness passes pairwise and longer/staggered diagnostic, pointwise, and simultaneous promotion, while direct PT-All cohort ratios and survey designs retain separate gates |
 | Causal ML promotion | Implement the frozen construction-cross-fitted native orthogonal-stack contract, then harden R-/DR-learners with repeated-split and publication-scale evidence; unit-level intervals, RATE, and policy evaluation retain separate contracts |
 | Regression-discontinuity extensions | Covariate adjustment, discrete running variables, local randomization, kink/multi-cutoff designs, official density testing, and survey inference |
-| Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |
 
 Roadmap status is not an implementation promise. A family remains experimental or absent
 until its public contract, failure behavior, tests, independent reference evidence, and

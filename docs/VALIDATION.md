@@ -17,6 +17,15 @@ used in empirical validation must record whether they are oracle, fixed low-comp
 held-out, or cross-fitted; in-sample adaptive predictions cannot be presented as validated
 cross-fitted inference.
 
+For fixed-effects Panel IV, maintained tests must reconstruct a hand-computed within 2SLS
+coefficient, entity-cluster score meat, full absorbed-rank CR1 correction, residual degrees
+of freedom, partial first-stage R-squared, and classical F statistic. Balanced and
+connected unbalanced two-way panels must agree with explicit fixed-effect dummy 2SLS.
+Entity/time duplication, singleton entities, disconnected two-way graphs, role overlap,
+absorbed variables, order/rank failure, non-nested clusters, and invalid missing policies
+must refuse. Promotion additionally requires hash-pinned real data, Python/R/Stata parity,
+serial-error recovery/coverage, and a no-dummy/no-quadratic performance certificate.
+
 For nearest-neighbor matching, point-estimation evidence begins with hand-computed ATT,
 ATC, and bidirectional ATE examples. It must also reconstruct fractional tie weights,
 effect-weight identities, comparison reuse, inclusive caliper and support boundaries,
@@ -299,6 +308,7 @@ passing only after its tests have executed successfully in the recorded environm
 | One-way CR1 | Unequal cluster sizes and within-cluster dependence | Cluster scores, CR1 multiplier, `G-1` reference degrees, cluster metadata |
 | First stages | Strong, weak, multiple-instrument, multiple-endogenous cases | R-squared, partial R-squared, classical F, covariance-aware joint test and metadata |
 | Overidentification | Just identified, overidentified, every covariance label | Sargan only for overidentified unadjusted fit; correct statistic, p-value, and `q-m` df |
+| Fixed-effects Panel IV | Entity/two-way effects; balanced/unbalanced; homoskedastic, HC1, and entity/higher-level CR1 | Hand within/CR1/first-stage identities, explicit-dummy parity, absorption/connectivity/cluster refusals, real-data sensitivity, serial-error coverage, compact scaling |
 | Data contract | NumPy and pandas, missing/non-finite, misaligned indices, duplicate names | Stable success behavior or precise refusal; never silent sample drift |
 | Post-estimation | In-sample and new-data prediction, tables, Markdown | Schema enforcement, index preservation, numerical alignment |
 | Integrations | Optional dependency present and absent | Stable adapter output or actionable optional-dependency error |
@@ -388,6 +398,10 @@ Rscript benchmarks/validate_rd_reference.R
 python benchmarks/validate_rd_real_data.py
 python benchmarks/validate_rd_promotion.py
 python benchmarks/benchmark_rd.py
+python benchmarks/validate_panel_iv_real_data.py
+python benchmarks/validate_panel_iv_promotion.py
+python benchmarks/benchmark_panel_iv.py
+Rscript benchmarks/validate_panel_iv_reference.R
 ```
 
 The ML/R-learner commands are separate one-run real-data records, not benchmark
@@ -408,6 +422,19 @@ Stata site instead. If Stata cannot load the distributed Mata library, pass that
 site as the do-file's first argument; the harness compiles the pinned official Mata source
 with the running Stata version inside the cache. The harness writes
 `benchmarks/validate_rd_stata_output.txt` before assertions.
+
+Panel IV Stata parity is manual. Prepare the hash-verified real-data fixture and run the
+official explicit-dummy reference from the repository root:
+
+```text
+python benchmarks/prepare_panel_iv_stata.py --download
+do "benchmarks/validate_panel_iv_stata.do"
+```
+
+The do-file writes `benchmarks/validate_panel_iv_stata_output.txt` before assertions.
+The reviewed Stata/IC 17 artifact passes all six estimate/standard-error fields with a
+maximum absolute difference of `1.2146e-12` at tolerance `1e-8`; its SHA-256 is
+`1ac883346889ff0d9c651864b8fdf17570cb663d392fc56e883d832961f70704`.
 
 Prepare and run the pinned real-data certificate against the exact R reference checkouts:
 

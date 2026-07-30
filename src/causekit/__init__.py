@@ -55,6 +55,7 @@ from .ml import (
     RLearnerResult,
 )
 from .observational import AIPWATE, IPWATE, ObservationalATEResult, OverlapDiagnostic
+from .panel_iv import PanelIV2SLS, PanelIV2SLSResult
 from .postestimation import (
     confint,
     fitted_values,
@@ -101,6 +102,8 @@ __all__ = [
     "IPWATE",
     "ObservationalATEResult",
     "OverlapDiagnostic",
+    "PanelIV2SLS",
+    "PanelIV2SLSResult",
     "NuisanceEstimatorProtocol",
     "NuisanceDiagnosticsProtocol",
     "NearestNeighborMatch",

@@ -12,6 +12,7 @@ from causekit import (
     DifferenceInDifferences,
     DRLearner,
     NearestNeighborMatch,
+    PanelIV2SLS,
     PartiallyLinearDML,
     RandomizedATE,
     RegressionDiscontinuity,
@@ -67,6 +68,51 @@ def test_result_and_first_stage_can_be_added_to_outputhub(iv_result) -> None:
     assert len(hub.models) == 1
     assert len(hub.tables) == 1
     assert hub.tables[0].name == "Main IV first-stage diagnostics"
+
+
+def test_panel_iv_exports_design_variation_and_first_stage_without_refitting() -> None:
+    rng = np.random.default_rng(891)
+    rows = []
+    for entity in range(12):
+        alpha = rng.normal()
+        for period in range(4):
+            instrument = rng.normal()
+            control = rng.normal()
+            first_error = rng.normal(scale=0.5)
+            endogenous = instrument + 0.3 * control + first_error
+            outcome = 1.6 * endogenous - 0.4 * control + alpha + 0.2 * period + first_error
+            rows.append(
+                {
+                    "entity": entity,
+                    "time": period,
+                    "outcome": outcome,
+                    "endogenous": endogenous,
+                    "instrument": instrument,
+                    "control": control,
+                }
+            )
+    result = PanelIV2SLS().fit(
+        pd.DataFrame(rows),
+        outcome="outcome",
+        endogenous="endogenous",
+        instruments="instrument",
+        exogenous="control",
+        entity="entity",
+        time="time",
+    )
+
+    model = to_outputhub_model(result)
+    assert model.name == "Panel IV/2SLS"
+    assert model.metadata["estimator"] == "panel_iv_2sls"
+    assert model.metadata["effects"] == ["entity", "time"]
+    assert model.statistics["Entities"] == 12
+    hub = outputhub.OutputHub("Panel instrument design")
+    add_to_outputhub(hub, result)
+    assert [table.name for table in hub.tables] == [
+        "Panel IV/2SLS first-stage diagnostics",
+        "Panel IV/2SLS instrument variation",
+        "Panel IV/2SLS panel design",
+    ]
 
 
 def test_outputhub_adapter_validates_inputs(iv_result) -> None:

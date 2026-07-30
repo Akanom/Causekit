@@ -1,8 +1,9 @@
 # CauseKit
 
 CauseKit (installed and imported as `causekit`) is an identification-aware Python package for causal inference and
-instrumental-variable workflows. The `0.7.0a6` surface provides linear two-stage least
-squares, randomized-experiment effects, reusable nuisance cross-fitting, IPW/AIPW ATE,
+instrumental-variable workflows. The `0.7.0a6` surface provides cross-sectional and
+fixed-effects panel two-stage least squares, randomized-experiment effects, reusable
+nuisance cross-fitting, IPW/AIPW ATE,
 ATT, and ATC, scalar propensity-score matching with separate fixed- and estimated-score
 analytical inference paths, conventional staggered panel and repeated-cross-section DiD,
 cross-fitted covariate-adjusted Chen-Sant'Anna-Xie efficient DiD for short panels,
@@ -32,6 +33,31 @@ The retained IV API provides:
 - classical and covariance-aware first-stage excluded-instrument diagnostics; and
 - Sargan's overidentification test only for overidentified fits using
   `covariance="unadjusted"`.
+
+The fixed-effects Panel IV alpha adds mandatory entity absorption, optional time effects,
+and entity-clustered inference by default. It consumes a long-form DataFrame, requires
+excluded instruments to retain within variation, and does not construct dynamic-panel
+lags or import SystemGMMKit at runtime.
+
+```python
+from causekit import PanelIV2SLS
+
+panel_result = PanelIV2SLS().fit(
+    panel_data,
+    outcome="outcome",
+    endogenous="treatment",
+    instruments="encouragement",
+    exogenous=["control"],
+    entity="unit",
+    time="period",
+)
+```
+
+The compact implementation absorbs effects without fixed-effect dummy matrices, supports
+connected unbalanced two-way panels through deterministic alternating projections, and
+exposes fixed-effect-adjusted first stages plus instrument-variation audits. See the
+[Panel IV contract](docs/PANEL_IV_CONTRACT.md). Fixed effects do not validate an instrument
+or remove time-varying confounding.
 
 The `0.2.0a1` randomized-experiment layer adds:
 
@@ -977,7 +1003,9 @@ The causal-ML alpha includes native partially linear DML and separately contract
 construction/evaluation roles, held-out loss/calibration, group inference, and graph data.
 Available aligned Python/R/Stata parity rows are recorded, while unavailable comparator
 cells remain explicit. The sharp/fuzzy [RD contract](docs/RD_CONTRACT.md) is now public
-with reviewed Python/R/Stata parity. Later releases may add panel IV. Each family
+with reviewed Python/R/Stata parity. The [Panel IV contract](docs/PANEL_IV_CONTRACT.md)
+now passes hand/refusal, Python/R/Stata, real-data, recovery/coverage, and performance
+gates. Each family
 must define its estimand, assumptions, failure behavior, diagnostics, and independent
 validation evidence before promotion.
 

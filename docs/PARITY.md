@@ -29,6 +29,7 @@ uses different estimands or moments. Neither counts as a pass.
 | CauseKit family | Python comparator | R comparator | Stata comparator | Current status |
 | --- | --- | --- | --- | --- |
 | `IV2SLS` | `linearmodels` aligned coefficient/covariance tests | real-data matrix/HC1 contract passes | Stata/IC 17 real-data native `ivregress` HC1 harness passes | pass |
+| `PanelIV2SLS` | explicit-dummy `linearmodels` 7.0 passes 12 balanced/unbalanced, one-/two-way, and covariance cells; hash-pinned wage-panel coefficient/covariance differences below `7.73e-13` | R 4.5.1 `AER` 1.2.16 plus `sandwich` 3.1.1 explicit-dummy CR1 passes six fields within `3.90e-13` | reviewed Stata/IC 17 `ivregress 2sls` explicit-dummy CR1 passes six fields within `1.22e-12` | pass |
 | `RandomizedATE` | `statsmodels` regression/covariance identities | real NSW raw/Lin HC1 contracts pass | Stata/IC 17 real-data native robust regressions pass | pass |
 | `IPWATE` / `AIPWATE` ATE/ATT/ATC | analytical score identities pass | real Cattaneo supplied-nuisance influence contracts pass | Stata/IC 17 same conditional influence contracts pass; `teffects` first-step variance is non-comparable | pass for aligned conditional-nuisance contract |
 | `CrossFitter` | protocol and leakage/alignment tests; not itself an estimand | non-comparable | non-comparable | internal protocol |
@@ -53,6 +54,14 @@ The RD parity fixture fixes triangular `p=1`, `q=2`, left/right point bandwidths
 `29591cdf4a4ea3c4269838aafb02fec7942df8b870774c3aa221e04fbf429a0d`.
 Native bandwidth selection is CauseKit-specific and is validated by recovery/coverage,
 not represented as parity with `rdrobust` bandwidth selectors.
+
+The Panel IV parity contract uses the hash-pinned Vella-Verbeek wage panel, 545 person
+effects, seven retained year effects, person-clustered CR1, and full absorbed-rank finite-
+sample correction. CauseKit absorbs effects compactly; Python, R, and Stata references use
+explicit indicators. This validates numerical equivalence only. Lagged union status is
+not asserted to satisfy exclusion or exogeneity. See
+[Panel IV promotion evidence](PANEL_IV_PROMOTION_EVIDENCE.md). The reviewed Stata output
+SHA-256 is `1ac883346889ff0d9c651864b8fdf17570cb663d392fc56e883d832961f70704`.
 
 The DML parity fixture fixes already out-of-fold nuisance predictions and compares the
 aligned residual-on-residual coefficient and HC1 standard error. It validates the public

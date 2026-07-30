@@ -327,7 +327,29 @@ future task can resume without reconstructing intent from chat history.
     local-randomization, kink/multi-cutoff, official density-test, and survey RD remain
     separately unavailable rather than being inferred from this contract.
 
+29. `0.7.0a6` fixed-effects Panel IV candidate: public `PanelIV2SLS` now implements
+    mandatory entity and optional time absorption, connected unbalanced alternating
+    projections, strict within-variation/order/rank refusals, full absorbed-rank
+    homoskedastic/HC1/one-way-CR1 inference, fixed-effect-adjusted first stages, variation
+    audits, level/within result reconstruction, post-estimation, OutputHub, and a real-data
+    example. Hand/refusal tests, 12-cell explicit-dummy `linearmodels` parity, official R
+    `AER`/`sandwich` parity, hash-pinned wage-panel sensitivity, 1,500 serial-error
+    promotion fits with zero refusals, and a 200,000-row performance gate pass. Reviewed
+    Stata/IC 17 `ivregress 2sls` explicit-dummy parity passes all six estimate/standard-
+    error fields with maximum absolute difference `1.22e-12` at tolerance `1e-8`; the
+    saved-output SHA-256 is
+    `1ac883346889ff0d9c651864b8fdf17570cb663d392fc56e883d832961f70704`.
+    A sibling ownership audit found no active CauseKit estimator under
+    `limiteddepkit/src`; its stale `_out_of_scope/treatment_effect.py` snapshot and test
+    were deleted and LimitedDepKit's ownership documentation was updated. SystemGMMKit's
+    broader panel-IV implementation remains owned by its panel suite, while this
+    implementation has no sibling runtime dependency.
+
 ## Open promotion gates
+
+- Fixed-effects Panel IV has passed its native, Python, R, Stata, real-data, coverage, and
+  performance gates. Dynamic-panel GMM, generated lags, multiway covariance,
+  weak-IV-robust confidence sets, and random-effects IV remain separate contracts.
 
 - Matching still defaults to `inference="none"`. Known-score reuse-aware inference and a
   separately validated full-sample Logit-MLE correction now pass hand, parity,
@@ -396,8 +418,9 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Panel IV: reuse public `systemgmmkit` panel validation, entity/time indexing, fixed
-   effects, and clustered covariance contracts.
+1. The scheduled fixed-effects Panel IV milestone is complete. Do not begin another
+   estimator family until its estimand, identification boundary, covariance, diagnostics,
+   failure behavior, and independent promotion gates have been frozen separately.
 
 The stationary repeated-section survey and balanced-panel direct-ratio gates are
 complete. Raw survey weights, composition combinations, FPCs, replicate weights, and

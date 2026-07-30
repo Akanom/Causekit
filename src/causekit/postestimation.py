@@ -10,9 +10,10 @@ import pandas as pd
 from scipy.stats import chi2, f, norm, t
 
 from .iv import IV2SLSResult
+from .panel_iv import PanelIV2SLSResult
 from .rd import RegressionDiscontinuityResult
 
-InferenceResult = IV2SLSResult | RegressionDiscontinuityResult
+InferenceResult = IV2SLSResult | PanelIV2SLSResult | RegressionDiscontinuityResult
 
 
 def summary_frame(result: InferenceResult, *, level: float = 0.95) -> pd.DataFrame:
@@ -43,13 +44,13 @@ def predict(
     return result.predict(endogenous=endogenous, exogenous=exogenous)
 
 
-def residuals(result: IV2SLSResult) -> pd.Series:
+def residuals(result: IV2SLSResult | PanelIV2SLSResult) -> pd.Series:
     """Return fitted structural residuals."""
 
     return result.residuals.copy()
 
 
-def fitted_values(result: IV2SLSResult) -> pd.Series:
+def fitted_values(result: IV2SLSResult | PanelIV2SLSResult) -> pd.Series:
     """Return fitted structural outcomes."""
 
     return result.fitted_values.copy()

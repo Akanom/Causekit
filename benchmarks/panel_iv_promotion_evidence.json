@@ -1,0 +1,89 @@
+{
+  "artifact": "causekit_panel_iv_promotion_v1",
+  "generated_on": "2026-07-30",
+  "generator": "benchmarks/validate_panel_iv_promotion.py",
+  "reproduction_command": "python benchmarks/validate_panel_iv_promotion.py",
+  "causekit_version": "0.7.0a6",
+  "python_version": "3.14.6",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "design": "Static valid excluded instrument, endogenous first-stage disturbance, additive entity/time effects, and serially dependent errors with entity-clustered CR1.",
+  "gates": {
+    "zero_refusals": true,
+    "absolute_bias_max": 0.05,
+    "standard_error_ratio": [
+      0.82,
+      1.18
+    ],
+    "pointwise_coverage_95": [
+      0.91,
+      0.985
+    ],
+    "median_first_stage_f_min": 25.0
+  },
+  "results": [
+    {
+      "name": "balanced_entity_fe",
+      "n_entities": 80,
+      "n_periods": 6,
+      "time_effects": false,
+      "unbalanced": false,
+      "truth": 1.6,
+      "replications_requested": 500,
+      "replications_successful": 500,
+      "seed": 2026073101,
+      "refusals": 0,
+      "refusal_messages": {},
+      "mean_estimate": 1.6012017297106471,
+      "absolute_bias": 0.001201729710647026,
+      "empirical_standard_deviation": 0.035493219695253646,
+      "mean_standard_error": 0.03872437668347175,
+      "standard_error_ratio": 1.0910358940654288,
+      "pointwise_coverage_95": 0.952,
+      "median_first_stage_f": 1126.3149619653773,
+      "status": "pass"
+    },
+    {
+      "name": "balanced_two_way_fe",
+      "n_entities": 80,
+      "n_periods": 6,
+      "time_effects": true,
+      "unbalanced": false,
+      "truth": 1.6,
+      "replications_requested": 500,
+      "replications_successful": 500,
+      "seed": 2026073201,
+      "refusals": 0,
+      "refusal_messages": {},
+      "mean_estimate": 1.599347345856825,
+      "absolute_bias": 0.0006526541431750577,
+      "empirical_standard_deviation": 0.03040177833324221,
+      "mean_standard_error": 0.03306885559480758,
+      "standard_error_ratio": 1.087727672780546,
+      "pointwise_coverage_95": 0.962,
+      "median_first_stage_f": 1099.2110553528962,
+      "status": "pass"
+    },
+    {
+      "name": "unbalanced_two_way_fe",
+      "n_entities": 80,
+      "n_periods": 7,
+      "time_effects": true,
+      "unbalanced": true,
+      "truth": 1.6,
+      "replications_requested": 500,
+      "replications_successful": 500,
+      "seed": 2026073301,
+      "refusals": 0,
+      "refusal_messages": {},
+      "mean_estimate": 1.5993757046098036,
+      "absolute_bias": 0.0006242953901964832,
+      "empirical_standard_deviation": 0.030929779098719405,
+      "mean_standard_error": 0.0337607386442688,
+      "standard_error_ratio": 1.091528605377806,
+      "pointwise_coverage_95": 0.972,
+      "median_first_stage_f": 1047.3587296260462,
+      "status": "pass"
+    }
+  ],
+  "status": "pass"
+}

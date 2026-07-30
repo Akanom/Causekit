@@ -79,6 +79,22 @@ REAL_DATASETS: dict[str, RealDataset] = {
         ),
         provenance_url="https://github.com/kerryqwq/DiD-Survey-Data",
     ),
+    "wage_panel": RealDataset(
+        name="wage_panel",
+        filename="wage_panel.csv.bz2",
+        url=(
+            "https://raw.githubusercontent.com/bashtage/linearmodels/"
+            "28af72e/linearmodels/datasets/wage_panel/wage_panel.csv.bz2"
+        ),
+        sha256="ee4f36706491d6348614f06bfcd5b2eef411603590a996ebb061078ae1024e78",
+        description=(
+            "Vella-Verbeek longitudinal wage and union-status panel distributed by "
+            "linearmodels 7.0."
+        ),
+        provenance_url=(
+            "https://github.com/bashtage/linearmodels/tree/28af72e/linearmodels/datasets/wage_panel"
+        ),
+    ),
 }
 
 
@@ -188,7 +204,7 @@ def load_real_dataset(
         data_directory=data_directory,
         download=download,
     )
-    if path.suffix.lower() == ".csv":
+    if path.suffix.lower() == ".csv" or path.name.lower().endswith(".csv.bz2"):
         return pd.read_csv(path)
     return pd.read_stata(path, convert_categoricals=False)
 

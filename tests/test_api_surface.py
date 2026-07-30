@@ -16,6 +16,8 @@ PUBLIC_EXPORTS = {
     "CATEResultProtocol",
     "IV2SLS",
     "IV2SLSResult",
+    "PanelIV2SLS",
+    "PanelIV2SLSResult",
     "RandomizedATE",
     "RandomizedATEResult",
     "IPWATE",
@@ -80,10 +82,11 @@ def test_initial_stable_namespace_exports_iv_and_postestimation_contract() -> No
     assert not hasattr(causekit, "NativeOrthogonalStackedCATE")
 
 
-def test_causekit_has_no_limiteddepkit_dependency_or_import() -> None:
+def test_causekit_has_no_sibling_runtime_dependency_or_import() -> None:
     repository_root = Path(__file__).resolve().parents[1]
     metadata = (repository_root / "pyproject.toml").read_text(encoding="utf-8").lower()
     assert "limiteddepkit" not in metadata
+    assert "systemgmmkit" not in metadata
 
     import_roots = [
         repository_root / "src",
@@ -95,7 +98,14 @@ def test_causekit_has_no_limiteddepkit_dependency_or_import() -> None:
         for path in root.rglob("*.py"):
             source = path.read_text(encoding="utf-8")
             if any(
-                line.lstrip().startswith(("import limiteddepkit", "from limiteddepkit"))
+                line.lstrip().startswith(
+                    (
+                        "import limiteddepkit",
+                        "from limiteddepkit",
+                        "import systemgmmkit",
+                        "from systemgmmkit",
+                    )
+                )
                 for line in source.splitlines()
             ):
                 imported.append(path.relative_to(repository_root).as_posix())
@@ -132,6 +142,25 @@ def test_estimator_signatures_keep_identification_inputs_explicit() -> None:
     assert fit.parameters["instruments"].kind is inspect.Parameter.KEYWORD_ONLY
     assert fit.parameters["exogenous"].default is None
     assert fit.parameters["clusters"].default is None
+
+    panel_iv = inspect.signature(causekit.PanelIV2SLS)
+    assert panel_iv.parameters["covariance"].default == "clustered"
+    assert panel_iv.parameters["time_effects"].default is True
+    assert panel_iv.parameters["missing"].default == "raise"
+    panel_fit = inspect.signature(causekit.PanelIV2SLS.fit)
+    assert list(panel_fit.parameters) == [
+        "self",
+        "data",
+        "outcome",
+        "endogenous",
+        "instruments",
+        "entity",
+        "time",
+        "exogenous",
+        "cluster",
+    ]
+    assert panel_fit.parameters["outcome"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert panel_fit.parameters["cluster"].default is None
 
     matching = inspect.signature(causekit.NearestNeighborMatch)
     assert matching.parameters["estimand"].default == "att"

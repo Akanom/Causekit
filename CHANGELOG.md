@@ -8,6 +8,26 @@ versions may refine APIs, but breaking changes must still be documented explicit
 
 ### Added
 
+- Public `PanelIV2SLS` and immutable result for static entity-fixed-effects 2SLS with
+  optional time effects. The compact path handles balanced panels exactly and connected
+  unbalanced panels through deterministic alternating projections, refuses absorbed or
+  rank-deficient structural/instrument designs, and never materializes fixed-effect dummy
+  or observation projection matrices. Entity-clustered CR1 with full absorbed-rank
+  correction is the default; homoskedastic/HC1 alternatives, higher-level nested clusters,
+  fixed-effect-adjusted first stages, instrument-variation audits, reconstructed level
+  fitted values, post-estimation, OutputHub, and a hash-pinned real-data example are public.
+- Twelve explicit-dummy `linearmodels` cells, official R `AER`/`sandwich`, and hash-pinned
+  Vella-Verbeek wage-panel parity pass. The 1,500-fit serial-error promotion certificate
+  has zero refusals and coverage `0.952–0.972`; the 200,000-row performance gate completes
+  near `0.503` seconds with `52.66 MiB` peak allocation. Reviewed Stata/IC 17
+  `ivregress 2sls` explicit-dummy parity passes all six estimate/standard-error fields;
+  the maximum absolute difference is `1.22e-12` at tolerance `1e-8`.
+- A package-ownership audit confirms that CauseKit imports no estimator from LimitedDepKit
+  or SystemGMMKit. LimitedDepKit's stale archived 2SLS implementation and test were deleted
+  after migration; its remaining references are ecosystem documentation. SystemGMMKit
+  retains its general panel implementation while CauseKit owns this separately contracted
+  causal Panel IV boundary.
+
 - Public `RegressionDiscontinuity`, immutable result/bandwidth/manipulation records, and
   a native continuity-based local-polynomial path for sharp cutoff effects and fuzzy
   local-Wald complier effects. The default triangular local-linear estimate uses a

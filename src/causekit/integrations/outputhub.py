@@ -15,6 +15,7 @@ from ..iv import IV2SLSResult
 from ..matching import NearestNeighborMatchResult
 from ..ml import DRLearnerResult, PartiallyLinearDMLResult, RLearnerResult
 from ..observational import ObservationalATEResult
+from ..panel_iv import PanelIV2SLSResult
 from ..randomized import RandomizedATEResult
 from ..rd import RegressionDiscontinuityResult
 
@@ -30,7 +31,7 @@ def _regression_model_class() -> Any:
     return RegressionModel
 
 
-def _first_stage_table(result: IV2SLSResult) -> pd.DataFrame:
+def _first_stage_table(result: IV2SLSResult | PanelIV2SLSResult) -> pd.DataFrame:
     return pd.DataFrame.from_records(
         [diagnostic.to_dict() for diagnostic in result.first_stage.values()]
     ).set_index("endogenous")
@@ -39,6 +40,7 @@ def _first_stage_table(result: IV2SLSResult) -> pd.DataFrame:
 def to_outputhub_model(
     result: (
         IV2SLSResult
+        | PanelIV2SLSResult
         | RandomizedATEResult
         | ObservationalATEResult
         | DiDResult
@@ -59,6 +61,7 @@ def to_outputhub_model(
         result,
         (
             IV2SLSResult,
+            PanelIV2SLSResult,
             RandomizedATEResult,
             ObservationalATEResult,
             DiDResult,
@@ -72,7 +75,7 @@ def to_outputhub_model(
         ),
     ):
         raise TypeError(
-            "result must be an IV2SLSResult, RandomizedATEResult, "
+            "result must be an IV2SLSResult, PanelIV2SLSResult, RandomizedATEResult, "
             "ObservationalATEResult, DiDResult, RepeatedCrossSectionDiDResult, "
             "RepeatedCrossSectionCompositionDiagnostic, "
             "NearestNeighborMatchResult, or "
@@ -588,8 +591,28 @@ def to_outputhub_model(
                 "Sargan p": result.overidentification.p_value,
             }
         )
+    is_panel_iv = isinstance(result, PanelIV2SLSResult)
+    panel_statistics: dict[str, Any] = {}
+    panel_metadata: dict[str, Any] = {}
+    if isinstance(result, PanelIV2SLSResult):
+        panel_statistics = {
+            "Entities": result.n_entities,
+            "Periods": result.n_periods,
+            "Balanced": result.balanced,
+            "Absorbed rank": result.absorbed_rank,
+        }
+        panel_metadata = {
+            "effects": list(result.effects),
+            "entity": result.entity_name,
+            "time": result.time_name,
+            "cluster": result.cluster_name,
+            "balanced": result.balanced,
+            "absorbed_rank": result.absorbed_rank,
+            "within_iterations": result.within_iterations,
+            "within_converged": result.within_converged,
+        }
     return RegressionModel(
-        name=name or "IV/2SLS",
+        name=name or ("Panel IV/2SLS" if is_panel_iv else "IV/2SLS"),
         depvar=result.y_name,
         params=result.params.rename("coef"),
         std_errors=result.standard_errors.rename("se"),
@@ -598,16 +621,18 @@ def to_outputhub_model(
             "N": result.nobs,
             "Residual df": result.df_resid,
             "Converged": result.converged,
+            **panel_statistics,
         },
         diagnostics=diagnostics,
         metadata={
-            "estimator": "iv_2sls",
+            "estimator": "panel_iv_2sls" if is_panel_iv else "iv_2sls",
             "backend": result.backend,
             "covariance_type": result.covariance_type,
             "inference_distribution": result.inference_distribution,
             "n_clusters": result.n_clusters,
             "endogenous": list(result.endogenous_names),
             "excluded_instruments": list(result.instrument_names),
+            **panel_metadata,
             "causal_interpretation_requires_assumptions": True,
             "assumptions": list(result.assumptions),
         },
@@ -619,6 +644,7 @@ def add_to_outputhub(
     hub: Any,
     result: (
         IV2SLSResult
+        | PanelIV2SLSResult
         | RandomizedATEResult
         | ObservationalATEResult
         | DiDResult
@@ -662,6 +688,8 @@ def add_to_outputhub(
         if isinstance(result, DiDResult)
         else "Randomized ATE"
         if isinstance(result, RandomizedATEResult)
+        else "Panel IV/2SLS"
+        if isinstance(result, PanelIV2SLSResult)
         else "IV/2SLS"
     )
     model = to_outputhub_model(result, name=model_name)
@@ -746,7 +774,8 @@ def add_to_outputhub(
             ),
             metadata=metadata,
         )
-    elif isinstance(result, IV2SLSResult) and hasattr(hub, "add_table"):
+    elif isinstance(result, (IV2SLSResult, PanelIV2SLSResult)) and hasattr(hub, "add_table"):
+        estimator_name = "panel_iv_2sls" if isinstance(result, PanelIV2SLSResult) else "iv_2sls"
         hub.add_table(
             f"{model_name} first-stage diagnostics",
             _first_stage_table(result).reset_index(),
@@ -755,8 +784,24 @@ def add_to_outputhub(
                 "The classical F < 10 warning is a heuristic, not a universal "
                 "weak-identification test."
             ),
-            metadata={"source": "causekit", "estimator": "iv_2sls"},
+            metadata={"source": "causekit", "estimator": estimator_name},
         )
+        if isinstance(result, PanelIV2SLSResult):
+            hub.add_table(
+                f"{model_name} instrument variation",
+                result.instrument_variation.reset_index(),
+                caption=(
+                    "Raw and fixed-effect-adjusted variation for endogenous regressors and "
+                    "excluded instruments. Variation does not establish exogeneity or exclusion."
+                ),
+                metadata={"source": "causekit", "estimator": estimator_name},
+            )
+            hub.add_table(
+                f"{model_name} panel design",
+                result.panel_summary().rename_axis("diagnostic").reset_index(name="value"),
+                caption="Retained panel, absorption, clustering, and within-transform audit.",
+                metadata={"source": "causekit", "estimator": estimator_name},
+            )
     elif isinstance(result, NearestNeighborMatchResult) and hasattr(hub, "add_table"):
         table_metadata = {"source": "causekit", "estimator": "nearest_neighbor_match"}
         hub.add_table(
