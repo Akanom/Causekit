@@ -2,10 +2,16 @@
 
 ## Status and boundary
 
-This is a design-only contract for a future `composition="robust"` path. The current
-`RepeatedCrossSectionDiD` implementation supports only `composition="stationary"` and
-must continue to refuse every other label until the failing-first gates below exist and
-the score is implemented. No placeholder estimator, result, or diagnostic is exported.
+The first `composition="robust"` slice is implemented through
+`RepeatedCrossSectionDiD`: exactly two periods, one treated cohort, a fixed never-treated
+comparison population, non-empty covariates, and an explicit `CrossFitter`. It targets the
+treated target-period population, retains its four normalized cell weights, and supports
+the existing observation/PSU analytical and optional multiplier-inference machinery.
+
+Staggered group-time aggregation, conditional pre-trends with additional periods, the
+stationary-versus-robust composition diagnostic, survey designs, external estimator
+parity, publication-scale coverage, and promotion beyond this first slice remain open.
+No placeholder diagnostic or staggered wrapper is exported.
 
 Composition robustness is not a weighting option on the stationary score. It changes the
 target population, generalized propensity nuisance, efficient influence function,
@@ -90,7 +96,7 @@ unmeasured composition changes.
 
 ## CrossFitter execution
 
-The first implementation phase is the pairwise two-group, two-period score. It reuses the
+The implemented first phase is the pairwise two-group, two-period score. It reuses the
 public `CrossFitter` rather than owning learners. One four-class probability task predicts
 the ordered cells `(0,0)`, `(0,1)`, `(1,0)`, `(1,1)`. Three masked scalar outcome tasks
 predict `m_10`, `m_01`, and `m_00`; `m_11` is not a nuisance in the efficient score and
@@ -153,22 +159,28 @@ The robust path must refuse:
 No cell pooling, clipping, row trimming, implicit baseline substitution, fallback to the
 stationary score, or variance repair is permitted.
 
-## Failing-first promotion sequence
+## Current failing-first evidence
 
-Before estimator code is written, tests must fail for:
+`tests/test_did_rcs_composition.py` was added and observed with four failures at the old
+public refusal before runtime code changed. The retained tests now reconstruct the exact
+two-by-two estimate, all four normalized weights, the complete efficient influence
+vector, and HC1 standard error. They also verify the target and nuisance schema, absence
+of an unused `m_11` fit, non-empty-covariate and pairwise-scope refusals, hard four-cell
+overlap refusal without clipping, and immutable row/whole-PSU cross-fitting. Existing
+stationary tests remain unchanged apart from allowing the now-supported robust label.
 
-1. a hand-computed two-by-two estimate, every normalized weight, the complete influence
-   vector, HC1/CR1 reconstruction, and outcome-regression identity;
-2. exact recovery when the four-cell composition changes but the maintained conditional
-   parallel-trends restriction holds;
-3. a contrasting example where the stationary score targets the wrong treated
-   distribution;
-4. generalized-propensity ordering, sum-to-one, overlap, leakage, row-permutation, and
-   whole-PSU refusal tests;
-5. a hand-computed scalar and vector composition diagnostic, including singular and
-   misaligned-input refusals; and
-6. conditional pre-trend and fixed-seed max-t identities using the robust influence
-   records without nuisance refitting.
+## Remaining promotion sequence
+
+Promotion beyond the implemented first slice still requires:
+
+1. exact recovery when four-cell composition changes under the maintained conditional
+   parallel-trends restriction and a contrasting stationary-score bias example;
+2. row-permutation invariance and broader generalized-propensity class/order refusals;
+3. hand-computed scalar and vector composition diagnostics, including singular and
+   misaligned-input refusals;
+4. conditional pre-trends for longer designs and fixed-seed max-t identities using robust
+   influence records without nuisance refitting; and
+5. staggered group-time aggregation only after the pairwise evidence below passes.
 
 Promotion requires separate favorable-stationarity and composition-change simulations,
 including nonlinear nuisances and unequal period sizes. Preregistered cells must cover

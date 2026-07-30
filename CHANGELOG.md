@@ -64,12 +64,17 @@ versions may refine APIs, but breaking changes must still be documented explicit
   refusals. All 16 event-vector joint-coverage cells pass at `0.931–0.961`; maximum
   Monte Carlo SE is `0.0081`, minimum realized PSU cell support is 31 clusters, and all
   whole-PSU fold-role audits pass.
-- Design-only contracts for three independent DiD extensions: calibrated direct pairwise
-  cohort odds replacing multiclass ratios in balanced-panel PT-All; a target-period-
-  treated composition-change-robust repeated-section score and aligned diagnostic; and an
-  explicit repeated-section survey-design/population-target contract with weighted
-  nuisances and design-based variance. No placeholder API was added and current
-  unsupported combinations continue to refuse.
+- A first pairwise `composition="robust"` repeated-section DiD path for exactly one
+  treated cohort and two periods. It targets the treated target-period population,
+  cross-fits one ordered four-cell generalized propensity and only the three outcome
+  regressions used by the efficient score, retains all four normalized weights, and
+  reuses observation/PSU analytical and multiplier inference. Hand-computed estimate,
+  EIF, HC1, overlap, scope, leakage, whole-PSU role, and OutputHub contracts were observed
+  failing first and now pass without clipping, trimming, or an unused `m_11` fit.
+- Design-only contracts remain for calibrated direct pairwise cohort odds in balanced-
+  panel PT-All, the composition diagnostic and staggered composition-robust extension,
+  and repeated-section survey-design/population targets. Unsupported combinations keep
+  refusing; the narrow robust path does not imply that those separate gates are promoted.
 
 ### Changed
 
@@ -83,12 +88,14 @@ versions may refine APIs, but breaking changes must still be documented explicit
 
 ### Known limitations
 
-- Stationary composition is declared but not testable from the estimator.
-  Compositional-change-robust estimation and sampling or survey weights remain
-  unimplemented and refuse. Direct cohort-ratio nuisances are also design-only; the
-  implemented PT-All path continues to use multiclass probabilities. Covariate
-  estimator-level parity is unavailable where reviewed R/Stata public paths target
-  different moments.
+- Stationary composition is declared but not testable from the estimator. Composition-
+  robust estimation is currently restricted to a covariate-adjusted two-period design
+  with one treated cohort; staggered aggregation, longer-design pre-trends, the aligned
+  composition diagnostic, external parity, real-data sensitivity, and publication-scale
+  coverage remain open. Sampling or survey weights remain unimplemented and refuse.
+  Direct cohort-ratio nuisances are also design-only; the implemented PT-All path
+  continues to use multiclass probabilities. Covariate estimator-level parity is
+  unavailable where reviewed R/Stata public paths target different moments.
 - Stata `csdid` aggregate standard errors are non-comparable to the maintained pooled-
   cohort-share uncertainty contract. Observation/PSU band mechanics pass hand identities
   and the internal publication-scale joint-coverage certificate. Exact seeded resampling

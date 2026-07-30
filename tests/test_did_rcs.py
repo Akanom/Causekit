@@ -429,7 +429,7 @@ def test_observation_multiplier_band_has_seeded_joint_coverage_smoke() -> None:
     ("constructor", "message"),
     [
         ({"control_group": "already_treated"}, "control_group"),
-        ({"composition": "robust"}, "composition"),
+        ({"composition": "dynamic"}, "composition"),
         ({"anticipation": -1}, "anticipation"),
         ({"anticipation": 0.5}, "anticipation"),
         ({"covariance": "homoskedastic"}, "covariance"),

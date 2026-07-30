@@ -12,9 +12,10 @@ so its ATT is `(7 - 2) - (4 - 3) = 4`. Its ordered observation influence vector 
 The focused contracts also reconstruct staggered never-treated and not-yet-treated
 effects, pooled estimated-share contributions, event/calendar/ESavg aggregation,
 anticipation, independent-cell placebos, unequal sample sizes, row permutation, and
-cluster-summed CR1 variance. Malformed roles, unsupported composition and inference,
-missing clean baselines, weak cells, invalid PSUs, covariates without an explicit
-`CrossFitter`, and sampling weights refuse without row deletion or numerical repair.
+cluster-summed CR1 variance. Malformed roles, unsupported composition values and
+inference, missing clean baselines, weak cells, invalid PSUs, covariates without an
+explicit `CrossFitter`, and sampling weights refuse without row deletion or numerical
+repair.
 
 The covariate contract in `tests/test_did_rcs_covariate.py` was also observed failing
 before implementation. Its fixed-OOF fixture has ATT `2.4875`, influence
@@ -23,6 +24,18 @@ error `0.12706625568314087`. It reconstructs all eight normalized score componen
 ratio influence terms. Separate contracts verify both double-robustness legs, shared
 folds, row/PSU non-leakage, hard overlap refusal, conditional placebos, staggered
 never/not-yet-treated aggregation, fixed-seed reproduction, and OutputHub transport.
+
+The pairwise composition-change contract in `tests/test_did_rcs_composition.py` was
+observed with four failures at the prior `composition="robust"` refusal before the runtime
+path was added. Its 16-row fixture has estimate `2.295038744545108` and independently
+reconstructs the complete centered EIF, HC1 standard error, and all four normalized cell
+weights. The retained refusals cover missing covariates, more than two periods, more than
+one treated cohort, and a generalized-propensity cell at the hard probability floor.
+Separate audit assertions keep construction/holdout rows and declared PSUs disjoint,
+require identical folds across the four-class and three outcome tasks, and verify that no
+unused target-cell outcome regression is fitted. This evidence promotes only the
+pairwise score; it is not staggered, external-package, real-data, or publication-scale
+evidence.
 
 ## Cross-language hand reference
 
@@ -183,9 +196,11 @@ observed covariate, two whole-hospital folds, and hospital CR1 inference. It ret
 `0.8676486723638247`, standard error `0.04274270577554287`, 46 PSUs, and 60 fold/task
 diagnostic rows. The source is artificial and the affine/empirical nuisances are an
 execution contract, not evidence that the nuisance models or identifying assumptions are
-substantively correct. Composition-change robustness and survey weights remain open;
-covariate publication-scale pointwise and simultaneous joint-coverage evidence is
-promoted separately above.
+substantively correct. The narrow pairwise composition-robust path has hand-contract
+evidence only; real-data sensitivity, external parity, publication-scale coverage,
+staggered composition robustness, its aligned diagnostic, and survey weights remain
+open. Covariate stationary-composition publication-scale pointwise and simultaneous
+joint-coverage evidence is promoted separately above.
 
 Reproduce the covariate large-sample path with:
 

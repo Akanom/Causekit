@@ -162,6 +162,7 @@ def to_outputhub_model(
                 "control_group": result.control_group,
                 "composition": result.composition,
                 "composition_verified": False,
+                "target_population": result.target_population,
                 "anticipation": result.anticipation,
                 "pre_periods": result.pre_periods,
                 "covariance_type": result.covariance_type,
@@ -689,7 +690,10 @@ def add_to_outputhub(
                 f"{model_name} nuisance fitting diagnostics",
                 result.nuisance_diagnostics.copy(),
                 caption=(
-                    "Provider-neutral fold-local fits for the propensity and four "
+                    "Provider-neutral fold-local fits for the four-cell generalized propensity "
+                    "and three outcome regressions; every reported prediction is out of fold."
+                    if result.composition == "robust"
+                    else "Provider-neutral fold-local fits for the propensity and four "
                     "group-period outcome regressions; every reported prediction is out of fold."
                 ),
                 metadata={
@@ -698,12 +702,29 @@ def add_to_outputhub(
                     "probability_floor": result.nuisance_probability_floor,
                 },
             )
+        if not result.composition_weights.empty:
+            hub.add_table(
+                f"{model_name} composition weights",
+                result.composition_weights.copy(),
+                caption=(
+                    "Normalized target and generalized-propensity cell weights for the "
+                    "composition-change-robust efficient score."
+                ),
+                metadata={
+                    **table_metadata,
+                    "composition": result.composition,
+                    "target_population": result.target_population,
+                },
+            )
         if not result.pretrend.placebo_effects.empty:
             hub.add_table(
                 f"{model_name} pre-trend placebos",
                 result.pretrend.placebo_effects.reset_index(),
                 caption=(
-                    "Independent-cell adjacent pre-period placebos. Failure to reject "
+                    "Adjacent conditional pre-period placebos. Failure to reject does not prove "
+                    "parallel trends or composition validity."
+                    if result.composition == "robust"
+                    else "Independent-cell adjacent pre-period placebos. Failure to reject "
                     "does not prove parallel trends or stationary composition."
                 ),
                 metadata={

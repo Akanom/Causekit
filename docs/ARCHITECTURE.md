@@ -238,9 +238,9 @@ different outcomes, samples, timing, or cluster designs.
 Repeated cross sections do not enter this panel bundle. `did_rcs.py` owns their separate
 four-cell means, observation-level influence records, pooled cohort-share aggregation,
 cell audit table, and observation/PSU inference. It accepts unequal period and cell sizes,
-requires an explicit stationary-composition declaration, and never synthesizes a panel
-entity. Only the generic score-covariance and joint-Wald kernels are shared with `did.py`;
-the panel validator, within-entity changes, and panel pre-trend helper are not reused.
+requires an explicit composition declaration, and never synthesizes a panel entity. Only
+the generic score-covariance and joint-Wald kernels are shared with `did.py`; the panel
+validator, within-entity changes, and panel pre-trend helper are not reused.
 
 Its covariate path plans every group-time and conditional-placebo comparison together,
 then sends one propensity and four masked group-period outcome tasks per comparison through
@@ -251,10 +251,15 @@ aggregation, and uncertainty. It does not own a nuisance learner, import the pan
 outcome-change machinery, clip probabilities, or expose irrelevant comparison-row
 predictions as meaningful values.
 
-Two repeated-section extensions remain outside the runtime architecture. Composition
-robustness requires a four-cell generalized propensity and target-period treated
-influence; survey support requires an explicit design object, weighted nuisance protocol,
-and design-based variance. A third, separate balanced-panel extension replaces
+The implemented pairwise composition-robust branch makes two coordinated `CrossFitter`
+calls on the same four-cell-stratified observation/whole-PSU folds: one multiclass
+probability task and three masked outcome tasks. `did_rcs.py` validates the fixed class
+order, applies hard overlap refusal, constructs normalized `w_00`, `w_01`, `w_10`, and
+`w_11`, evaluates the target-period-treated efficient score and influence, and exposes the
+weights without fitting `m_11`. It deliberately refuses longer or multi-cohort designs.
+
+Survey support remains outside the runtime architecture and requires an explicit design
+object, weighted nuisance protocol, and design-based variance. A separate balanced-panel extension replaces
 `EfficientDiD` multiclass probability ratios with calibrated pairwise cohort odds and
 refactors its conditional covariance only by a scale that cancels in normalized efficient
 weights. Their contracts prohibit placeholder exports and cross-score reuse.

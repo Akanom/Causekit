@@ -301,6 +301,15 @@ counts, nuisance fit, or a pre-trend test. Observation-level HC1 or declared-PSU
 replace entity-level panel changes. Composition-change robustness is not approximated by
 either stationary-composition path.
 
+The explicit `composition="robust"` first slice instead targets
+`E[Y_1(1)-Y_1(0) | D=1,T=1]` for one treated cohort in a two-period repeated sample. It
+requires measured baseline covariates, conditional parallel trends, no anticipation, and
+strict support for all four `(D,T)` cells given those covariates. One cross-fitted
+four-class generalized propensity and the `m_00`, `m_01`, and `m_10` outcome regressions
+form the Sant'Anna-Xu efficient score. It permits the measured `(D,X)` distribution to
+change by period but does not repair unmeasured composition changes. Staggered robust
+effects and the composition diagnostic are not yet implemented.
+
 The opt-in repeated-section multiplier path leaves those point estimates and analytical
 standard errors unchanged. It draws Rademacher multipliers once per observation under
 HC1, or once per declared indivisible PSU after summing observation influences under CR1,

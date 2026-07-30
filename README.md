@@ -424,8 +424,11 @@ compares four independent cohort-period cell means. With covariates it uses the 
 efficient doubly robust repeated-cross-section score with one propensity and four group-
 period outcome regressions per comparison. Both paths hold the eligible comparison rule
 fixed at target and baseline and permit unequal period and cell sizes. The current surface
-requires `composition="stationary"`, no sampling weights, and either HC1 observation
-inference or one-way CR1 inference at a declared PSU.
+also offers a narrow `composition="robust"` path for exactly two periods and one treated
+cohort. That path cross-fits a four-cell generalized propensity and three outcome
+regressions and targets treated observations in the target-period population. Sampling
+weights remain unavailable. HC1 observation or one-way CR1 PSU inference applies to both
+composition contracts.
 
 ```python
 from causekit import RepeatedCrossSectionDiD
@@ -481,6 +484,33 @@ print(adjusted.pretrend.placebo_effects)  # the aligned conditional score
 print(adjusted.nuisance_diagnostics)      # task-by-fold audit; no refitting
 ```
 
+Pairwise composition-change robustness is an explicit alternative estimand and score:
+
+```python
+robust_composition = RepeatedCrossSectionDiD(composition="robust").fit(
+    two_period_samples,
+    outcome="outcome",
+    time="period",
+    treatment_time="first_treated",
+    covariates=["baseline_risk", "age"],
+    cross_fitter=CrossFitter(
+        propensity_factory=multiclass_probability_factory,
+        outcome_factory=outcome_factory,
+        n_splits=5,
+        random_state=20260730,
+    ),
+)
+
+print(robust_composition.target_population)    # treated_target_period
+print(robust_composition.composition_weights)  # normalized w_00, w_01, w_10, w_11
+```
+
+The generalized-propensity result must expose all four `(group, period)` class
+probabilities. The first robust slice refuses more than two periods, multiple treated
+cohorts, empty covariates, weak four-cell overlap, survey weights, and any clipping or
+fallback. A runnable provider-neutral example is
+[`examples/composition_robust_repeated_cross_section_did.py`](examples/composition_robust_repeated_cross_section_did.py).
+
 There is intentionally no `entity=` role and no `panel=False` switch. Every result records
 that stationary composition is an identifying assumption rather than a verified
 diagnostic. Adjusted placebos use the same cross-fitted conditional score as the reported
@@ -488,7 +518,7 @@ effects; failure to reject proves neither parallel trends nor stable composition
 overlap failures refuse without clipping or dropping rows. The opt-in simultaneous path
 draws one Rademacher multiplier per observation or declared PSU and reports a studentized
 max-t band over the retained event-time path. Survey weights and composition-change-
-robust scores remain separate gates. See the
+robust staggered aggregation and diagnostics remain separate gates. See the
 [repeated-cross-section contract](docs/DID_REPEATED_CROSS_SECTION_CONTRACT.md).
 
 The covariate publication certificate covers 4,000 estimator fits and 240,000 fold-local
@@ -789,8 +819,9 @@ cross-fitted covariate paths. The next stages are now separately frozen as desig
 contracts for [composition-change robustness](docs/DID_RCS_COMPOSITION_CHANGE_CONTRACT.md)
 and [survey designs](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md). The balanced-panel PT-All
 path separately freezes [direct cohort-ratio nuisances](docs/DID_DIRECT_RATIO_CONTRACT.md).
-They add no placeholder API; the existing robust-composition and raw-weight refusals
-remain in force.
+The composition contract now has an implemented pairwise first slice; its staggered and
+diagnostic gates remain open. The direct-ratio and survey contracts add no placeholder API,
+and raw survey weights still refuse.
 The causal-ML alpha includes native partially linear DML and separately contracted public
 [honest R-learner](docs/R_LEARNER_CONTRACT.md) and
 [honest DR-learner](docs/DR_LEARNER_CONTRACT.md) paths, with immutable

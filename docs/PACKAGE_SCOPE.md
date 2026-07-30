@@ -61,7 +61,10 @@ and four group-period outcome regressions per comparison, implements the locally
 doubly robust repeated-cross-section score, and aligns conditional pre-trend placebos to
 that score. Both paths retain fixed comparison membership, pooled cohort-share
 aggregation, cell-count audits, and HC1 observation or one-way CR1 PSU inference. It has
-no entity role and still refuses sampling weights and composition-change-robust labels.
+no entity role and still refuses sampling weights. A separate
+`composition="robust"` first slice supports exactly one treated cohort and two periods,
+cross-fits a four-cell generalized propensity plus three outcome regressions, and targets
+the treated target-period population. Longer or staggered robust designs still refuse.
 Its opt-in multiplier path draws once per observation or indivisible PSU and supplies
 studentized max-t simultaneous event-study bands without nuisance refitting. Separate
 1,000-replication publication certificates cover the
@@ -209,7 +212,7 @@ and validation gates:
 | Family | Required design questions before promotion |
 | --- | --- |
 | Matching extensions | Publication-scale sensitivity/coverage and available Python/R/Stata evidence pass; generic-score, selected-target, tie-expanded, clustered, survey, and bootstrap inference remain separately prohibited or deferred |
-| DiD promotion | Covariate-adjusted balanced-panel PT-All and repeated-section paths are implemented; direct PT-All cohort ratios, repeated-section composition robustness, and repeated-section survey designs have separate design-only contracts and retain separate gates |
+| DiD promotion | Covariate-adjusted balanced-panel PT-All and stationary repeated-section paths are implemented; composition robustness has a pairwise first slice, while its staggered/diagnostic promotion, direct PT-All cohort ratios, and survey designs retain separate gates |
 | Causal ML promotion | Implement the frozen construction-cross-fitted native orthogonal-stack contract, then harden R-/DR-learners with repeated-split and publication-scale evidence; unit-level intervals, RATE, and policy evaluation retain separate contracts |
 | Regression discontinuity | Sharp/fuzzy design, running-variable support, bandwidth and polynomial choice, manipulation checks, bias correction, and local estimand |
 | Panel IV | Entity/time indexing, fixed effects, within transformations, serial dependence, instrument variation, clustered inference, and compatibility with `systemgmmkit` |
@@ -227,10 +230,10 @@ The conventional/efficient distinction, timing rules, formulas, covariate nuisan
 and inference boundaries are recorded in [Difference-in-differences contract](DID_CONTRACT.md).
 
 The balanced-panel PT-All [direct cohort-ratio](DID_DIRECT_RATIO_CONTRACT.md) nuisance and
-the repeated-section [composition-change](DID_RCS_COMPOSITION_CHANGE_CONTRACT.md) and
-[survey-design](DID_RCS_SURVEY_DESIGN_CONTRACT.md) paths are frozen independently. They
-are not public APIs and cannot be reused or composed until their score-specific gates
-pass.
+the repeated-section [survey-design](DID_RCS_SURVEY_DESIGN_CONTRACT.md) path remain
+design-only. The independent [composition-change](DID_RCS_COMPOSITION_CHANGE_CONTRACT.md)
+contract has a public pairwise score but retains separate staggered and diagnostic gates.
+None can be reused or composed until its score-specific gates pass.
 
 ## Out of current scope
 

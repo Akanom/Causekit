@@ -8,9 +8,10 @@ opt-in cross-fitted covariate-adjusted slice are implemented as
 `RepeatedCrossSectionDiD`. Each was added only after its hand identities and refusal tests
 had been written and observed failing. The covariate path implements the locally efficient
 doubly robust repeated-cross-section score of Sant'Anna and Zhao (2020), not the balanced-
-panel PT-All machinery. Observation/PSU simultaneous bands are promoted.
-Composition-change robustness and survey designs remain separate design-only promotion
-gates rather than implicit features.
+panel PT-All machinery. Observation/PSU simultaneous bands are promoted. A narrow
+two-group, two-period composition-change-robust covariate score is implemented under an
+explicit opt-in; its staggered extension and diagnostic remain separate promotion gates.
+Survey designs remain design-only.
 
 Repeated cross sections are not an option on the balanced-panel classes. The observations,
 influence functions, nuisance tasks, and composition assumptions differ materially from a
@@ -68,10 +69,12 @@ test or by flexible nuisance fitting.
 `composition="stationary"` declares that the joint distribution of the relevant baseline
 characteristics and treatment cohort is stable across the repeated samples. This is an
 identifying restriction, not a balance diagnostic. CauseKit will record it in every result
-and refuse to relabel it as verified. A later `composition="robust"` path may implement the
-Sant'Anna-Xu estimand under compositional changes, but it requires its own score,
-diagnostics, external evidence, and promotion gate; it will not be approximated by adding
-time controls to the stationary-composition estimator.
+and refuse to relabel it as verified. `composition="robust"` now implements only the
+Sant'Anna-Xu two-group, two-period estimand for treated observations in the target-period
+population. It requires covariates, a four-cell generalized propensity, three outcome
+regressions, and its own influence function; it is not approximated by adding time
+controls to the stationary estimator. Staggered effects and a composition diagnostic
+remain unavailable.
 
 ## Data contract
 
@@ -248,13 +251,12 @@ Current promotion status is:
 
 ## Separately contracted next stages
 
-Two repeated-section capabilities now have independent design contracts. Neither changes
-the current public API or its refusals:
+Two repeated-section capabilities have independent contracts:
 
-- [Composition-change robustness](DID_RCS_COMPOSITION_CHANGE_CONTRACT.md) targets the ATT
-  among treated members of the target-period population and requires a four-cell
-  generalized propensity, a different efficient influence function, and a diagnostic
-  that cannot be used for pretest-based estimator selection.
+- [Composition-change robustness](DID_RCS_COMPOSITION_CHANGE_CONTRACT.md) now has its
+  pairwise score, influence, weights, strict refusals, and OutputHub transport. Staggered
+  aggregation, its diagnostic, parity, simulation, and publication evidence remain open;
+  the diagnostic cannot be used for pretest-based estimator selection.
 - [Survey designs](DID_RCS_SURVEY_DESIGN_CONTRACT.md) change the population measure and
   design-based uncertainty. Bare `sampling_weights` remain insufficient; a validated
   design, explicit population target, weighted nuisance protocol, and survey-specific

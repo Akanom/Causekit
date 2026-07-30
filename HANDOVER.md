@@ -248,6 +248,17 @@ future task can resume without reconstructing intent from chat history.
     coordinate, cluster-count, and whole-PSU fold-role audit passes; minimum realized PSU
     cell support is 31. No estimator code or public default changed.
 
+25. `0.7.0a6` pairwise composition-change-robust repeated-section alpha: explicit
+    `composition="robust"` now targets the treated target-period population for exactly
+    one treated cohort and two periods. It cross-fits one ordered four-cell generalized
+    propensity plus `m00`, `m01`, and `m10` on identical immutable row/whole-PSU folds,
+    retains the four normalized cell weights, and reuses HC1/CR1 and multiplier inference.
+    Four failing-first tests now pass the exact hand estimate, EIF, HC1, overlap, scope,
+    leakage, PSU-role, nuisance-schema, and OutputHub contracts. No `m11` nuisance is fit.
+    Staggered aggregation, longer-design conditional pre-trends, the composition
+    diagnostic, external `compdid` parity, real-data sensitivity, publication-scale
+    coverage, and survey combinations remain open.
+
 ## Open promotion gates
 
 - Matching still defaults to `inference="none"`. Known-score reuse-aware inference and a
@@ -268,9 +279,10 @@ future task can resume without reconstructing intent from chat history.
   recorded as non-comparable. The covariate score has independent fixed-OOF base-R parity;
   pinned R/Stata estimator-level cells remain unavailable because their maintained public
   paths do not implement the same score. Observation/PSU multiplier mechanics and the
-  16-cell publication-scale joint-band certificate pass. Compositional-change robustness
-  and survey designs are now frozen in separate design-only contracts; both remain
-  unimplemented and their current refusals stay active.
+  16-cell publication-scale joint-band certificate pass. The narrow pairwise composition-
+  robust score passes its hand/refusal contracts, but its staggered, diagnostic, external-
+  parity, real-data, and publication-scale gates remain open. Survey designs remain a
+  separate design-only contract and continue to refuse.
 - The R-learner alpha is public with honest evaluation, calibration, groups, bands, graph
   data, simulations, base-R/Stata parity, performance, native nonlinear support, and two
   real-data CATE records. The next native nonlinear stage is frozen as a separate
@@ -308,11 +320,12 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Implement only one repeated-section extension at a time from its failing-first
-   [composition-change](docs/DID_RCS_COMPOSITION_CHANGE_CONTRACT.md) or
-   [survey-design](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md) contract. The recommended first
-   implementation is the pairwise composition-robust score because it addresses an
-   identifying restriction. The balanced-panel
+1. Promote the implemented pairwise [composition-change](docs/DID_RCS_COMPOSITION_CHANGE_CONTRACT.md)
+   score through class/order and permutation refusals, composition-shift recovery,
+   official `compdid` parity, real-data sensitivity, performance, and preregistered
+   coverage before adding its diagnostic or staggered wrapper. Keep the separate
+   [survey-design](docs/DID_RCS_SURVEY_DESIGN_CONTRACT.md) contract design-only until that
+   base evidence is complete. The balanced-panel
    [direct-ratio](docs/DID_DIRECT_RATIO_CONTRACT.md) nuisance is a separate PT-All option;
    do not combine or reuse these paths before their base gates pass.
 2. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
