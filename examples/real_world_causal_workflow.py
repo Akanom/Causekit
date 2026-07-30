@@ -1,9 +1,9 @@
 """Run CauseKit's model families on four pinned, real datasets.
 
 The workflow covers real-data IV, randomized, observational, matching, native causal ML,
-conventional DiD, and efficient-DiD paths. Network access is opt-in, HTTPS-only, and
-followed by an exact SHA-256 check. Source files are cached outside the repository and are
-not redistributed by CauseKit.
+conventional panel DiD, efficient panel DiD, and repeated-cross-section DiD paths.
+Network access is opt-in, HTTPS-only, and followed by an exact SHA-256 check. Source
+files are cached outside the repository and are not redistributed by CauseKit.
 
 Install the validation extra before running because the nuisance examples use
 ``statsmodels``::
@@ -32,6 +32,7 @@ from causekit import (
     NearestNeighborMatch,
     PartiallyLinearDML,
     RandomizedATE,
+    RepeatedCrossSectionDiD,
     RLearner,
     did_hausman_test,
 )
@@ -247,6 +248,23 @@ def _did_workflow(data: pd.DataFrame) -> None:
     }
     conventional = DifferenceInDifferences().fit(panel, **fit_arguments)
     efficient = EfficientDiD(pre_periods="all").fit(panel, **fit_arguments)
+    repeated_sample = data[["hospital", "month", "satis", "procedure"]].copy()
+    first_treated = (
+        repeated_sample.loc[repeated_sample["procedure"].eq(1)]
+        .groupby("hospital", sort=False)["month"]
+        .min()
+    )
+    repeated_sample["treatment_time"] = (
+        repeated_sample["hospital"].map(first_treated).fillna(np.inf)
+    )
+    repeated_sample = repeated_sample.rename(columns={"satis": "outcome"}).reset_index(drop=True)
+    repeated = RepeatedCrossSectionDiD(covariance="clustered").fit(
+        repeated_sample,
+        outcome="outcome",
+        time="month",
+        treatment_time="treatment_time",
+        cluster="hospital",
+    )
     try:
         hausman = did_hausman_test(conventional, efficient)
         hausman_message = f"PT-All versus PT-Post Hausman p-value: {hausman.pvalue}"
@@ -254,10 +272,14 @@ def _did_workflow(data: pd.DataFrame) -> None:
         hausman_message = f"PT-All versus PT-Post Hausman unavailable: {error}"
     results = pd.DataFrame(
         {
-            "estimate": [conventional.estimate, efficient.estimate],
-            "std_err": [conventional.standard_error, efficient.standard_error],
+            "estimate": [conventional.estimate, efficient.estimate, repeated.estimate],
+            "std_err": [
+                conventional.standard_error,
+                efficient.standard_error,
+                repeated.standard_error,
+            ],
         },
-        index=["conventional", "efficient_pt_all"],
+        index=["panel_conventional", "panel_efficient_pt_all", "repeated_cross_section"],
     )
     print("\nDifference-in-differences — hospital procedure adoption")
     print(results.to_string())
@@ -269,6 +291,10 @@ def _did_workflow(data: pd.DataFrame) -> None:
     print("The efficient estimate is opt-in: it requires the stronger PT-All restriction;")
     print("it does not replace the conventional post-treatment parallel-trends analysis.")
     print("Neither failure to reject is proof of parallel trends or a model-selection rule.")
+    print("The repeated-cross-section row treats patient-satisfaction records as separate")
+    print("period samples and hospitals as PSUs; it declares stationary composition.")
+    print("The source labels these hospital records artificial, so this is a public-data")
+    print("execution smoke rather than substantive empirical evidence.")
 
 
 def main() -> None:

@@ -182,6 +182,19 @@ future task can resume without reconstructing intent from chat history.
     higher honest R-loss than linear ridge; neither stage beat the construction-fitted
     constant, so no nonlinear performance gain is claimed.
 
+20. `0.7.0a6` repeated-cross-section DiD first slice: public
+    `RepeatedCrossSectionDiD` is separate from both balanced-panel classes and implements
+    conventional no-covariate cohort-time effects under declared stationary composition.
+    Four independent group-period means, fixed comparison membership, unequal cell sizes,
+    pooled estimated-share aggregation, full observation influences, HC1/CR1 inference,
+    independent-cell placebos, cell audits, and OutputHub are integrated. Hand/refusal
+    tests were observed failing before implementation; staggered, permutation,
+    anticipation, covariance, aggregation, base-R 4.5.1 hand parity, small coverage,
+    public-data, and 100,000-row smokes pass. The manual Stata hand script is written but
+    not yet reviewed. Estimator-level `did::att_gt(panel = FALSE)`/`csdid` parity and
+    publication-scale coverage remain open, as do covariates, compositional-change
+    robustness, survey weights, and simultaneous bands.
+
 ## Open promotion gates
 
 - Matching still defaults to `inference="none"`. Known-score reuse-aware inference and a
@@ -194,11 +207,12 @@ future task can resume without reconstructing intent from chat history.
 - Efficient DiD owns no nuisance model classes. The implemented covariate path must keep
   consuming public cross-fitting factories; direct density-ratio regression remains a
   possible future stability enhancement over ratios of multiclass probabilities.
-- Repeated-cross-section DiD implementation, publication-scale coverage, and a larger
-  covariate benchmark remain open. The covariate-adjusted path still needs an aligned
-  conditional pre-trend diagnostic. Covariate-efficient external parity was
-  audited: the pinned public R implementation has no covariate path and reviewed Stata
-  estimators target different moments, so those cells remain explicitly unavailable.
+- Repeated-cross-section DiD's no-covariate stationary-composition implementation is
+  public. Publication-scale coverage, estimator-level R/Stata parity, observation/PSU
+  multiplier bands, compositional-change robustness, and the covariate-adjusted path with
+  an aligned conditional pre-trend diagnostic remain open. Covariate-efficient external
+  parity was audited: the pinned public R implementation has no covariate path and reviewed
+  Stata estimators target different moments, so those cells remain explicitly unavailable.
 - The R-learner alpha is public with honest evaluation, calibration, groups, bands, graph
   data, simulations, base-R/Stata parity, performance, native nonlinear support, and two
   real-data CATE records. The next native nonlinear stage is frozen as a separate
@@ -236,8 +250,8 @@ future task can resume without reconstructing intent from chat history.
 
 ## Next development order
 
-1. Implement repeated-cross-section DiD from its frozen contract, then return to
-   publication-scale DiD coverage, direct-ratio nuisance support if justified, the
+1. Return to publication-scale panel/repeated-cross-section DiD coverage, estimator-level
+   repeated-cross-section R/Stata parity, direct-ratio nuisance support if justified, the
    conditional covariate pre-trend score, and broader reference evidence.
 2. Regression discontinuity: sharp/fuzzy design, bandwidth, polynomial order,
    manipulation checks, bias correction, and local estimand.

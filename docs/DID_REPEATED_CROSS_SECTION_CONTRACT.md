@@ -3,14 +3,15 @@
 ## Status
 
 This document freezes the identification, data, API, inference, and validation decisions
-for the repeated-cross-section DiD milestone. It is a design contract, not an implemented
-estimator. CauseKit intentionally exports no `RepeatedCrossSectionDiD` placeholder until
-the hand identities, refusal tests, reference comparisons, coverage, and performance gates
-below exist in the real execution path.
+for repeated-cross-section DiD. The no-covariate stationary-composition first slice is now
+implemented as `RepeatedCrossSectionDiD`; it was exported only after the hand identities
+and refusal tests had been written and observed failing. Publication-scale coverage,
+estimator-level external parity, covariate adjustment, composition-change robustness, and
+simultaneous bands remain promotion gates rather than implicit features.
 
 Repeated cross sections are not an option on the balanced-panel classes. The observations,
 influence functions, nuisance tasks, and composition assumptions differ materially from a
-panel. A separate public class is therefore the planned surface.
+panel. A separate public class is therefore the implemented surface.
 
 ## Chosen first slice
 
@@ -19,7 +20,7 @@ sampling and a stationary-composition restriction. It will retain both never-tre
 valid not-yet-treated comparisons and the existing anticipation semantics. It will not
 claim the short-panel Chen-Sant'Anna-Xie PT-All efficiency bound.
 
-The planned constructor is:
+The implemented constructor is:
 
 ```python
 RepeatedCrossSectionDiD(
@@ -31,10 +32,10 @@ RepeatedCrossSectionDiD(
 )
 ```
 
-The planned `fit` roles are `outcome`, `time`, and `treatment_time`, with optional
-`cluster` and later optional baseline `covariates` plus a public `CrossFitter`. There is no
-`entity` role. Supplying an entity identifier will not silently turn repeated observations
-into a panel or change the sampling unit.
+The implemented `fit` roles are `outcome`, `time`, and `treatment_time`, with optional
+`cluster`. `covariates` and `sampling_weights` are accepted only to return explicit
+first-slice refusals. There is no `entity` role. Supplying an entity identifier cannot
+silently turn repeated observations into a panel or change the sampling unit.
 
 ## Estimand and identification
 
@@ -127,7 +128,7 @@ covariance machinery are not valid substitutes.
 
 ## Refusals
 
-The planned estimator will refuse unsupported composition labels, panel/entity arguments,
+The estimator refuses unsupported composition labels, panel/entity arguments,
 finite adoption times outside observed periods, missing or non-finite roles, absent clean
 baselines, empty or undersized group-period cells, invalid anticipation, unsupported
 sampling weights or survey designs, malformed clusters, covariates without `CrossFitter`,
@@ -139,23 +140,28 @@ ridge, pseudoinverse, or generic bootstrap will be introduced merely to produce 
 
 ## Validation and promotion gates
 
-Implementation starts with tests that fail before estimator code exists:
+The validation sequence started with tests that failed before estimator code existed.
+Current first-slice status is:
 
-1. a hand-computed two-period 2-by-2 ATT and observation-influence identity;
-2. staggered never-treated and not-yet-treated group-time identities;
-3. unequal period-size and row-permutation invariance;
-4. anticipation and uncontaminated placebo identities;
-5. HC1 and cluster-summed CR1 covariance reconstruction;
-6. stationary-composition, cell-support, entity-role, sampling-weight, and nuisance-leakage
-   refusals;
-7. event/calendar/ESavg share-influence identities;
-8. estimand-aligned comparison with pinned R `did::att_gt(panel = FALSE)` and, where its
-   options target the same moments, reviewed Stata `csdid`; unavailable cells remain
-   explicit;
-9. favorable and stressed-overlap Monte Carlo bias, coverage, and SE-calibration gates;
-10. one hash-pinned public real-data workflow plus a fixed-time, vectorized large-`n`
-    performance smoke; and
-11. documentation, OutputHub, API-surface, build, lint, type, and security checks.
+1. The hand-computed two-period 2-by-2 ATT, full observation influence, and HC1 identity
+   pass in Python and an independent base-R 4.5.1 reconstruction. A manual Stata 17
+   reconstruction is maintained but is not yet reviewed as passed.
+2. Staggered never-treated/not-yet-treated group-time identities, unequal period-size and
+   row-permutation invariance, anticipation/placebo identities, HC1/CR1 reconstruction,
+   strict refusals, and event/calendar/ESavg share-influence identities pass.
+3. A small deterministic 2-by-2 bias/coverage smoke passes. The preregistered favorable
+   and stressed-overlap publication-scale coverage and SE-calibration certificate remains
+   open.
+4. The hash-pinned public `hospdd` workflow exercises patient-level repeated samples with
+   hospital PSUs. Its Stata source label says the data are artificial, so this is an
+   execution smoke rather than substantive empirical evidence.
+5. The 100,000-row, six-period benchmark completes through vectorized row arithmetic
+   without an observation-distance or entity-period matrix. Exact runtime and memory are
+   environment-specific and are reproduced by `benchmarks/benchmark_did_rcs.py`.
+6. OutputHub, namespace, documentation, package build, lint, type, and security checks are
+   release gates for each candidate. Estimator-level parity with pinned R
+   `did::att_gt(panel = FALSE)` and, where moments align, reviewed Stata `csdid` remains
+   open; unavailable cells must stay explicit.
 
 ## Alternatives considered
 

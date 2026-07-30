@@ -288,10 +288,16 @@ event-study vectors using the influence function of their difference. Rejection 
 against the additional PT-All restrictions; non-rejection does not prove them or justify
 mechanical estimator selection.
 
-Neither panel class has a repeated-cross-section interpretation. That design requires
-observation-level influence functions and an explicit stationarity or composition-change
-contract; the frozen implementation plan is documented separately and no estimator
-placeholder is exported.
+Neither panel class has a repeated-cross-section interpretation. The separate
+`RepeatedCrossSectionDiD` first slice targets the same cohort-time ATT logic using four
+independently sampled means: treated target minus treated baseline, less fixed-comparison
+target minus fixed-comparison baseline. It requires stationary composition of the
+relevant cohort populations across samples, enough observations in every used cell, and
+the same consistency, no-interference, overlap, no-anticipation, and repeated-cross-
+section parallel-trends conditions. Stationarity is recorded as an assumption, not
+inferred from cell counts or a pre-trend test. Observation-level HC1 or declared-PSU CR1
+scores replace entity-level panel changes. Composition-change-robust and covariate-
+adjusted scores are not approximated by the no-covariate estimator.
 
 ## Honest heterogeneous effects
 

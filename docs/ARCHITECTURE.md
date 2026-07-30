@@ -1,6 +1,6 @@
 # Architecture
 
-`causekit` is organized around small, auditable estimation paths. The `0.7.0a5`
+`causekit` is organized around small, auditable estimation paths. The `0.7.0a6`
 architecture keeps causal assumptions visible, separates numerical estimation from
 inference and diagnostics, and returns frozen labelled result containers suitable for
 reporting. The pandas objects stored inside a result should be treated as read-only; helper
@@ -234,10 +234,12 @@ formed from the complete influence matrix, with cluster vector sums performed on
 PT-All minus PT-Post influence vector; a result fingerprint prevents comparisons across
 different outcomes, samples, timing, or cluster designs.
 
-Repeated cross sections will not enter this panel bundle. Their separate contract uses
-observation- or PSU-level scores, unequal cell sizes, and an explicit composition
-restriction. No panel entity is synthesized and no current panel helper is exposed as a
-repeated-cross-section estimator.
+Repeated cross sections do not enter this panel bundle. `did_rcs.py` owns their separate
+four-cell means, observation-level influence records, pooled cohort-share aggregation,
+cell audit table, and observation/PSU inference. It accepts unequal period and cell sizes,
+requires an explicit stationary-composition declaration, and never synthesizes a panel
+entity. Only the generic score-covariance and joint-Wald kernels are shared with `did.py`;
+the panel validator, within-entity changes, and panel pre-trend helper are not reused.
 
 No nuisance learner lives in `did.py`. The covariate-adjusted efficient path expresses
 cohort classification, group-specific outcome changes, and conditional residual products

@@ -14,6 +14,7 @@ from causekit import (
     NearestNeighborMatch,
     PartiallyLinearDML,
     RandomizedATE,
+    RepeatedCrossSectionDiD,
     RLearner,
     add_to_outputhub,
     to_outputhub_model,
@@ -296,6 +297,39 @@ def test_did_adds_pretrend_table_when_clean_placebos_exist() -> None:
     assert result.pretrend.available
     assert hub.tables[0].name == "Difference-in-Differences pre-trend placebos"
     assert hub.tables[0].metadata["joint_test_available"] is True
+
+
+def test_repeated_cross_section_did_exports_cells_and_effect_tables() -> None:
+    data = pd.DataFrame(
+        {
+            "outcome": [1.0, 3.0, 6.0, 8.0, 2.0, 4.0, 3.0, 5.0],
+            "time": [1.0, 1.0, 2.0, 2.0, 1.0, 1.0, 2.0, 2.0],
+            "treatment_time": [2.0, 2.0, 2.0, 2.0, np.inf, np.inf, np.inf, np.inf],
+        }
+    )
+    result = RepeatedCrossSectionDiD().fit(
+        data,
+        outcome="outcome",
+        time="time",
+        treatment_time="treatment_time",
+    )
+
+    model = to_outputhub_model(result)
+
+    assert model.name == "Repeated-cross-section DiD"
+    assert model.metadata["estimator"] == "repeated_cross_section_group_time"
+    assert model.metadata["sampling_unit"] == "observation"
+    assert model.metadata["composition"] == "stationary"
+    assert model.metadata["composition_verified"] is False
+    assert model.statistics["Observations"] == 8
+    hub = outputhub.OutputHub("Repeated samples")
+    add_to_outputhub(hub, result)
+    assert [table.name for table in hub.tables] == [
+        "Repeated-cross-section DiD cell counts",
+        "Repeated-cross-section DiD group-time effects",
+        "Repeated-cross-section DiD event study",
+        "Repeated-cross-section DiD calendar-time effects",
+    ]
 
 
 def test_matching_converts_and_adds_design_tables_without_reestimating() -> None:

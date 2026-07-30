@@ -1,13 +1,13 @@
 # CauseKit
 
 CauseKit (installed and imported as `causekit`) is an identification-aware Python package for causal inference and
-instrumental-variable workflows. The `0.7.0a5` surface provides linear two-stage least
+instrumental-variable workflows. The `0.7.0a6` surface provides linear two-stage least
 squares, randomized-experiment effects, reusable nuisance cross-fitting, IPW/AIPW ATE,
 ATT, and ATC, scalar propensity-score matching with separate fixed- and estimated-score
-analytical inference paths, conventional staggered DiD, and cross-fitted covariate-adjusted
-Chen-Sant'Anna-Xie efficient DiD for short panels, and CauseKit-native partially linear
-double machine learning plus separately contracted honest heterogeneous-effect R- and
-DR-learning.
+analytical inference paths, conventional staggered panel and repeated-cross-section DiD,
+cross-fitted covariate-adjusted Chen-Sant'Anna-Xie efficient DiD for short panels,
+CauseKit-native partially linear double machine learning, and separately contracted honest
+heterogeneous-effect R- and DR-learning.
 
 This is alpha research software. A successful fit is not evidence that an instrument is
 valid, and an IV coefficient is not automatically an average treatment effect. State the
@@ -412,9 +412,46 @@ conditional covariances through `CrossFitter`, and solves the observation-specif
 covariance systems without hidden regularization. Probabilities below
 `nuisance_probability_floor` and singular systems refuse rather than clip or repair.
 The efficiency claim is conditional on PT-All and the paper's nuisance regularity
-conditions. Repeated cross-sections and sampling weights remain unsupported. See the
+conditions. These two panel classes do not accept repeated cross sections or sampling
+weights. See the
 [DiD contract](docs/DID_CONTRACT.md) for formulas, assumptions, target populations, and
 promotion gates.
+
+### Repeated-cross-section difference-in-differences
+
+`RepeatedCrossSectionDiD` is a separate observation-level estimator. It compares four
+independent cohort-period cell means, holds the eligible comparison-cohort rule fixed at
+the target and baseline periods, and permits unequal period and cell sizes. The first
+slice requires `composition="stationary"`, no covariates or sampling weights, and either
+HC1 observation inference or one-way CR1 inference at a declared PSU.
+
+```python
+from causekit import RepeatedCrossSectionDiD
+
+repeated = RepeatedCrossSectionDiD(
+    control_group="not_yet_treated",
+    composition="stationary",
+    covariance="clustered",
+).fit(
+    repeated_samples,
+    outcome="outcome",
+    time="period",
+    treatment_time="first_treated",
+    cluster="sampling_psu",
+)
+
+print(repeated.group_time)
+print(repeated.cell_counts)
+print(repeated.event_study)
+print(repeated.pretrend.placebo_effects)
+```
+
+There is intentionally no `entity=` role and no `panel=False` switch. Every result records
+that stationary composition is an identifying assumption rather than a verified
+diagnostic. Pre-trend placebos use independent adjacent cells; failure to reject proves
+neither parallel trends nor stable composition. Simultaneous bands, survey weights,
+composition-change-robust scores, and covariate adjustment remain separate gates. See the
+[repeated-cross-section contract](docs/DID_REPEATED_CROSS_SECTION_CONTRACT.md).
 
 There is no formula API yet. Prepare numeric arrays, `Series`, or `DataFrame` objects
 explicitly, including categorical encoding and transformations. `add_constant=True` is
@@ -457,7 +494,7 @@ attrition correction, or multi-arm experiments.
 From PyPI after publication:
 
 ```bash
-python -m pip install causekit==0.7.0a5
+python -m pip install causekit==0.7.0a6
 ```
 
 From a source checkout:
@@ -688,8 +725,11 @@ publication-scale ATT/ATC/ATE coverage and real-data sensitivity certificate pas
 without widening either analytical boundary. DiD
 promotion includes cross-fitted covariate nuisances, simultaneous event-study bands,
 uncontaminated pre-trend placebos, and a PT-All/PT-Post Hausman diagnostic. The separate
-[repeated-cross-section design contract](docs/DID_REPEATED_CROSS_SECTION_CONTRACT.md) is
-frozen; its estimator, coverage, and external parity gates remain open.
+[repeated-cross-section contract](docs/DID_REPEATED_CROSS_SECTION_CONTRACT.md) now has an
+implemented no-covariate stationary-composition first slice with observation/PSU scores,
+cell audits, pre-trend placebos, OutputHub, base-R hand parity, a public-data workflow, and
+a 100,000-row smoke. Publication-scale coverage and estimator-level R/Stata parity remain
+open promotion gates.
 The causal-ML alpha includes native partially linear DML and separately contracted public
 [honest R-learner](docs/R_LEARNER_CONTRACT.md) and
 [honest DR-learner](docs/DR_LEARNER_CONTRACT.md) paths, with immutable

@@ -10,7 +10,7 @@ preparation use the same registry in `causekit.datasets`.
 | `hsng` | 1980 U.S. Census state housing IV example | `https://www.stata-press.com/data/r19/hsng.dta` | `d19cd25299af57569d93d8f16b4f72d5ffc7f897c9247d8a8e5fddddef43ad11` |
 | `nsw_mixtape` | National Supported Work randomized job-training experiment and honest weighted-CATE comparison | `https://raw.githubusercontent.com/scunning1975/mixtape/master/nsw_mixtape.dta` | `fc424cfc9d7861f4b95a6612f27c7e842671fea5a8612edcfe0273ee62e6f0a4` |
 | `cattaneo2` | Maternal smoking, birthweight, supplied-nuisance effects, matching, native partially linear DML, and honest R-learner example | `https://www.stata-press.com/data/r19/cattaneo2.dta` | `631e926eb9981828ba2e542b32c16ae08f336b9efa10621651a8a185405e0577` |
-| `hospdd` | Hospital procedure-adoption conventional and efficient DiD | `https://www.stata-press.com/data/r19/hospdd.dta` | `e3ae6451e89cb915c546ab772410046726f280ad7d117611376beb4f46a521bb` |
+| `hospdd` | Hospital procedure-adoption panel and repeated-cross-section DiD execution smoke | `https://www.stata-press.com/data/r19/hospdd.dta` | `e3ae6451e89cb915c546ab772410046726f280ad7d117611376beb4f46a521bb` |
 
 Stata Press lists `hsng` for `ivregress`, `cattaneo2` for the `teffects` family, and
 `hospdd` for `didregress`. The NSW file is the 445-observation experimental sample used in
@@ -34,9 +34,12 @@ The workflow fits:
 - five-fold supplied-nuisance IPW/AIPW, point matching, CauseKit-native partially linear
   DML, and the honest R-learner on `cattaneo2`; and
 - conventional and PT-All efficient DiD on an equal-hospital-weight panel constructed
-  from `hospdd`.
+  from `hospdd`, plus stationary-composition repeated-cross-section DiD on the underlying
+  patient-satisfaction rows with hospitals declared as PSUs.
 
-It prints explicit interpretation boundaries. In particular, instrument diagnostics do
+The Stata file labels `hospdd` as artificial hospital procedure data. Its repeated-sample
+row is therefore a hash-verified public-data execution smoke, not substantive real-world
+evidence. The workflow prints explicit interpretation boundaries. In particular, instrument diagnostics do
 not establish exclusion; the smoking analysis remains observational; cross-fitted
 matching is not given an unsupported analytical standard error; and PT-All efficient DiD
 is displayed beside the conventional estimator rather than replacing it.

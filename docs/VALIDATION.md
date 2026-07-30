@@ -90,6 +90,17 @@ event-study difference influence function and covariance, hashes the complete es
 design, and refuses not-yet-treated, covariate-adjusted, mismatched, reduced-moment, and
 singular comparisons without pseudoinverse rank selection.
 
+Repeated-cross-section DiD has a separate validation path. Tests reconstruct all four
+independent group-period mean scores, require the comparison cohort rule to be identical
+at target and baseline, include pooled estimated-cohort-share terms, and verify staggered
+never/not-yet aggregation, unequal period sizes, row permutation, anticipation, adjacent
+placebos, HC1, and cluster-summed CR1. Missing or undersized cells, entity/panel roles,
+unsupported composition, covariates, sampling weights, simultaneous inference, and
+malformed PSUs refuse. Base R 4.5.1 reproduces the hand estimate, influence vector, and
+HC1 standard error. A small deterministic coverage smoke and 100,000-row benchmark are
+maintained, while publication-scale coverage and estimator-level R/Stata parity remain
+explicitly open.
+
 The covariate path additionally requires exact shared-fold alignment across multiclass
 cohort probabilities, masked outcome-change tasks, and residual-product second-moment
 tasks; a multi-moment fixture must exercise observation-specific conditional covariance

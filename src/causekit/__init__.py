@@ -23,6 +23,11 @@ from .did import (
     EfficientDiD,
     did_hausman_test,
 )
+from .did_rcs import (
+    RepeatedCrossSectionDiD,
+    RepeatedCrossSectionDiDResult,
+    RepeatedCrossSectionPretrendDiagnostic,
+)
 from .integrations import add_to_outputhub, to_outputhub_model
 from .iv import IV2SLS, IV2SLSResult
 from .matching import (
@@ -89,6 +94,9 @@ __all__ = [
     "PartiallyLinearDMLResult",
     "RLearner",
     "RLearnerResult",
+    "RepeatedCrossSectionDiD",
+    "RepeatedCrossSectionDiDResult",
+    "RepeatedCrossSectionPretrendDiagnostic",
     "PropensityResultProtocol",
     "PropensityScoreStatus",
     "WeightedCATEEstimatorProtocol",
@@ -108,4 +116,4 @@ __all__ = [
     "did_hausman_test",
 ]
 
-__version__ = "0.7.0a5"
+__version__ = "0.7.0a6"

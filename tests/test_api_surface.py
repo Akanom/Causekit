@@ -50,6 +50,9 @@ PUBLIC_EXPORTS = {
     "NativeSplineRidgeCATEResult",
     "RLearner",
     "RLearnerResult",
+    "RepeatedCrossSectionDiD",
+    "RepeatedCrossSectionDiDResult",
+    "RepeatedCrossSectionPretrendDiagnostic",
     "confint",
     "fitted_values",
     "predict",
@@ -64,7 +67,6 @@ def test_initial_stable_namespace_exports_iv_and_postestimation_contract() -> No
     assert all(hasattr(causekit, name) for name in PUBLIC_EXPORTS)
     assert "TreatmentEffect" not in causekit.__all__
     assert not hasattr(causekit, "TreatmentEffect")
-    assert not hasattr(causekit, "RepeatedCrossSectionDiD")
     assert not hasattr(causekit, "NativeOrthogonalStackedCATE")
 
 
@@ -95,8 +97,8 @@ def test_distribution_and_import_namespace_are_causekit_only() -> None:
     metadata = (repository_root / "pyproject.toml").read_text(encoding="utf-8")
 
     assert 'name = "causekit"' in metadata
-    assert 'version = "0.7.0a5"' in metadata
-    assert causekit.__version__ == "0.7.0a5"
+    assert 'version = "0.7.0a6"' in metadata
+    assert causekit.__version__ == "0.7.0a6"
     assert (repository_root / "src" / "causekit" / "__init__.py").is_file()
     assert not (repository_root / "src" / "causalkit").exists()
 
@@ -152,6 +154,16 @@ def test_estimator_signatures_keep_identification_inputs_explicit() -> None:
     assert efficient_did.parameters["covariance"].default == "robust"
     assert efficient_did.parameters["inference"].default == "analytic"
     assert efficient_did.parameters["nuisance_probability_floor"].default == 1e-6
+
+    repeated_cross_section_did = inspect.signature(causekit.RepeatedCrossSectionDiD)
+    assert repeated_cross_section_did.parameters["control_group"].default == "never_treated"
+    assert repeated_cross_section_did.parameters["composition"].default == "stationary"
+    assert repeated_cross_section_did.parameters["anticipation"].default == 0
+    assert repeated_cross_section_did.parameters["covariance"].default == "robust"
+    assert repeated_cross_section_did.parameters["inference"].default == "analytic"
+    repeated_cross_section_fit = inspect.signature(causekit.RepeatedCrossSectionDiD.fit)
+    assert "entity" not in repeated_cross_section_fit.parameters
+    assert "panel" not in repeated_cross_section_fit.parameters
 
     partially_linear_dml = inspect.signature(causekit.PartiallyLinearDML)
     assert partially_linear_dml.parameters["outcome_factory"].default is None

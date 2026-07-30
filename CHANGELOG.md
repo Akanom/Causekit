@@ -4,6 +4,42 @@ All notable changes to CauseKit are recorded here. The project follows
 [Semantic Versioning](https://semver.org/) once a public contract is released. Alpha
 versions may refine APIs, but breaking changes must still be documented explicitly.
 
+## [0.7.0a6] - Unreleased
+
+### Added
+
+- Public `RepeatedCrossSectionDiD`, `RepeatedCrossSectionDiDResult`, and
+  `RepeatedCrossSectionPretrendDiagnostic` for no-covariate conventional cohort-time DiD
+  under an explicit stationary-composition restriction. The estimator uses four
+  independent cohort-period means, fixes comparison-cohort membership at target and
+  baseline, and retains never-treated or valid not-yet-treated choices.
+- Full observation-level group/event/calendar/ESavg influence records, pooled estimated-
+  cohort-share terms, HC1 observation inference, one-way CR1 PSU inference, finite-cluster
+  references, cell-count audits, and independent-cell adjacent pre-trend placebos without
+  ridge or pseudoinverse repair.
+- Hand-computed 2-by-2 estimate/influence/HC1 tests observed failing before the public
+  estimator existed, staggered aggregation and anticipation identities, strict refusal
+  tests, base-R 4.5.1 hand parity, a manual Stata 17 hand-parity script, OutputHub tables,
+  a hash-verified public hospital-data execution smoke, and a 100,000-row fixed-period
+  performance harness.
+
+### Changed
+
+- The package version and public documentation now identify `0.7.0a6`. Balanced-panel
+  `DifferenceInDifferences` and `EfficientDiD` remain separate and unchanged; there is no
+  `panel=False` alias or synthesized entity identifier.
+- The repeated-cross-section design contract now records the implemented first-slice
+  evidence and the still-open promotion gates.
+
+### Known limitations
+
+- Stationary composition is declared but not testable from the estimator. Covariate-
+  adjusted doubly robust scores, compositional-change-robust estimation, sampling or
+  survey weights, and simultaneous event-study bands remain unimplemented and refuse.
+- The small deterministic coverage smoke and base-R hand reconstruction are not the
+  publication-scale coverage or estimator-level `did::att_gt(panel = FALSE)`/Stata
+  `csdid` promotion certificate. The Stata hand script requires manual execution.
+
 ## [0.7.0a5] - Unreleased
 
 ### Added

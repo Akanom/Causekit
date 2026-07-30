@@ -5,7 +5,7 @@ identification. Inclusion requires more than a method being common in applied ec
 the package must be able to state the estimand, identifying assumptions, supported data
 structure, inference target, diagnostics, and validation boundary.
 
-## Public `0.7.0a5` alpha surface
+## Public `0.7.0a6` alpha surface
 
 The surface is estimator-specific. Cross-sectional linear instrumental variables retain
 the following contract:
@@ -52,8 +52,15 @@ clustered pointwise inference, optional multiplier-bootstrap simultaneous event-
 bands, uncontaminated pre-trend placebos, and OutputHub tables. The public Hausman
 diagnostic compares aligned no-covariate PT-All and PT-Post event-study paths from the
 difference influence function. Efficient DiD is an opt-in stronger-assumption estimator,
-not a replacement default. Repeated-cross-section DiD has a frozen separate design
-contract but no exported estimator yet.
+not a replacement default.
+
+The separate `RepeatedCrossSectionDiD` surface implements conventional no-covariate
+cohort-time effects under declared stationary composition. It uses four independent
+group-period means, fixed comparison membership at target and baseline, pooled
+cohort-share aggregation, cell-count audits, HC1 observation or one-way CR1 PSU
+inference, and independent-cell pre-trend placebos. It has no entity role and refuses
+covariates, sampling weights, composition-change-robust labels, and simultaneous bands in
+this first slice.
 
 The causal-ML surface adds `PartiallyLinearDML` for the scalar DML2 coefficient in a
 declared constant-effect partially linear model. CauseKit owns its default standardized

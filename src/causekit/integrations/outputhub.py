@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 
 from ..did import DiDResult
+from ..did_rcs import RepeatedCrossSectionDiDResult
 from ..iv import IV2SLSResult
 from ..matching import NearestNeighborMatchResult
 from ..ml import DRLearnerResult, PartiallyLinearDMLResult, RLearnerResult
@@ -37,6 +38,7 @@ def to_outputhub_model(
         | RandomizedATEResult
         | ObservationalATEResult
         | DiDResult
+        | RepeatedCrossSectionDiDResult
         | NearestNeighborMatchResult
         | PartiallyLinearDMLResult
         | DRLearnerResult
@@ -54,6 +56,7 @@ def to_outputhub_model(
             RandomizedATEResult,
             ObservationalATEResult,
             DiDResult,
+            RepeatedCrossSectionDiDResult,
             NearestNeighborMatchResult,
             PartiallyLinearDMLResult,
             DRLearnerResult,
@@ -62,7 +65,8 @@ def to_outputhub_model(
     ):
         raise TypeError(
             "result must be an IV2SLSResult, RandomizedATEResult, "
-            "ObservationalATEResult, DiDResult, NearestNeighborMatchResult, or "
+            "ObservationalATEResult, DiDResult, RepeatedCrossSectionDiDResult, "
+            "NearestNeighborMatchResult, or "
             "PartiallyLinearDMLResult, DRLearnerResult, or RLearnerResult."
         )
     RegressionModel = _regression_model_class()
@@ -114,6 +118,55 @@ def to_outputhub_model(
                 "propensity_model": result.propensity_model_name,
                 "propensity_link": result.propensity_link,
                 "inference_distribution": result.inference_distribution,
+                "causal_interpretation_requires_assumptions": True,
+                "assumptions": list(result.assumptions),
+            },
+            source="causekit",
+        )
+    if isinstance(result, RepeatedCrossSectionDiDResult):
+        return RegressionModel(
+            name=name or "Repeated-cross-section DiD",
+            depvar=result.outcome_name,
+            params=result.params.rename("coef"),
+            std_errors=result.standard_errors.rename("se"),
+            pvalues=result.pvalues.rename("pvalue"),
+            statistics={
+                "Observations": result.nobs,
+                "Periods": result.n_periods,
+                "Treated cohorts": len(result.cohort_sizes),
+                "Converged": result.converged,
+            },
+            diagnostics={
+                "Group-time effects": len(result.group_time),
+                "Event-time effects": len(result.event_study),
+                "Pre-trend restrictions": result.pretrend.n_restrictions,
+                **(
+                    {
+                        "Pre-trend joint statistic": result.pretrend.statistic,
+                        "Pre-trend joint p-value": result.pretrend.pvalue,
+                    }
+                    if result.pretrend.available
+                    else {}
+                ),
+            },
+            metadata={
+                "estimator": result.method,
+                "backend": result.backend,
+                "sampling_unit": result.sampling_unit,
+                "parallel_trends": result.parallel_trends,
+                "control_group": result.control_group,
+                "composition": result.composition,
+                "composition_verified": False,
+                "anticipation": result.anticipation,
+                "pre_periods": result.pre_periods,
+                "covariance_type": result.covariance_type,
+                "inference_distribution": result.inference_distribution,
+                "inference_method": result.inference_method,
+                "n_clusters": result.n_clusters,
+                "covariates": list(result.covariates),
+                "nuisance_cross_fitted": result.cross_fitted,
+                "pretrend_available": result.pretrend.available,
+                "pretrend_unavailable_reason": result.pretrend.reason,
                 "causal_interpretation_requires_assumptions": True,
                 "assumptions": list(result.assumptions),
             },
@@ -441,6 +494,7 @@ def add_to_outputhub(
         | RandomizedATEResult
         | ObservationalATEResult
         | DiDResult
+        | RepeatedCrossSectionDiDResult
         | NearestNeighborMatchResult
         | PartiallyLinearDMLResult
         | DRLearnerResult
@@ -464,6 +518,8 @@ def add_to_outputhub(
         if isinstance(result, DRLearnerResult)
         else "Nearest-neighbor matching"
         if isinstance(result, NearestNeighborMatchResult)
+        else "Repeated-cross-section DiD"
+        if isinstance(result, RepeatedCrossSectionDiDResult)
         else "Efficient DiD"
         if isinstance(result, DiDResult) and result.method.startswith("chen_santanna_xie_efficient")
         else "Difference-in-Differences"
@@ -613,6 +669,47 @@ def add_to_outputhub(
             pd.DataFrame([item.__dict__ for item in result.balance]),
             caption="Unadjusted pre-treatment covariate balance by randomized arm.",
             metadata={"source": "causekit", "estimator": "randomized_ate"},
+        )
+    elif isinstance(result, RepeatedCrossSectionDiDResult) and hasattr(hub, "add_table"):
+        table_metadata = {"source": "causekit", "estimator": result.method}
+        if not result.pretrend.placebo_effects.empty:
+            hub.add_table(
+                f"{model_name} pre-trend placebos",
+                result.pretrend.placebo_effects.reset_index(),
+                caption=(
+                    "Independent-cell adjacent pre-period placebos. Failure to reject "
+                    "does not prove parallel trends or stationary composition."
+                ),
+                metadata={
+                    **table_metadata,
+                    "joint_test_available": result.pretrend.available,
+                    "joint_test_statistic": result.pretrend.statistic,
+                    "joint_test_pvalue": result.pretrend.pvalue,
+                },
+            )
+        hub.add_table(
+            f"{model_name} cell counts",
+            result.cell_counts.reset_index(),
+            caption="Observed cohort-period support used to audit repeated samples.",
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} group-time effects",
+            result.group_time.reset_index(),
+            caption="Four-cell cohort-time effects with pointwise observation/PSU inference.",
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} event study",
+            result.event_study.reset_index(),
+            caption="Pooled-cohort-share-weighted event-time effects with pointwise inference.",
+            metadata=table_metadata,
+        )
+        hub.add_table(
+            f"{model_name} calendar-time effects",
+            result.calendar_time.reset_index(),
+            caption="Pooled-cohort-share-weighted post-adoption calendar-time effects.",
+            metadata=table_metadata,
         )
     elif isinstance(result, DiDResult) and hasattr(hub, "add_table"):
         table_metadata = {"source": "causekit", "estimator": result.method}
