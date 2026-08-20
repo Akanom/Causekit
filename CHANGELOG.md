@@ -4,6 +4,16 @@ All notable changes to CauseKit are recorded here. The project follows
 [Semantic Versioning](https://semver.org/) once a public contract is released. Alpha
 versions may refine APIs, but breaking changes must still be documented explicitly.
 
+## Unreleased
+
+### Fixed
+
+- Kaggle and command-line examples no longer render structurally inapplicable fields as
+  unexplained `NaN` values. Point-only matching labels inference as not requested,
+  observation-level honest calibration omits cluster counts, manual RD reports only its
+  applicable bandwidth audit fields, and outcome-regression nuisance tasks label class
+  counts as not applicable. Estimator and inference contracts are unchanged.
+
 ## [0.7.0a6] - 2026-07-30
 
 ### Added

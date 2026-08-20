@@ -85,6 +85,28 @@ class _StatsmodelsOLSResult:
         return np.asarray(self.fitted.predict(design), dtype=float)
 
 
+def _matching_point_table(result: Any) -> pd.DataFrame:
+    if not np.isfinite(result.estimate):
+        raise RuntimeError("The matching point estimate must be finite.")
+    return pd.DataFrame(
+        {
+            "estimate": [result.estimate],
+            "inference": ["not requested for a cross-fitted propensity score"],
+        },
+        index=["matching_att"],
+    )
+
+
+def _observation_level_calibration_table(result: Any) -> pd.DataFrame:
+    calibration = result.calibration_plot_data()
+    if "n_clusters" in calibration and calibration["n_clusters"].isna().all():
+        calibration = calibration.drop(columns="n_clusters")
+    numeric_calibration = calibration.select_dtypes(include="number").to_numpy(dtype=float)
+    if not np.isfinite(numeric_calibration).all():
+        raise RuntimeError("The reported R-learner calibration statistics must be finite.")
+    return calibration
+
+
 def _iv_workflow(data: pd.DataFrame) -> None:
     region = pd.get_dummies(
         data["region"].astype(int), prefix="region", drop_first=True, dtype=float
@@ -185,7 +207,7 @@ def _observational_workflow(data: pd.DataFrame) -> None:
     )
     print("\nObservational effects — maternal smoking and birthweight")
     print(pd.concat([ipw.summary_frame(), aipw.summary_frame()], keys=["IPW", "AIPW"]))
-    print(matched.summary_frame().rename(index={"att": "matching_att"}).to_string())
+    print(_matching_point_table(matched).to_string())
     print("\nCauseKit-native partially linear DML")
     print(dml.summary_frame().to_string())
     print("\nFold-level native nuisance tuning")
@@ -203,7 +225,7 @@ def _observational_workflow(data: pd.DataFrame) -> None:
         ).to_string()
     )
     print("\nTie-preserving honest calibration groups")
-    print(rlearner.calibration_plot_data().to_string())
+    print(_observation_level_calibration_table(rlearner).to_string())
     print("\nCauseKit-native honest DR-learner differential calibration")
     print(drlearner.summary_frame().to_string())
     print("\nHonest DR-score loss comparison")

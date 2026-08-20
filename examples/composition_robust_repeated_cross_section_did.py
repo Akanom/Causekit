@@ -111,6 +111,16 @@ def repeated_samples(seed: int = 20_260_730) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _displayable_nuisance_diagnostics(diagnostics: pd.DataFrame) -> pd.DataFrame:
+    displayed = diagnostics.copy()
+    displayed["declared_class_count"] = displayed["declared_class_count"].map(
+        lambda value: "not applicable" if pd.isna(value) else str(int(value))
+    )
+    if displayed.isna().any().any():
+        raise RuntimeError("The displayed nuisance diagnostics contain an unexplained gap.")
+    return displayed
+
+
 def main() -> None:
     data = repeated_samples()
     result = RepeatedCrossSectionDiD(composition="robust").fit(
@@ -133,7 +143,7 @@ def main() -> None:
     print("\nNormalized composition weights")
     print(result.composition_weights.describe().to_string())
     print("\nFold/task diagnostics")
-    print(result.nuisance_diagnostics.to_string(index=False))
+    print(_displayable_nuisance_diagnostics(result.nuisance_diagnostics).to_string(index=False))
 
 
 if __name__ == "__main__":

@@ -63,6 +63,13 @@ def test_notebook_uses_verified_real_data_and_honest_ml_contracts() -> None:
     assert "construction_index.intersection(rlearner.evaluation_index).empty" in source
     assert "construction_nobs + rlearner.evaluation_nobs" in source
     assert 'NearestNeighborMatch(estimand="att", inference="none")' in source
+    assert "matching_point = pd.DataFrame" in source
+    assert "assert np.isfinite(matching.estimate)" in source
+    assert "display(matching.summary_frame" not in source
+    assert 'drop(columns="n_clusters")' in source
+    assert "bandwidth_audit = pd.Series" in source
+    assert "print(rd.bandwidth_selection)" not in source
+    assert "not applicable to manually supplied bandwidths" in source
     assert "diagnostics—not proofs of identification" in source
 
 
